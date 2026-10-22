@@ -49,8 +49,14 @@ describe('graphRevset', () => {
     expect(graphRevset('recent', 'all')).not.toContain('committer_date')
   })
 
-  test('restricts to own changes for the mine filter', () => {
-    expect(graphRevset('mine', '30d')).toContain('mine()')
+  test('supports a 14 day depth', () => {
+    expect(graphRevset('recent', '14d')).toContain('committer_date(after:"14 days ago")')
+  })
+
+  test('shows all own open changes and own history within the depth for the mine filter', () => {
+    expect(graphRevset('mine', '30d')).toContain(
+      'mine() & (mutable() | committer_date(after:"30 days ago"))',
+    )
   })
 
   test('uses the reachable stack of @ for the stack filter', () => {

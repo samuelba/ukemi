@@ -21,9 +21,12 @@ Ukemi is a visual interface for [Jujutsu (jj)](https://jj-vcs.github.io/jj/) in 
 
 ## Settings
 
+Select the gear in the title bar of the Ukemi view to open the Ukemi settings.
+
 | Setting | Purpose |
 | --- | --- |
 | `ukemi.jjPath` | Path to jj. Empty means search `PATH` and common folders. |
+| `ukemi.defaultFilter`, `ukemi.historyDepth` | Filter and time range that the graph shows first. |
 | `ukemi.repoScanDepth` | Folder levels to search for repositories. |
 | `ukemi.showSourceControl` | When to show the working copy in Source Control. |
 | `ukemi.gitlab.hosts`, `ukemi.github.hosts` | Self-hosted GitLab and GitHub Enterprise hosts. |

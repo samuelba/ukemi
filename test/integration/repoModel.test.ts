@@ -108,6 +108,40 @@ describe('RepoModel', () => {
     expect(model.graph?.hasUnpushed).toBe(false)
   })
 
+  test('knows when redo is possible', async () => {
+    jj(root, 'describe', '-m', 'one')
+    await model.refresh()
+    expect(model.graph?.canRedo).toBe(false)
+
+    jj(root, 'undo')
+    await model.refresh()
+    expect(model.graph?.canRedo).toBe(true)
+
+    jj(root, 'redo')
+    await model.refresh()
+    expect(model.graph?.canRedo).toBe(false)
+  })
+
+  test('finds the bookmarks of the current stack', async () => {
+    writeFile(root, 'a.txt', 'a\n')
+    jj(root, 'describe', '-m', 'feature')
+    jj(root, 'bookmark', 'set', 'feature', '-r', '@')
+    jj(root, 'new')
+
+    await model.refresh()
+
+    expect(model.graph?.currentBookmarks).toEqual(['feature'])
+  })
+
+  test('uses the default filter from the options', async () => {
+    const stackModel = new RepoModel(makeRepo(root), NULL_LOGGER, { filter: 'stack', depth: '14d' })
+
+    await stackModel.refresh()
+
+    expect(stackModel.graph?.filter).toBe('stack')
+    expect(stackModel.graph?.depth).toBe('14d')
+  })
+
   test('caches file lists by commit id', async () => {
     writeFile(root, 'a.txt', 'a\n')
     await model.refresh()

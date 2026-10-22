@@ -115,7 +115,12 @@ export function App() {
 
   return (
     <div className="app">
-      <Toolbar repos={state.repos} activeRepoId={state.activeRepoId} graph={graph} />
+      <Toolbar
+        repos={state.repos}
+        activeRepoId={state.activeRepoId}
+        graph={graph}
+        isBusy={state.busy !== null}
+      />
       {state.busy && (
         <div className="busy" role="status">
           <div className="busy-bar" />

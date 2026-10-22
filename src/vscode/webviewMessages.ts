@@ -38,10 +38,14 @@ export function createMessageHandler(env: CommandEnv) {
     const graph = model.graph
     switch (message.type) {
       case 'setFilter':
-        await model.setView(message.filter, graph?.depth ?? '7d')
+        await env.operations.track('Loading', () =>
+          model.setView(message.filter, graph?.depth ?? '7d'),
+        )
         return
       case 'setDepth':
-        await model.setView(graph?.filter ?? 'recent', message.depth)
+        await env.operations.track('Loading', () =>
+          model.setView(graph?.filter ?? 'recent', message.depth),
+        )
         return
       case 'loadFiles': {
         const files = await model.filesFor(message.commitId)

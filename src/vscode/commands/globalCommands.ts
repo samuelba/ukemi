@@ -174,11 +174,13 @@ async function addWorkspace(env: CommandEnv, model: RepoModel): Promise<void> {
 
 export function globalCommands(env: CommandEnv): Record<string, Handler> {
   return {
-    'ukemi.refresh': withModel(env, async (model) => {
-      model.markDirty()
-      await model.refresh()
-      await env.forge.refreshRequests(model, { force: true })
-    }),
+    'ukemi.refresh': withModel(env, (model) =>
+      env.operations.track('Refreshing', async () => {
+        model.markDirty()
+        await model.refresh()
+        await env.forge.refreshRequests(model, { force: true })
+      }),
+    ),
     'ukemi.openView': async () => {
       if (readConfig().showInPanel) {
         env.graphView.openPanel()
@@ -196,12 +198,26 @@ export function globalCommands(env: CommandEnv): Record<string, Handler> {
     'ukemi.push': withModel(env, (model) =>
       env.operations.run('Push', model, () => model.repo.push()),
     ),
+    'ukemi.pushCurrent': withModel(env, async (model) => {
+      const names = model.graph?.currentBookmarks ?? []
+      if (names.length === 0) {
+        void vscode.window.showInformationMessage(
+          'Ukemi: the current change and its mutable ancestors have no bookmark.',
+        )
+        return
+      }
+      await env.operations.run(`Push ${names.join(', ')}`, model, () => model.repo.push(names))
+    }),
     'ukemi.undo': withModel(env, (model) =>
       env.operations.run('Undo', model, () => model.repo.undo()),
     ),
-    'ukemi.redo': withModel(env, (model) =>
-      env.operations.run('Redo', model, () => model.repo.redo()),
-    ),
+    'ukemi.redo': withModel(env, async (model) => {
+      if (model.graph?.canRedo === false) {
+        void vscode.window.showInformationMessage('Ukemi: nothing to redo.')
+        return
+      }
+      await env.operations.run('Redo', model, () => model.repo.redo())
+    }),
     'ukemi.goTo': withModel(env, (model) => goTo(env, model)),
     'ukemi.addWorkspace': withModel(env, (model) => addWorkspace(env, model)),
     'ukemi.openCommitDiff': withModel(env, async (model) => {
@@ -222,6 +238,6 @@ export function globalCommands(env: CommandEnv): Record<string, Handler> {
     }),
     'ukemi.forge.signOut': withModel(env, (model) => env.forge.signOut(model)),
     'ukemi.openSettings': () =>
-      vscode.commands.executeCommand('workbench.action.openSettings', 'ukemi'),
+      vscode.commands.executeCommand('workbench.action.openSettings', '@ext:ukemi.ukemi'),
   }
 }

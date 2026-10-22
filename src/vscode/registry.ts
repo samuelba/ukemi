@@ -172,8 +172,10 @@ export class RepoRegistry implements vscode.Disposable {
     if (kind !== 'jj') {
       return entry
     }
+    const config = readConfig()
     const model = new RepoModel(new JjRepo(root, this.runner), this.logger, {
-      depth: readConfig().historyDepth,
+      depth: config.historyDepth,
+      filter: config.defaultFilter,
     })
     entry.model = model
     entry.disposables.push(

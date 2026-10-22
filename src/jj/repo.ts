@@ -94,6 +94,18 @@ export class JjRepo {
     return parseRemotes(stdout)
   }
 
+  async bookmarkNames(revset: string): Promise<string[]> {
+    const { stdout } = await this.read([
+      'log',
+      '--no-graph',
+      '-r',
+      revset,
+      '-T',
+      'local_bookmarks.map(|b| b.name() ++ "\\n").join("")',
+    ])
+    return stdout.split('\n').filter((line) => line.length > 0)
+  }
+
   async pushedBookmarkNames(): Promise<Set<string>> {
     const { stdout } = await this.read([
       'bookmark',
@@ -241,8 +253,10 @@ export class JjRepo {
     return this.mutate(['git', 'fetch', '--all-remotes'], { timeoutMs: NETWORK_TIMEOUT_MS })
   }
 
-  push(bookmark?: string) {
-    const target = bookmark ? ['--bookmark', bookmark] : ['--tracked']
+  push(bookmarks?: string | readonly string[]) {
+    const names = typeof bookmarks === 'string' ? [bookmarks] : (bookmarks ?? [])
+    const target =
+      names.length > 0 ? names.flatMap((name) => ['--bookmark', `exact:${name}`]) : ['--tracked']
     return this.mutate(['git', 'push', ...target], { timeoutMs: NETWORK_TIMEOUT_MS })
   }
 

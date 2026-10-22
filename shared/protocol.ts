@@ -37,6 +37,8 @@ export interface GraphState {
   hasRemotes: boolean
   hasUnpushed: boolean
   canUndo: boolean
+  canRedo: boolean
+  currentBookmarks: string[]
   trunkName: string | null
   forge: ForgeState | null
 }

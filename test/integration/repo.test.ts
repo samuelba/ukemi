@@ -202,6 +202,22 @@ describe('mutations', () => {
     expect(await repo.remotes()).toEqual([{ name: 'origin', url: remote }])
   })
 
+  test('push with names pushes only those bookmarks', async () => {
+    const remote = join(fixture.dir, 'remote.git')
+    execFileSync('git', ['init', '--bare', '-q', remote])
+    jj(root, 'git', 'remote', 'add', 'origin', remote)
+    writeFile(root, 'a.txt', 'a\n')
+    jj(root, 'describe', '-m', 'first')
+    jj(root, 'bookmark', 'set', 'one', '-r', '@')
+    jj(root, 'new', '-m', 'second')
+    jj(root, 'bookmark', 'set', 'two', '-r', '@')
+    jj(root, 'bookmark', 'set', 'three', '-r', '@')
+
+    await repo.push(['one', 'two'])
+
+    expect([...(await repo.pushedBookmarkNames())].sort()).toEqual(['one', 'two'])
+  })
+
   test('addWorkspace creates a sibling workspace', async () => {
     const wsPath = join(fixture.dir, 'repo-ws')
 

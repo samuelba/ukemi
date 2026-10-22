@@ -151,7 +151,13 @@
       },
       {
         "command": "ukemi.push",
-        "title": "Push Tracked Bookmarks",
+        "title": "Push All Tracked Bookmarks",
+        "category": "Ukemi",
+        "icon": "$(repo-push)"
+      },
+      {
+        "command": "ukemi.pushCurrent",
+        "title": "Push Current Bookmark",
         "category": "Ukemi",
         "icon": "$(cloud-upload)"
       },
@@ -686,7 +692,7 @@
         },
         {
           "command": "ukemi.openSettings",
-          "group": "9_misc@2",
+          "group": "navigation@3",
           "when": "view == ukemi.graph"
         }
       ],
@@ -979,10 +985,26 @@
           ],
           "description": "Folder names to skip during the repository search."
         },
+        "ukemi.defaultFilter": {
+          "type": "string",
+          "enum": [
+            "recent",
+            "mine",
+            "stack"
+          ],
+          "default": "recent",
+          "enumDescriptions": [
+            "Your open changes, bookmarks and tags in the time range.",
+            "All your open changes, and your history in the time range.",
+            "The changes connected to the working copy."
+          ],
+          "description": "Filter that the change graph shows first."
+        },
         "ukemi.historyDepth": {
           "type": "string",
           "enum": [
             "7d",
+            "14d",
             "30d",
             "1y",
             "all"

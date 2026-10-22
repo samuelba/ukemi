@@ -4,12 +4,13 @@ import { postMessage } from '../shared/vscodeApi'
 
 const FILTERS: ReadonlyArray<{ id: GraphFilter; label: string; hint: string }> = [
   { id: 'recent', label: 'Recent', hint: 'Mutable changes, bookmarks and tags' },
-  { id: 'mine', label: 'Mine', hint: 'Only your mutable changes' },
+  { id: 'mine', label: 'Mine', hint: 'All your open changes, and your history in the time range' },
   { id: 'stack', label: 'Stack', hint: 'Changes connected to the working copy' },
 ]
 
 const DEPTHS: ReadonlyArray<{ id: HistoryDepth; label: string }> = [
   { id: '7d', label: '7 days' },
+  { id: '14d', label: '14 days' },
   { id: '30d', label: '30 days' },
   { id: '1y', label: '1 year' },
   { id: 'all', label: 'All' },
@@ -19,6 +20,7 @@ interface ToolbarProps {
   repos: RepoSummary[]
   activeRepoId: string | null
   graph: GraphState | null
+  isBusy: boolean
 }
 
 function command(name: string, context: Record<string, unknown> = {}) {
@@ -30,17 +32,20 @@ function ToolButton({
   label,
   onClick,
   isAccent,
+  isDisabled,
 }: {
   icon: string
   label: string
   onClick: () => void
   isAccent?: boolean
+  isDisabled?: boolean
 }) {
   return (
     <button
       className={`icon-button${isAccent ? ' accent' : ''}`}
       title={label}
       aria-label={label}
+      disabled={isDisabled}
       onClick={onClick}
     >
       <i className={`codicon codicon-${icon}`} />
@@ -48,8 +53,20 @@ function ToolButton({
   )
 }
 
-export function Toolbar({ repos, activeRepoId, graph }: ToolbarProps) {
+function pushCurrentLabel(graph: GraphState): string {
+  return graph.currentBookmarks.length > 0
+    ? `Push ${graph.currentBookmarks.join(', ')}`
+    : 'Push current bookmark (no bookmark on this stack)'
+}
+
+function hasUnsyncedCurrent(graph: GraphState): boolean {
+  const current = new Set(graph.currentBookmarks)
+  return graph.commits.some((c) => c.localBookmarks.some((b) => current.has(b.name) && !b.synced))
+}
+
+export function Toolbar({ repos, activeRepoId, graph, isBusy }: ToolbarProps) {
   const repoId = graph?.repoId
+  const ignoresDepth = graph?.filter === 'stack'
   return (
     <div className="toolbar">
       <div className="toolbar-row">
@@ -93,10 +110,17 @@ export function Toolbar({ repos, activeRepoId, graph }: ToolbarProps) {
                 />
                 <ToolButton
                   icon="cloud-upload"
+                  label={pushCurrentLabel(graph)}
+                  isAccent={hasUnsyncedCurrent(graph)}
+                  isDisabled={graph.currentBookmarks.length === 0}
+                  onClick={() => command('ukemi.pushCurrent', { repoId })}
+                />
+                <ToolButton
+                  icon="repo-push"
                   label={
                     graph.hasUnpushed
-                      ? 'Push tracked bookmarks (unpushed changes)'
-                      : 'Push tracked bookmarks'
+                      ? 'Push all tracked bookmarks (unpushed changes)'
+                      : 'Push all tracked bookmarks'
                   }
                   isAccent={graph.hasUnpushed}
                   onClick={() => command('ukemi.push', { repoId })}
@@ -110,12 +134,17 @@ export function Toolbar({ repos, activeRepoId, graph }: ToolbarProps) {
             />
             <ToolButton
               icon="redo"
-              label="Redo"
+              label={graph.canRedo ? 'Redo' : 'Nothing to redo'}
+              isDisabled={!graph.canRedo}
               onClick={() => command('ukemi.redo', { repoId })}
             />
           </>
         )}
-        <ToolButton icon="refresh" label="Refresh" onClick={() => command('ukemi.refresh')} />
+        <ToolButton
+          icon={isBusy ? 'refresh codicon-modifier-spin' : 'refresh'}
+          label="Refresh"
+          onClick={() => command('ukemi.refresh')}
+        />
       </div>
       {graph && (
         <div className="toolbar-row filters">
@@ -137,7 +166,8 @@ export function Toolbar({ repos, activeRepoId, graph }: ToolbarProps) {
           <select
             className="depth-select"
             value={graph.depth}
-            title="History depth"
+            title={ignoresDepth ? 'Stack shows the whole stack, whatever its age' : 'History depth'}
+            disabled={ignoresDepth}
             onChange={(e) =>
               postMessage({ type: 'setDepth', depth: e.target.value as HistoryDepth })
             }

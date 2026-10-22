@@ -67,4 +67,7 @@ export interface Remote {
 }
 
 export type GraphFilter = 'recent' | 'mine' | 'stack'
-export type HistoryDepth = '7d' | '30d' | '1y' | 'all'
+export type HistoryDepth = '7d' | '14d' | '30d' | '1y' | 'all'
+
+export const HISTORY_DEPTHS: readonly HistoryDepth[] = ['7d', '14d', '30d', '1y', 'all']
+export const GRAPH_FILTERS: readonly GraphFilter[] = ['recent', 'mine', 'stack']

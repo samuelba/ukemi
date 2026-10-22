@@ -3,9 +3,10 @@ import type { ChangedFile, Commit, GraphFilter, HistoryDepth } from '../../share
 import type { CommitView, ForgeState, GraphState, RequestBadge } from '../../shared/protocol'
 import { buildGraphNodes } from '../graph/buildGraph'
 import { JjRepo } from '../jj/repo'
-import { graphRevset } from '../jj/revsets'
+import { CURRENT_BOOKMARKS_REVSET, graphRevset } from '../jj/revsets'
 import type { Logger } from '../util/logger'
 import { errorMessage } from '../util/logger'
+import { canRedo, UNDO_HISTORY_LIMIT } from './undoState'
 
 const FILE_CACHE_LIMIT = 200
 const NETWORK_OPERATION = /^(fetch from git remote|push .*to git remote)/
@@ -29,9 +30,10 @@ export class RepoModel {
   constructor(
     readonly repo: JjRepo,
     private readonly logger: Logger,
-    options: { depth?: HistoryDepth } = {},
+    options: { depth?: HistoryDepth; filter?: GraphFilter } = {},
   ) {
     this.depth = options.depth ?? this.depth
+    this.filter = options.filter ?? this.filter
   }
 
   get root(): string {
@@ -123,15 +125,16 @@ export class RepoModel {
 
   private async buildState(): Promise<GraphState> {
     const revset = graphRevset(this.filter, this.depth)
-    const [logged, trunkIds, operations, workspaces, remotes, trunkName, pushed] =
+    const [logged, trunkIds, operations, workspaces, remotes, trunkName, pushed, currentBookmarks] =
       await Promise.all([
         this.repo.log(revset),
         this.repo.commitIds('present(trunk())'),
-        this.repo.operations(1),
+        this.repo.operations(UNDO_HISTORY_LIMIT),
         this.repo.workspaces(),
         this.repo.remotes(),
         this.repo.trunkBookmark(),
         this.repo.pushedBookmarkNames(),
+        this.repo.bookmarkNames(CURRENT_BOOKMARKS_REVSET),
       ])
     const commits = remotes.length > 0 ? markNeverPushed(logged, pushed) : logged
     const nodes = await buildGraphNodes(commits, (parent) =>
@@ -168,6 +171,8 @@ export class RepoModel {
       hasRemotes: remotes.length > 0,
       hasUnpushed: remotes.length > 0 && hasUnsyncedBookmarks(commits),
       canUndo: head !== undefined && !NETWORK_OPERATION.test(head.description),
+      canRedo: canRedo(operations.map((op) => op.description)),
+      currentBookmarks,
       trunkName,
       forge: this.forge,
     }

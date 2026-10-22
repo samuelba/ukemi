@@ -1,5 +1,10 @@
 import * as vscode from 'vscode'
-import type { HistoryDepth } from '../../shared/model'
+import {
+  GRAPH_FILTERS,
+  HISTORY_DEPTHS,
+  type GraphFilter,
+  type HistoryDepth,
+} from '../../shared/model'
 import { DEFAULT_EXCLUDES } from '../repo/discovery'
 
 export type SourceControlMode = 'auto' | 'always' | 'never'
@@ -12,6 +17,7 @@ export interface UkemiConfig {
   repoScanDepth: number
   repoScanExclude: string[]
   historyDepth: HistoryDepth
+  defaultFilter: GraphFilter
   changeIdLength: number
   showFullPaths: boolean
   addJjToTerminalPath: boolean
@@ -19,11 +25,12 @@ export interface UkemiConfig {
   githubHosts: string[]
 }
 
-const HISTORY_DEPTHS: readonly HistoryDepth[] = ['7d', '30d', '1y', 'all']
+function oneOf<T extends string>(value: string, allowed: readonly T[], fallback: T): T {
+  return (allowed as readonly string[]).includes(value) ? (value as T) : fallback
+}
 
 export function readConfig(): UkemiConfig {
   const c = vscode.workspace.getConfiguration('ukemi')
-  const depth = c.get<string>('historyDepth', '7d')
   return {
     jjPath: c.get<string>('jjPath', ''),
     showSourceControl: c.get<SourceControlMode>('showSourceControl', 'auto'),
@@ -31,7 +38,8 @@ export function readConfig(): UkemiConfig {
     followActiveEditor: c.get<boolean>('followActiveEditor', true),
     repoScanDepth: c.get<number>('repoScanDepth', 4),
     repoScanExclude: c.get<string[]>('repoScanExclude', DEFAULT_EXCLUDES),
-    historyDepth: HISTORY_DEPTHS.includes(depth as HistoryDepth) ? (depth as HistoryDepth) : '7d',
+    historyDepth: oneOf(c.get<string>('historyDepth', '7d'), HISTORY_DEPTHS, '7d'),
+    defaultFilter: oneOf(c.get<string>('defaultFilter', 'recent'), GRAPH_FILTERS, 'recent'),
     changeIdLength: c.get<number>('changeIdLength', 4),
     showFullPaths: c.get<boolean>('showFullPaths', false),
     addJjToTerminalPath: c.get<boolean>('addJjToTerminalPath', true),

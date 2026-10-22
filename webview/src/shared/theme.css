@@ -111,6 +111,16 @@ body {
   color: var(--ukemi-accent);
 }
 
+.icon-button:disabled,
+select:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.icon-button:disabled:hover {
+  background: transparent;
+}
+
 button:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
