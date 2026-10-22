@@ -11,7 +11,7 @@ body {
 .split-header {
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -48,10 +48,13 @@ body.vscode-high-contrast .split {
   margin-top: 16px;
   border: 1px solid var(--vscode-widget-border, var(--vscode-contrastBorder, transparent));
   border-radius: 4px;
-  overflow: hidden;
+  overflow: clip;
 }
 
 .split-file-head {
+  position: sticky;
+  top: var(--split-header-height, 0);
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 4px;

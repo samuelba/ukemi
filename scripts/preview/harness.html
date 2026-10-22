@@ -103,6 +103,12 @@
       const script = document.createElement('script')
       script.src = `../../dist/webview/${view}.js`
       document.body.appendChild(script)
+      const scroll = Number(params.get('scroll') ?? 0)
+      if (scroll > 0) {
+        document.documentElement.style.cssText = 'height: 100%; overflow: hidden'
+        document.body.style.cssText = 'height: 100%; overflow: auto'
+        setTimeout(() => (document.body.scrollTop = scroll), 500)
+      }
     </script>
   </body>
 </html>

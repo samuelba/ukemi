@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import type {
   Segment,
   SplitFile,
@@ -196,6 +196,16 @@ export function SplitApp() {
   const [request, setRequest] = useState<SplitRequest | null>(null)
   const [choices, setChoices] = useState<ReadonlyMap<string, FileChoice>>(new Map())
   const [message, setMessage] = useState('')
+  const [headerHeight, setHeaderHeight] = useState(0)
+
+  const headerRef = useCallback((node: HTMLElement | null) => {
+    if (!node) {
+      return
+    }
+    const observer = new ResizeObserver(() => setHeaderHeight(node.offsetHeight))
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
     const onMessage = (event: MessageEvent<SplitHostMessage>) => {
@@ -234,8 +244,8 @@ export function SplitApp() {
     })
 
   return (
-    <div className="split">
-      <header className="split-header">
+    <div className="split" style={{ '--split-header-height': `${headerHeight}px` } as CSSProperties}>
+      <header className="split-header" ref={headerRef}>
         <h1>Split “{request.title || '(no description)'}”</h1>
         <p className="muted">
           Select the changes for a new change before this one. The rest stays in “
