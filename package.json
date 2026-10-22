@@ -212,7 +212,7 @@
       },
       {
         "command": "ukemi.forge.signOut",
-        "title": "Sign Out of GitLab",
+        "title": "Sign Out of GitHub or GitLab",
         "category": "Ukemi"
       },
       {
