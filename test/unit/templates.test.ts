@@ -49,6 +49,11 @@ describe('graphRevset', () => {
     expect(graphRevset('recent', 'all')).not.toContain('committer_date')
   })
 
+  test('shows the last trunk commits in the recent filter, whatever their age', () => {
+    expect(graphRevset('recent', '7d')).toContain('| first_ancestors(present(trunk()), 10)')
+    expect(graphRevset('mine', '7d')).not.toContain('first_ancestors')
+  })
+
   test('supports a 14 day depth', () => {
     expect(graphRevset('recent', '14d')).toContain('committer_date(after:"14 days ago")')
   })

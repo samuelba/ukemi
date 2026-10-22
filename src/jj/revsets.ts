@@ -25,6 +25,8 @@ function dateFilter(depth: HistoryDepth): string {
 export const CURRENT_BOOKMARKS_REVSET = 'heads(::@ & bookmarks() & mutable())'
 
 const ANCHORS = 'present(@) | working_copies() | present(trunk())'
+const TRUNK_HISTORY_LENGTH = 10
+const TRUNK_HISTORY = `first_ancestors(present(trunk()), ${TRUNK_HISTORY_LENGTH})`
 
 export function graphRevset(filter: GraphFilter, depth: HistoryDepth): string {
   const base = graphBase(filter, depth)
@@ -34,7 +36,7 @@ export function graphRevset(filter: GraphFilter, depth: HistoryDepth): string {
 function graphBase(filter: GraphFilter, depth: HistoryDepth): string {
   switch (filter) {
     case 'recent':
-      return `(mutable() | bookmarks() | remote_bookmarks() | tags()) & ${dateFilter(depth)}`
+      return `((mutable() | bookmarks() | remote_bookmarks() | tags()) & ${dateFilter(depth)}) | ${TRUNK_HISTORY}`
     case 'mine':
       return 'mine() & mutable()'
     case 'myHistory':
