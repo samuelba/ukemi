@@ -35,8 +35,17 @@ body {
   gap: 6px;
 }
 
+.split {
+  --file-head-tint: var(--ai);
+}
+
+body.vscode-dark .split,
+body.vscode-high-contrast .split {
+  --file-head-tint: #7f88d8;
+}
+
 .split-file {
-  margin-top: 12px;
+  margin-top: 16px;
   border: 1px solid var(--vscode-widget-border, var(--vscode-contrastBorder, transparent));
   border-radius: 4px;
   overflow: hidden;
@@ -46,8 +55,9 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 6px;
-  background: var(--vscode-sideBarSectionHeader-background, var(--vscode-editorWidget-background));
+  padding: 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--file-head-tint) 45%, transparent);
+  background: color-mix(in srgb, var(--file-head-tint) 22%, var(--vscode-editor-background));
 }
 
 .split-file-head label {
@@ -61,6 +71,7 @@ body {
 .split-file-head .path {
   overflow: hidden;
   font-family: var(--vscode-editor-font-family);
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -69,8 +80,27 @@ body {
   padding: 0 4px;
   border-radius: 2px;
   font-size: 0.85em;
+  font-weight: 600;
   text-transform: uppercase;
   color: var(--vscode-descriptionForeground);
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.status-added {
+  color: var(--vscode-gitDecoration-addedResourceForeground);
+}
+
+.status-modified {
+  color: var(--vscode-gitDecoration-modifiedResourceForeground);
+}
+
+.status-removed {
+  color: var(--vscode-gitDecoration-deletedResourceForeground);
+}
+
+.status-renamed,
+.status-copied {
+  color: var(--vscode-gitDecoration-renamedResourceForeground);
 }
 
 .whole-note {
