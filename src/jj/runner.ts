@@ -72,6 +72,8 @@ export function describeArgs(args: readonly string[]): string {
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
 export class JjRunner {
+  private extraEnv: Readonly<Record<string, string>> = {}
+
   constructor(
     private binaryPath: string,
     private readonly logger: Logger,
@@ -83,6 +85,10 @@ export class JjRunner {
 
   useBinary(path: string): void {
     this.binaryPath = path
+  }
+
+  setEnvironment(env: Readonly<Record<string, string>>): void {
+    this.extraEnv = env
   }
 
   async run(options: RunOptions): Promise<RunResult> {
@@ -117,7 +123,7 @@ export class JjRunner {
     return new Promise((resolve, reject) => {
       const child = spawn(this.binaryPath, args, {
         cwd: options.cwd,
-        env: { ...process.env, JJ_EDITOR: 'false', GIT_TERMINAL_PROMPT: '0' },
+        env: { ...process.env, ...this.extraEnv, JJ_EDITOR: 'false', GIT_TERMINAL_PROMPT: '0' },
         stdio: ['pipe', 'pipe', 'pipe'],
       })
       const stdout: Buffer[] = []

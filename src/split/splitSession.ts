@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import type { ChangedFile } from '../../shared/model'
 import type { SplitFile, SplitRequest, SplitSelection } from '../../shared/split'
 import type { JjRepo } from '../jj/repo'
+import { nodeWrapperScript } from '../util/nodeWrapper'
 import { computeSegments } from './hunks'
 import { buildPlan, type FileContents } from './plan'
 
@@ -98,6 +99,5 @@ export class SplitSession {
 }
 
 export function wrapperScript(nodePath: string, toolArgs: readonly string[]): string {
-  const quoted = [nodePath, ...toolArgs].map((arg) => `'${arg.replace(/'/g, `'\\''`)}'`).join(' ')
-  return `#!/bin/sh\nELECTRON_RUN_AS_NODE=1 UKEMI_SPLIT_TOOL=1 exec ${quoted} "$@"\n`
+  return nodeWrapperScript(nodePath, toolArgs, 'UKEMI_SPLIT_TOOL')
 }

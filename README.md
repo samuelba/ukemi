@@ -10,7 +10,7 @@ Ukemi is a visual interface for [Jujutsu (jj)](https://jj-vcs.github.io/jj/) in 
 - **Split by hunks.** Select hunks in a split editor. The selected hunks go into a new change before the original.
 - **Evolution.** Click the versions button to see how the selected change evolved: each amend, describe, snapshot and rebase. Click a version to see what it changed, compare it with the current version, or restore its files.
 - **Diffs.** Click a file to see its diff. The Source Control view shows the working copy for repositories that the Git extension does not show.
-- **Sync.** Fetch, push tracked bookmarks, undo and redo from the toolbar.
+- **Sync.** Fetch, push tracked bookmarks, undo and redo from the toolbar. SSH remotes use your SSH agent. For HTTPS remotes, Ukemi uses your git credential helper first, then your GitHub sign-in in the editor or your GitLab token.
 - **Pull and merge requests.** Create GitHub pull requests and GitLab merge requests from a change. See their status and CI result in the graph. Merge them and clean up after the merge.
 - **Many repositories.** Ukemi finds repositories in subfolders, for example `tools/firmware/repo`. When it finds more than one, select it in the dropdown. Ukemi follows the active editor.
 - **No setup.** When jj is missing, Ukemi offers to download the official static release and checks its SHA-256 digest.

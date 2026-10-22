@@ -30,6 +30,14 @@ const builds = [
   },
   {
     ...common,
+    entryPoints: ['src/askpass/askpassMain.ts'],
+    outfile: 'dist/askpass.js',
+    platform: 'node',
+    format: 'cjs',
+    target: 'node20',
+  },
+  {
+    ...common,
     entryPoints: { graph: 'webview/src/graph/main.tsx', split: 'webview/src/split/main.tsx' },
     outdir: 'dist/webview',
     platform: 'browser',

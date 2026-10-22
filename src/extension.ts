@@ -1,5 +1,7 @@
 import * as vscode from 'vscode'
+import { AskpassServer } from './askpass/server'
 import { JjRunner } from './jj/runner'
+import { errorMessage } from './util/logger'
 import { commitCommands } from './vscode/commands/commitCommands'
 import { contextCommit, registerAll, type CommandEnv } from './vscode/commands/context'
 import { fileCommands } from './vscode/commands/fileCommands'
@@ -40,6 +42,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
   const operations = new Operations(logger)
   const graphView = new GraphView(context.extensionUri, registry, operations, availability, logger)
   const forge = new ForgeService(registry, context.secrets, logger)
+  const askpass = new AskpassServer(
+    process.execPath,
+    [vscode.Uri.joinPath(context.extensionUri, 'dist', 'askpass.js').fsPath],
+    (request) => forge.gitCredential(request),
+  )
+  try {
+    await askpass.start()
+    runner.setEnvironment(askpass.env)
+  } catch (error) {
+    logger.warn(`git sign-in over HTTPS is not available: ${errorMessage(error)}`)
+  }
   const env: CommandEnv = {
     registry,
     operations,
@@ -65,6 +78,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
 
   context.subscriptions.push(
     channel,
+    askpass,
     registry,
     operations,
     graphView,
