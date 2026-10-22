@@ -123,14 +123,17 @@ export class RepoModel {
 
   private async buildState(): Promise<GraphState> {
     const revset = graphRevset(this.filter, this.depth)
-    const [commits, trunkIds, operations, workspaces, remotes, trunkName] = await Promise.all([
-      this.repo.log(revset),
-      this.repo.commitIds('present(trunk())'),
-      this.repo.operations(1),
-      this.repo.workspaces(),
-      this.repo.remotes(),
-      this.repo.trunkBookmark(),
-    ])
+    const [logged, trunkIds, operations, workspaces, remotes, trunkName, pushed] =
+      await Promise.all([
+        this.repo.log(revset),
+        this.repo.commitIds('present(trunk())'),
+        this.repo.operations(1),
+        this.repo.workspaces(),
+        this.repo.remotes(),
+        this.repo.trunkBookmark(),
+        this.repo.pushedBookmarkNames(),
+      ])
+    const commits = remotes.length > 0 ? markNeverPushed(logged, pushed) : logged
     const nodes = await buildGraphNodes(commits, (parent) =>
       this.repo.commitIds(`heads(::${parent} & (${revset}))`),
     )
@@ -196,6 +199,19 @@ export class RepoModel {
     this.fileCache.set(commitId, files)
     return files
   }
+}
+
+function markNeverPushed(commits: readonly Commit[], pushed: ReadonlySet<string>): Commit[] {
+  return commits.map((commit) =>
+    commit.localBookmarks.every((b) => pushed.has(b.name))
+      ? commit
+      : {
+          ...commit,
+          localBookmarks: commit.localBookmarks.map((b) =>
+            pushed.has(b.name) ? b : { ...b, synced: false },
+          ),
+        },
+  )
 }
 
 function hasUnsyncedBookmarks(commits: readonly Commit[]): boolean {

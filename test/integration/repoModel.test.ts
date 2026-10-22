@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { RepoModel } from '../../src/repo/repoModel'
@@ -74,6 +75,37 @@ describe('RepoModel', () => {
     await model.refreshIfOperationChanged()
 
     expect(model.graph?.commits[0]?.description).toBe('external\n')
+  })
+
+  test('marks bookmarks that were never pushed as unsynced', async () => {
+    const remote = join(fixture.dir, 'remote.git')
+    execFileSync('git', ['init', '--bare', '-q', remote])
+    jj(root, 'git', 'remote', 'add', 'origin', remote)
+    writeFile(root, 'a.txt', 'a\n')
+    jj(root, 'describe', '-m', 'pushed')
+    jj(root, 'bookmark', 'set', 'pushed', '-r', '@')
+    jj(root, 'git', 'push', '--bookmark', 'pushed')
+    jj(root, 'new', '-m', 'local only')
+    writeFile(root, 'b.txt', 'b\n')
+    jj(root, 'bookmark', 'set', 'local-only', '-r', '@')
+
+    await model.refresh()
+
+    const bookmarks = model.graph?.commits.flatMap((c) => c.localBookmarks) ?? []
+    expect(bookmarks.find((b) => b.name === 'pushed')?.synced).toBe(true)
+    expect(bookmarks.find((b) => b.name === 'local-only')?.synced).toBe(false)
+    expect(model.graph?.hasUnpushed).toBe(true)
+  })
+
+  test('treats bookmarks as synced when the repository has no remote', async () => {
+    jj(root, 'bookmark', 'set', 'solo', '-r', '@')
+
+    await model.refresh()
+
+    expect(model.graph?.commits[0]?.localBookmarks).toEqual([
+      { name: 'solo', synced: true, conflict: false },
+    ])
+    expect(model.graph?.hasUnpushed).toBe(false)
   })
 
   test('caches file lists by commit id', async () => {

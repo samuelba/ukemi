@@ -2,7 +2,6 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="stylesheet" href="../../dist/webview/graph.css" />
     <style>
       :root {
         --vscode-font-family: system-ui, 'Ubuntu', sans-serif;
@@ -15,6 +14,8 @@
         --vscode-icon-foreground: #cccccc;
         --vscode-sideBar-background: #181818;
         --vscode-editor-background: #1f1f1f;
+        --vscode-editorWidget-background: #202020;
+        --vscode-sideBarSectionHeader-background: #181818;
         --vscode-sideBarSectionHeader-border: #2b2b2b;
         --vscode-widget-border: #313131;
         --vscode-list-hoverBackground: #2a2d2e;
@@ -32,28 +33,76 @@
         --vscode-dropdown-background: #313131;
         --vscode-dropdown-foreground: #cccccc;
         --vscode-dropdown-border: #3c3c3c;
+        --vscode-input-background: #313131;
+        --vscode-input-foreground: #cccccc;
+        --vscode-input-border: #3c3c3c;
         --vscode-focusBorder: #0078d4;
+        --vscode-diffEditor-insertedLineBackground: #9bb95533;
+        --vscode-diffEditor-removedLineBackground: #ff000033;
         --vscode-gitDecoration-addedResourceForeground: #81b88b;
         --vscode-gitDecoration-modifiedResourceForeground: #e2c08d;
         --vscode-gitDecoration-deletedResourceForeground: #c74e39;
         --vscode-gitDecoration-renamedResourceForeground: #73c991;
         --vscode-gitDecoration-conflictingResourceForeground: #e4676b;
       }
-      body {
-        width: 400px;
-        background: var(--vscode-sideBar-background);
+      :root:has(body.vscode-light) {
+        --vscode-foreground: #3b3b3b;
+        --vscode-descriptionForeground: #6f6f6f;
+        --vscode-icon-foreground: #424242;
+        --vscode-sideBar-background: #f8f8f8;
+        --vscode-editor-background: #ffffff;
+        --vscode-editorWidget-background: #f8f8f8;
+        --vscode-sideBarSectionHeader-background: #f8f8f8;
+        --vscode-sideBarSectionHeader-border: #e5e5e5;
+        --vscode-widget-border: #e5e5e5;
+        --vscode-list-hoverBackground: #f2f2f2;
+        --vscode-list-inactiveSelectionBackground: #e4e6f1;
+        --vscode-list-activeSelectionBackground: #e8e8e8;
+        --vscode-list-dropBackground: #d6ebff;
+        --vscode-toolbar-hoverBackground: #b8b8b850;
+        --vscode-badge-background: #cccccc;
+        --vscode-badge-foreground: #3b3b3b;
+        --vscode-button-secondaryBackground: #e5e5e5;
+        --vscode-button-secondaryForeground: #3b3b3b;
+        --vscode-dropdown-background: #ffffff;
+        --vscode-dropdown-foreground: #3b3b3b;
+        --vscode-dropdown-border: #cecece;
+        --vscode-input-background: #ffffff;
+        --vscode-input-foreground: #3b3b3b;
+        --vscode-input-border: #cecece;
+        --vscode-gitDecoration-addedResourceForeground: #587c0c;
+        --vscode-gitDecoration-modifiedResourceForeground: #895503;
+        --vscode-gitDecoration-deletedResourceForeground: #ad0707;
+      }
+      html:has(body.vscode-dark) {
+        background: #181818;
+      }
+      html:has(body.vscode-light) {
+        background: #f8f8f8;
       }
     </style>
   </head>
-  <body class="vscode-dark">
+  <body>
     <div id="root"></div>
-    <script>
-      window.acquireVsCodeApi = () => ({ postMessage: () => undefined, getState: () => undefined, setState: () => undefined })
-    </script>
     <script src="state.generated.js"></script>
-    <script src="../../dist/webview/graph.js"></script>
     <script>
-      window.postMessage({ type: 'state', state: window.UKEMI_STATE }, '*')
+      const params = new URLSearchParams(location.search)
+      const view = params.get('view') === 'split' ? 'split' : 'graph'
+      const reply =
+        view === 'split' ? { type: 'load', request: window.UKEMI_SPLIT } : { type: 'state', state: window.UKEMI_STATE }
+      window.acquireVsCodeApi = () => ({
+        postMessage: (message) => message.type === 'ready' && window.postMessage(reply, '*'),
+        getState: () => undefined,
+        setState: () => undefined,
+      })
+      document.body.className = params.get('theme') === 'light' ? 'vscode-light' : 'vscode-dark'
+      const style = document.createElement('link')
+      style.rel = 'stylesheet'
+      style.href = `../../dist/webview/${view}.css`
+      document.head.appendChild(style)
+      const script = document.createElement('script')
+      script.src = `../../dist/webview/${view}.js`
+      document.body.appendChild(script)
     </script>
   </body>
 </html>

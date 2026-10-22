@@ -70,5 +70,7 @@ export const COMMIT_ID_TEMPLATE = 'commit_id ++ "\\n"'
 export const WORKSPACE_TEMPLATE =
   'json({"name" => name, "root" => root, "commit_id" => target.commit_id()}) ++ "\\n"'
 
+export const PUSHED_BOOKMARK_TEMPLATE = 'if(remote && remote != "git", name ++ "\\n")'
+
 export const OP_LOG_TEMPLATE =
   'json({"id" => id, "description" => description, "time" => time.end()}) ++ "\\n"'

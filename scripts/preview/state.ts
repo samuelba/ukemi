@@ -4,6 +4,7 @@ import type { ViewState } from '../../shared/protocol'
 import { JjRepo } from '../../src/jj/repo'
 import { JjRunner } from '../../src/jj/runner'
 import { RepoModel } from '../../src/repo/repoModel'
+import { SplitSession } from '../../src/split/splitSession'
 import { NULL_LOGGER } from '../../src/util/logger'
 
 async function main(root: string, output: string): Promise<void> {
@@ -31,7 +32,20 @@ async function main(root: string, output: string): Promise<void> {
     error: null,
     settings: { changeIdLength: 4, showFullPaths: false },
   }
-  writeFileSync(output, `window.UKEMI_STATE = ${JSON.stringify(state)};\n`)
+  const target = model.graph?.commits.find(
+    (c) => !c.isEmpty && c.localBookmarks.some((b) => b.name === 'main'),
+  )
+  const split = target
+    ? await SplitSession.load(
+        model.repo,
+        { commitId: target.commitId, parentId: target.parents[0], description: target.description },
+        await model.filesFor(target.commitId),
+      )
+    : null
+  writeFileSync(
+    output,
+    `window.UKEMI_STATE = ${JSON.stringify(state)};\nwindow.UKEMI_SPLIT = ${JSON.stringify(split?.request ?? null)};\n`,
+  )
 }
 
 const [root, output] = process.argv.slice(2)

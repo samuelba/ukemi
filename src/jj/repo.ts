@@ -17,6 +17,7 @@ import {
   FILES_TEMPLATE,
   LOG_TEMPLATE,
   OP_LOG_TEMPLATE,
+  PUSHED_BOOKMARK_TEMPLATE,
   WORKSPACE_TEMPLATE,
 } from './templates'
 
@@ -91,6 +92,17 @@ export class JjRepo {
   async remotes(): Promise<Remote[]> {
     const { stdout } = await this.read(['git', 'remote', 'list'])
     return parseRemotes(stdout)
+  }
+
+  async pushedBookmarkNames(): Promise<Set<string>> {
+    const { stdout } = await this.read([
+      'bookmark',
+      'list',
+      '--all-remotes',
+      '-T',
+      PUSHED_BOOKMARK_TEMPLATE,
+    ])
+    return new Set(stdout.split('\n').filter((line) => line.length > 0))
   }
 
   async operations(limit: number): Promise<Operation[]> {
