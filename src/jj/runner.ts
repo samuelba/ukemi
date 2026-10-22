@@ -56,12 +56,16 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 
 export class JjRunner {
   constructor(
-    private readonly binaryPath: string,
+    private binaryPath: string,
     private readonly logger: Logger,
   ) {}
 
   get binary(): string {
     return this.binaryPath
+  }
+
+  useBinary(path: string): void {
+    this.binaryPath = path
   }
 
   async run(options: RunOptions): Promise<RunResult> {

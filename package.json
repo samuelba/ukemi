@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@vscode/codicons": "^0.0.46-24",
+    "diff": "^8.0.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "zod": "^3.25.76"

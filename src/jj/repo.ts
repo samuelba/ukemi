@@ -239,6 +239,10 @@ export class JjRepo {
     return this.mutate(['workspace', 'forget', name])
   }
 
+  newChangeInWorkspace(workspaceRoot: string) {
+    return this.mutations.run(() => this.runner.run({ cwd: workspaceRoot, args: ['new'] }))
+  }
+
   static async initColocated(runner: JjRunner, directory: string): Promise<void> {
     await runner.run({ cwd: directory, args: ['git', 'init', '--colocate'] })
   }

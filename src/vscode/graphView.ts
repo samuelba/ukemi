@@ -1,0 +1,188 @@
+import { randomBytes } from 'node:crypto'
+import * as vscode from 'vscode'
+import type { HostMessage, ViewState, ViewStatus, WebviewMessage } from '../../shared/protocol'
+import { errorMessage, type Logger } from '../util/logger'
+import { readConfig } from './config'
+import type { Operations } from './operations'
+import type { RepoRegistry } from './registry'
+
+export const GRAPH_VIEW_ID = 'ukemi.graph'
+const PANEL_VIEW_TYPE = 'ukemi.graphPanel'
+
+export type MessageHandler = (message: WebviewMessage) => Promise<void>
+
+export interface JjAvailability {
+  isAvailable: boolean
+}
+
+export function webviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri, entry: string): string {
+  const base = vscode.Uri.joinPath(extensionUri, 'dist', 'webview')
+  const script = webview.asWebviewUri(vscode.Uri.joinPath(base, `${entry}.js`))
+  const style = webview.asWebviewUri(vscode.Uri.joinPath(base, `${entry}.css`))
+  const nonce = randomBytes(16).toString('base64')
+  const csp = [
+    "default-src 'none'",
+    `style-src ${webview.cspSource} 'unsafe-inline'`,
+    `font-src ${webview.cspSource}`,
+    `img-src ${webview.cspSource} data:`,
+    `script-src 'nonce-${nonce}'`,
+  ].join('; ')
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="${csp}">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="${style}">
+</head>
+<body>
+  <div id="root"></div>
+  <script nonce="${nonce}" src="${script}"></script>
+</body>
+</html>`
+}
+
+export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable {
+  private readonly webviews = new Set<vscode.Webview>()
+  private view: vscode.WebviewView | null = null
+  private panel: vscode.WebviewPanel | null = null
+  private handler: MessageHandler = async () => undefined
+  private readonly disposables: vscode.Disposable[] = []
+
+  constructor(
+    private readonly extensionUri: vscode.Uri,
+    private readonly registry: RepoRegistry,
+    private readonly operations: Operations,
+    private readonly jj: JjAvailability,
+    private readonly logger: Logger,
+  ) {
+    this.disposables.push(
+      registry.onDidChange(() => this.postState()),
+      operations.onDidChange(() => this.postState()),
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration('ukemi')) {
+          this.postState()
+        }
+      }),
+    )
+  }
+
+  setHandler(handler: MessageHandler): void {
+    this.handler = handler
+  }
+
+  get isVisible(): boolean {
+    return (this.view?.visible ?? false) || (this.panel?.visible ?? false)
+  }
+
+  resolveWebviewView(view: vscode.WebviewView): void {
+    this.view = view
+    this.attach(view.webview)
+    view.onDidDispose(() => {
+      this.webviews.delete(view.webview)
+      this.view = null
+    })
+    view.onDidChangeVisibility(() => {
+      if (view.visible) {
+        this.postState()
+      }
+    })
+  }
+
+  openPanel(): void {
+    if (this.panel) {
+      this.panel.reveal()
+      return
+    }
+    const panel = vscode.window.createWebviewPanel(PANEL_VIEW_TYPE, 'Ukemi', vscode.ViewColumn.Active, {
+      enableScripts: true,
+      retainContextWhenHidden: true,
+      localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview')],
+    })
+    panel.iconPath = vscode.Uri.joinPath(this.extensionUri, 'resources', 'activity.svg')
+    this.panel = panel
+    this.attach(panel.webview)
+    panel.onDidDispose(() => {
+      this.webviews.delete(panel.webview)
+      this.panel = null
+    })
+  }
+
+  private attach(webview: vscode.Webview): void {
+    webview.options = {
+      enableScripts: true,
+      localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview')],
+    }
+    webview.html = webviewHtml(webview, this.extensionUri, 'graph')
+    webview.onDidReceiveMessage(async (message: WebviewMessage) => {
+      if (message.type === 'ready') {
+        this.postState()
+        return
+      }
+      try {
+        await this.handler(message)
+      } catch (error: unknown) {
+        this.logger.error(`webview message ${message.type} failed: ${errorMessage(error)}`)
+      }
+    })
+    this.webviews.add(webview)
+  }
+
+  post(message: HostMessage): void {
+    for (const webview of this.webviews) {
+      void webview.postMessage(message)
+    }
+  }
+
+  private status(): ViewStatus {
+    if (!this.jj.isAvailable) {
+      return 'no-jj'
+    }
+    if ((vscode.workspace.workspaceFolders ?? []).length === 0) {
+      return 'no-folder'
+    }
+    const model = this.registry.activeModel
+    if (!model) {
+      return 'no-repo'
+    }
+    if (model.graph) {
+      return 'ready'
+    }
+    return model.error ? 'error' : 'loading'
+  }
+
+  state(): ViewState {
+    const config = readConfig()
+    const model = this.registry.activeModel
+    return {
+      status: this.status(),
+      repos: this.registry.summaries(),
+      activeRepoId: this.registry.activeRepoId,
+      graph: model?.graph ?? null,
+      busy: this.operations.busy,
+      error: this.operations.error ?? model?.error ?? null,
+      settings: { changeIdLength: config.changeIdLength, showFullPaths: config.showFullPaths },
+    }
+  }
+
+  postState(): void {
+    const state = this.state()
+    this.post({ type: 'state', state })
+    this.updateBadge(state)
+  }
+
+  private updateBadge(state: ViewState): void {
+    if (!this.view) {
+      return
+    }
+    const count = state.graph?.workingCopyFiles.length ?? 0
+    this.view.badge = count > 0 ? { value: count, tooltip: `${count} changed files in @` } : undefined
+    const active = state.repos.find((r) => r.id === state.activeRepoId)
+    this.view.description = state.repos.length > 1 ? active?.label : undefined
+  }
+
+  dispose(): void {
+    this.disposables.forEach((d) => d.dispose())
+    this.panel?.dispose()
+  }
+}
