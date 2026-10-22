@@ -79,4 +79,6 @@ npm run package     # builds ukemi-0.1.0.vsix
 code --install-extension ukemi-0.1.0.vsix
 ```
 
-Then run **Developer: Reload Window**. To remove it, run `code --uninstall-extension ukemi.ukemi`.
+In Cursor, `npm run install:cursor` packages and installs in one step.
+
+Then run **Developer: Restart Extension Host** or **Developer: Reload Window**. The editor keeps the old code loaded and does not ask for a restart when the version number is the same. To remove it, run `code --uninstall-extension ukemi.ukemi`.

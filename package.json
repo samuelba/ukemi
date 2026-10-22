@@ -17,6 +17,7 @@
     "test:coverage": "vitest run --coverage",
     "icons": "node scripts/render-icons.mjs",
     "package": "vsce package --no-dependencies",
+    "install:cursor": "npm run package && cursor --install-extension ukemi-$npm_package_version.vsix --force",
     "vscode:prepublish": "npm run package:build",
     "test:e2e": "npm run build && node test/e2e/runE2e.mjs"
   },
