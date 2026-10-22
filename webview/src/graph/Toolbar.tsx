@@ -23,6 +23,8 @@ interface ToolbarProps {
   activeRepoId: string | null
   graph: GraphState | null
   isBusy: boolean
+  isEvolutionOpen: boolean
+  onToggleEvolution: () => void
 }
 
 function command(name: string, context: Record<string, unknown> = {}) {
@@ -35,18 +37,21 @@ function ToolButton({
   onClick,
   isAccent,
   isDisabled,
+  isPressed,
 }: {
   icon: string | ReactNode
   label: string
   onClick: () => void
   isAccent?: boolean
   isDisabled?: boolean
+  isPressed?: boolean
 }) {
   return (
     <button
-      className={`icon-button${isAccent ? ' accent' : ''}`}
+      className={`icon-button${isAccent ? ' accent' : ''}${isPressed ? ' pressed' : ''}`}
       title={label}
       aria-label={label}
+      aria-pressed={isPressed}
       disabled={isDisabled}
       onClick={onClick}
     >
@@ -77,7 +82,14 @@ function hasUnsyncedCurrent(graph: GraphState): boolean {
   return graph.commits.some((c) => c.localBookmarks.some((b) => current.has(b.name) && !b.synced))
 }
 
-export function Toolbar({ repos, activeRepoId, graph, isBusy }: ToolbarProps) {
+export function Toolbar({
+  repos,
+  activeRepoId,
+  graph,
+  isBusy,
+  isEvolutionOpen,
+  onToggleEvolution,
+}: ToolbarProps) {
   const repoId = graph?.repoId
   const ignoresDepth = graph !== null && DEPTHLESS_FILTERS.includes(graph.filter)
   return (
@@ -113,6 +125,12 @@ export function Toolbar({ repos, activeRepoId, graph, isBusy }: ToolbarProps) {
               icon="search"
               label="Go to bookmark, request or revision"
               onClick={() => command('ukemi.goTo', { repoId })}
+            />
+            <ToolButton
+              icon="versions"
+              label={isEvolutionOpen ? 'Hide evolution' : 'Show evolution of the selected change'}
+              isPressed={isEvolutionOpen}
+              onClick={onToggleEvolution}
             />
             {graph.hasRemotes && (
               <>

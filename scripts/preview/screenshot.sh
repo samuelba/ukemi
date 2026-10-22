@@ -16,3 +16,5 @@ shot() {
 shot graph-dark 400,300 "theme=dark"
 shot graph-light 400,300 "theme=light"
 shot split-dark 700,520 "view=split&theme=dark"
+shot evolution-dark 400,420 "theme=dark&evolution"
+shot evolution-light 400,420 "theme=light&evolution"

@@ -42,9 +42,10 @@ async function main(root: string, output: string): Promise<void> {
         await model.filesFor(target.commitId),
       )
     : null
+  const evolution = await model.repo.evolution('@')
   writeFileSync(
     output,
-    `window.UKEMI_STATE = ${JSON.stringify(state)};\nwindow.UKEMI_SPLIT = ${JSON.stringify(split?.request ?? null)};\n`,
+    `window.UKEMI_STATE = ${JSON.stringify(state)};\nwindow.UKEMI_SPLIT = ${JSON.stringify(split?.request ?? null)};\nwindow.UKEMI_EVOLUTION = ${JSON.stringify(evolution)};\n`,
   )
 }
 

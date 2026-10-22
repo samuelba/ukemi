@@ -61,6 +61,16 @@ export interface Operation {
   time: string
 }
 
+export interface EvolutionEntry {
+  commitId: string
+  commitPrefix: string
+  parents: string[]
+  description: string
+  timestamp: string
+  isEmpty: boolean
+  operation: string
+}
+
 export interface Remote {
   name: string
   url: string

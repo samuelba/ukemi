@@ -65,6 +65,21 @@ export const FILES_TEMPLATE =
     conflicted: 'json(self.conflicted_files().map(|f| f.path()))',
   }) + LINE_END
 
+export const EVOLOG_TEMPLATE =
+  jsonObject({
+    commit_id: 'json(commit.commit_id())',
+    commit_prefix: 'json(commit.commit_id().shortest().prefix())',
+    parents: 'json(commit.parents().map(|p| p.commit_id()))',
+    description: 'json(commit.description())',
+    timestamp: 'json(commit.committer().timestamp())',
+    is_empty: 'json(commit.empty())',
+    operation: 'if(operation, json(operation.description()), "\\"\\"")',
+  }) + LINE_END
+
+export const DIFF_FILES_TEMPLATE =
+  'json({"path" => path.display(), "status" => status, "source" => source.path().display()})' +
+  LINE_END
+
 export const COMMIT_ID_TEMPLATE = 'commit_id ++ "\\n"'
 
 export const WORKSPACE_TEMPLATE =

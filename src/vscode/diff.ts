@@ -1,12 +1,16 @@
 import { basename, join } from 'node:path'
 import * as vscode from 'vscode'
-import type { ChangedFile } from '../../shared/model'
+import { z } from 'zod'
+import { sameParents } from '../../shared/evolution'
+import type { ChangedFile, EvolutionEntry } from '../../shared/model'
 import type { CommitView } from '../../shared/protocol'
 import type { RepoModel } from '../repo/repoModel'
 import type { RepoRegistry } from './registry'
 
 export const DIFF_SCHEME = 'ukemi'
+export const INTERDIFF_SCHEME = 'ukemi-interdiff'
 const BINARY_PLACEHOLDER = '(binary file)'
+const NO_DIFFERENCES = '(These versions have no differences in files or description.)'
 
 interface DiffQuery {
   root: string
@@ -100,6 +104,58 @@ export async function openCommitDiff(model: RepoModel, commit: CommitView, files
       file.status === 'removed' ? undefined : right,
     ]
   })
+  await vscode.commands.executeCommand('vscode.changes', title, resources)
+}
+
+const interdiffQuerySchema = z.object({ root: z.string(), from: z.string(), to: z.string() })
+
+function interdiffUri(root: string, from: EvolutionEntry, to: EvolutionEntry): vscode.Uri {
+  return vscode.Uri.from({
+    scheme: INTERDIFF_SCHEME,
+    path: `/${from.commitPrefix}..${to.commitPrefix}.diff`,
+    query: JSON.stringify({ root, from: from.commitId, to: to.commitId }),
+  })
+}
+
+export class InterdiffContentProvider implements vscode.TextDocumentContentProvider {
+  constructor(private readonly registry: RepoRegistry) {}
+
+  async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
+    let query: z.infer<typeof interdiffQuerySchema>
+    try {
+      query = interdiffQuerySchema.parse(JSON.parse(uri.query))
+    } catch {
+      return ''
+    }
+    const model = this.registry.modelFor(query.root)
+    if (!model) {
+      return ''
+    }
+    const patch = await model.repo.interdiff(query.from, query.to)
+    return patch || NO_DIFFERENCES
+  }
+}
+
+export async function openVersionDiff(
+  model: RepoModel,
+  commit: CommitView,
+  from: EvolutionEntry,
+  to: EvolutionEntry,
+) {
+  const files = sameParents(from.parents, to.parents)
+    ? await model.repo.diffFiles(from.commitId, to.commitId)
+    : []
+  if (files.length === 0) {
+    const document = await vscode.workspace.openTextDocument(interdiffUri(model.root, from, to))
+    await vscode.window.showTextDocument(document, { preview: true })
+    return
+  }
+  const title = `${changeLabel(commit)}: ${from.commitPrefix} → ${to.commitPrefix}`
+  const resources = files.map((file) => [
+    vscode.Uri.file(join(model.root, file.path)),
+    file.status === 'added' ? undefined : revisionUri(model.root, from.commitId, file.sourcePath),
+    file.status === 'removed' ? undefined : revisionUri(model.root, to.commitId, file.path),
+  ])
   await vscode.commands.executeCommand('vscode.changes', title, resources)
 }
 

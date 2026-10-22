@@ -1,5 +1,12 @@
 import { z } from 'zod'
-import type { ChangedFile, Commit, Operation, Remote, Workspace } from '../../shared/model'
+import type {
+  ChangedFile,
+  Commit,
+  EvolutionEntry,
+  Operation,
+  Remote,
+  Workspace,
+} from '../../shared/model'
 
 const signatureSchema = z.object({
   name: z.string(),
@@ -46,6 +53,18 @@ const workspaceSchema = z.object({
   name: z.string(),
   root: z.string().nullable(),
   commit_id: z.string(),
+})
+
+const diffFileSchema = z.object({ path: z.string(), status: fileStatusSchema, source: z.string() })
+
+const evolutionSchema = z.object({
+  commit_id: z.string(),
+  commit_prefix: z.string(),
+  parents: z.array(z.string()),
+  description: z.string(),
+  timestamp: z.string(),
+  is_empty: z.boolean(),
+  operation: z.string(),
 })
 
 const operationSchema = z.object({
@@ -125,6 +144,27 @@ export function parseWorkspaces(output: string): Workspace[] {
     name: entry.name,
     root: entry.root,
     commitId: entry.commit_id,
+  }))
+}
+
+export function parseEvolution(output: string): EvolutionEntry[] {
+  return parseLines(output, evolutionSchema, 'evolution').map((entry) => ({
+    commitId: entry.commit_id,
+    commitPrefix: entry.commit_prefix,
+    parents: entry.parents,
+    description: entry.description,
+    timestamp: entry.timestamp,
+    isEmpty: entry.is_empty,
+    operation: entry.operation,
+  }))
+}
+
+export function parseDiffFiles(output: string): ChangedFile[] {
+  return parseLines(output, diffFileSchema, 'diff').map((file) => ({
+    path: file.path,
+    sourcePath: file.source,
+    status: file.status,
+    isConflicted: false,
   }))
 }
 

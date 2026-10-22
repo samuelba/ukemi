@@ -1,9 +1,18 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import type { ChangedFile, Commit, Operation, Remote, Workspace } from '../../shared/model'
+import type {
+  ChangedFile,
+  Commit,
+  EvolutionEntry,
+  Operation,
+  Remote,
+  Workspace,
+} from '../../shared/model'
 import { SerialQueue } from '../util/serialQueue'
 import {
   parseCommitIds,
+  parseDiffFiles,
+  parseEvolution,
   parseFiles,
   parseLog,
   parseOperations,
@@ -14,6 +23,8 @@ import { rootFileset } from './revsets'
 import { JjRunner, NETWORK_TIMEOUT_MS, type RunResult } from './runner'
 import {
   COMMIT_ID_TEMPLATE,
+  DIFF_FILES_TEMPLATE,
+  EVOLOG_TEMPLATE,
   FILES_TEMPLATE,
   LOG_TEMPLATE,
   OP_LOG_TEMPLATE,
@@ -22,6 +33,7 @@ import {
 } from './templates'
 
 export const MAX_LOG_ENTRIES = 2000
+export const MAX_EVOLUTION_ENTRIES = 200
 
 export type SplitDirection = 'below' | 'above'
 export type RebaseMode = 'source' | 'revision'
@@ -82,6 +94,44 @@ export class JjRepo {
   async files(commitId: string): Promise<ChangedFile[]> {
     const { stdout } = await this.read(['log', '--no-graph', '-r', commitId, '-T', FILES_TEMPLATE])
     return parseFiles(stdout)
+  }
+
+  async evolution(revision: string): Promise<EvolutionEntry[]> {
+    const { stdout } = await this.read([
+      'evolog',
+      '--no-graph',
+      `--limit=${MAX_EVOLUTION_ENTRIES}`,
+      '-r',
+      revision,
+      '-T',
+      EVOLOG_TEMPLATE,
+    ])
+    return parseEvolution(stdout)
+  }
+
+  async diffFiles(fromCommitId: string, toCommitId: string): Promise<ChangedFile[]> {
+    const { stdout } = await this.read([
+      'diff',
+      '--from',
+      fromCommitId,
+      '--to',
+      toCommitId,
+      '-T',
+      DIFF_FILES_TEMPLATE,
+    ])
+    return parseDiffFiles(stdout)
+  }
+
+  async interdiff(fromCommitId: string, toCommitId: string): Promise<string> {
+    const { stdout } = await this.read([
+      'interdiff',
+      '--from',
+      fromCommitId,
+      '--to',
+      toCommitId,
+      '--git',
+    ])
+    return stdout
   }
 
   async workspaces(): Promise<Workspace[]> {
@@ -223,6 +273,10 @@ export class JjRepo {
 
   restoreFiles(commitId: string, paths: readonly string[]) {
     return this.mutate(['restore', '--changes-in', commitId, ...paths.map(rootFileset)])
+  }
+
+  restoreVersion(fromCommitId: string, intoCommitId: string) {
+    return this.mutate(['restore', '--from', fromCommitId, '--into', intoCommitId])
   }
 
   trackFiles(paths: readonly string[]) {

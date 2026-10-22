@@ -5,7 +5,12 @@ import { contextCommit, registerAll, type CommandEnv } from './vscode/commands/c
 import { fileCommands } from './vscode/commands/fileCommands'
 import { globalCommands } from './vscode/commands/globalCommands'
 import { refCommands } from './vscode/commands/refCommands'
-import { DIFF_SCHEME, RevisionContentProvider } from './vscode/diff'
+import {
+  DIFF_SCHEME,
+  INTERDIFF_SCHEME,
+  InterdiffContentProvider,
+  RevisionContentProvider,
+} from './vscode/diff'
 import { ForgeService } from './vscode/forgeService'
 import { GRAPH_VIEW_ID, GraphView } from './vscode/graphView'
 import { installJj, locateJj, offerInstall, updateTerminalPath } from './vscode/jjSetup'
@@ -72,6 +77,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
     vscode.workspace.registerTextDocumentContentProvider(
       DIFF_SCHEME,
       new RevisionContentProvider(registry),
+    ),
+    vscode.workspace.registerTextDocumentContentProvider(
+      INTERDIFF_SCHEME,
+      new InterdiffContentProvider(registry),
     ),
     vscode.workspace.onDidChangeConfiguration(async (e) => {
       if (

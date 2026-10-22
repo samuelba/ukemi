@@ -7,6 +7,7 @@ First release.
 - Change graph with bookmarks, tags, workspaces, conflicts and pull/merge request badges.
 - Drag and drop to rebase changes, move files and move bookmarks.
 - Describe, new, edit, squash, split by hunks or files, abandon, duplicate and revert.
+- Evolution panel: versions of a change, interdiff between versions, and restore.
 - Fetch, push, undo and redo.
 - GitHub pull requests and GitLab merge requests: create, status, CI, merge and clean-up.
 - Repositories in subfolders and many repositories per workspace, with a repository dropdown.

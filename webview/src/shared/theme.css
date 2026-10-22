@@ -111,6 +111,11 @@ body {
   color: var(--ukemi-accent);
 }
 
+.icon-button.pressed {
+  color: var(--vscode-inputOption-activeForeground, var(--vscode-icon-foreground));
+  background: var(--vscode-inputOption-activeBackground, var(--ukemi-selected));
+}
+
 .svg-icon {
   width: 16px;
   height: 16px;

@@ -90,8 +90,17 @@
       const view = params.get('view') === 'split' ? 'split' : 'graph'
       const reply =
         view === 'split' ? { type: 'load', request: window.UKEMI_SPLIT } : { type: 'state', state: window.UKEMI_STATE }
+      const evolutionReply = (message) => ({
+        type: 'evolution',
+        repoId: window.UKEMI_STATE.activeRepoId,
+        commitId: message.commitId,
+        entries: window.UKEMI_EVOLUTION,
+      })
       window.acquireVsCodeApi = () => ({
-        postMessage: (message) => message.type === 'ready' && window.postMessage(reply, '*'),
+        postMessage: (message) => {
+          if (message.type === 'ready') window.postMessage(reply, '*')
+          if (message.type === 'loadEvolution') window.postMessage(evolutionReply(message), '*')
+        },
         getState: () => undefined,
         setState: () => undefined,
       })
@@ -103,6 +112,9 @@
       const script = document.createElement('script')
       script.src = `../../dist/webview/${view}.js`
       document.body.appendChild(script)
+      if (params.has('evolution')) {
+        setTimeout(() => document.querySelector('[aria-label^="Show evolution"]')?.click(), 500)
+      }
       const scroll = Number(params.get('scroll') ?? 0)
       if (scroll > 0) {
         document.documentElement.style.cssText = 'height: 100%; overflow: hidden'
