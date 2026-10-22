@@ -1,10 +1,11 @@
-import type { GraphFilter, HistoryDepth } from '../../../shared/model'
+import { DEPTHLESS_FILTERS, type GraphFilter, type HistoryDepth } from '../../../shared/model'
 import type { GraphState, RepoSummary } from '../../../shared/protocol'
 import { postMessage } from '../shared/vscodeApi'
 
 const FILTERS: ReadonlyArray<{ id: GraphFilter; label: string; hint: string }> = [
   { id: 'recent', label: 'Recent', hint: 'Mutable changes, bookmarks and tags' },
-  { id: 'mine', label: 'Mine', hint: 'All your open changes, and your history in the time range' },
+  { id: 'mine', label: 'Mine', hint: 'All your open changes' },
+  { id: 'myHistory', label: 'My history', hint: 'Your open changes, and your history in the time range' },
   { id: 'stack', label: 'Stack', hint: 'Changes connected to the working copy' },
 ]
 
@@ -66,7 +67,7 @@ function hasUnsyncedCurrent(graph: GraphState): boolean {
 
 export function Toolbar({ repos, activeRepoId, graph, isBusy }: ToolbarProps) {
   const repoId = graph?.repoId
-  const ignoresDepth = graph?.filter === 'stack'
+  const ignoresDepth = graph !== null && DEPTHLESS_FILTERS.includes(graph.filter)
   return (
     <div className="toolbar">
       <div className="toolbar-row">

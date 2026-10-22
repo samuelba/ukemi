@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { GRAPH_FILTERS } from '../../shared/model'
 import { graphRevset } from '../../src/jj/revsets'
 import type { JjRepo } from '../../src/jj/repo'
 import { initRepo, jj, makeRepo, makeTempDir, writeFile, type Fixture } from '../helpers/jjFixture'
@@ -54,7 +55,7 @@ describe('log', () => {
   })
 
   test('evaluates every graph revset without errors', async () => {
-    for (const filter of ['recent', 'mine', 'stack'] as const) {
+    for (const filter of GRAPH_FILTERS) {
       for (const depth of ['7d', '30d', '1y', 'all'] as const) {
         const commits = await repo.log(graphRevset(filter, depth))
         expect(commits.some((c) => c.isWorkingCopy)).toBe(true)

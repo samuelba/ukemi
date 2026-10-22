@@ -53,8 +53,14 @@ describe('graphRevset', () => {
     expect(graphRevset('recent', '14d')).toContain('committer_date(after:"14 days ago")')
   })
 
-  test('shows all own open changes and own history within the depth for the mine filter', () => {
-    expect(graphRevset('mine', '30d')).toContain(
+  test('shows only own open changes for the mine filter, whatever the depth', () => {
+    expect(graphRevset('mine', '30d')).toBe(graphRevset('mine', '7d'))
+    expect(graphRevset('mine', '30d')).toContain('(mine() & mutable())')
+    expect(graphRevset('mine', '30d')).not.toContain('committer_date')
+  })
+
+  test('shows own open changes and own history within the depth for the my history filter', () => {
+    expect(graphRevset('myHistory', '30d')).toContain(
       'mine() & (mutable() | committer_date(after:"30 days ago"))',
     )
   })

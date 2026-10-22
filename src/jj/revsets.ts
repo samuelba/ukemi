@@ -36,6 +36,8 @@ function graphBase(filter: GraphFilter, depth: HistoryDepth): string {
     case 'recent':
       return `(mutable() | bookmarks() | remote_bookmarks() | tags()) & ${dateFilter(depth)}`
     case 'mine':
+      return 'mine() & mutable()'
+    case 'myHistory':
       return `mine() & (mutable() | ${dateFilter(depth)})`
     case 'stack':
       return 'reachable(@, mutable())'

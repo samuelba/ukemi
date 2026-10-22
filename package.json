@@ -990,12 +990,14 @@
           "enum": [
             "recent",
             "mine",
+            "myHistory",
             "stack"
           ],
           "default": "recent",
           "enumDescriptions": [
             "Your open changes, bookmarks and tags in the time range.",
-            "All your open changes, and your history in the time range.",
+            "All your open changes.",
+            "Your open changes, and your history in the time range.",
             "The changes connected to the working copy."
           ],
           "description": "Filter that the change graph shows first."
