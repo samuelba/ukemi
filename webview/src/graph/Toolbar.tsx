@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { DEPTHLESS_FILTERS, type GraphFilter, type HistoryDepth } from '../../../shared/model'
 import type { GraphState, RepoSummary } from '../../../shared/protocol'
 import { postMessage } from '../shared/vscodeApi'
@@ -35,7 +36,7 @@ function ToolButton({
   isAccent,
   isDisabled,
 }: {
-  icon: string
+  icon: string | ReactNode
   label: string
   onClick: () => void
   isAccent?: boolean
@@ -49,8 +50,19 @@ function ToolButton({
       disabled={isDisabled}
       onClick={onClick}
     >
-      <i className={`codicon codicon-${icon}`} />
+      {typeof icon === 'string' ? <i className={`codicon codicon-${icon}`} /> : icon}
     </button>
+  )
+}
+
+function PushAllIcon() {
+  return (
+    <svg className="svg-icon" viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        fillRule="evenodd"
+        d="M4.5 7H11.5A4.5 4.5 0 0 1 11.5 16H4.5A4.5 4.5 0 0 1 4.5 7ZM4.5 9L6.854 11.354A0.5 0.5 0 0 1 6.146 12.061L5 10.914V14A0.5 0.5 0 0 1 4 14V10.914L2.854 12.061A0.5 0.5 0 0 1 2.146 11.354ZM11.5 9L13.854 11.354A0.5 0.5 0 0 1 13.146 12.061L12 10.914V14A0.5 0.5 0 0 1 11 14V10.914L9.854 12.061A0.5 0.5 0 0 1 9.146 11.354ZM4.03 6.507C4.273 4.53 5.958 3 8 3C9.862 3 11.411 4.278 11.857 6H10.811C10.397 4.838 9.303 4 8 4C6.343 4 5.076 4.85 5.076 6.507Z"
+      />
+    </svg>
   )
 }
 
@@ -117,7 +129,7 @@ export function Toolbar({ repos, activeRepoId, graph, isBusy }: ToolbarProps) {
                   onClick={() => command('ukemi.pushCurrent', { repoId })}
                 />
                 <ToolButton
-                  icon="repo-push"
+                  icon={<PushAllIcon />}
                   label={
                     graph.hasUnpushed
                       ? 'Push all tracked bookmarks (unpushed changes)'
