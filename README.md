@@ -35,11 +35,45 @@ Ukemi is a visual interface for [Jujutsu (jj)](https://jj-vcs.github.io/jj/) in 
 
 ## Development
 
+Install the dependencies once:
+
 ```sh
 npm install
-npm run build
-npm test
-npm run package
 ```
 
-Press F5 in VS Code to start an Extension Development Host.
+### Run from source
+
+1. Open the `ukemi` folder in VS Code: `code ukemi`. The launch configuration is in `ukemi/.vscode`.
+2. Press F5, or select **Run Ukemi** in the Run and Debug view. The `watch` task builds the code first.
+3. In the new Extension Development Host window, open a folder that contains a jj repository.
+4. Select the Ukemi icon in the activity bar.
+
+The launch configuration disables VisualJJ in the development window, so that only one jj view shows.
+
+### Live changes
+
+The `watch` task stays active and rebuilds `dist/` each time you save. There is no hot reload. After a rebuild:
+
+| You changed | Do this in the Extension Development Host |
+| --- | --- |
+| `webview/src/**` | Run **Developer: Reload Webviews**, or close and open the Ukemi view. |
+| `src/**` or `shared/**` | Run **Developer: Reload Window** (Ctrl+R). |
+| `package.json` contributions | Stop the debug session and press F5 again. |
+
+To watch without the debugger, run `npm run watch` in a terminal.
+
+### Test and package
+
+```sh
+npm test            # unit and integration tests, needs jj on PATH
+npm run test:e2e    # runs the extension inside the installed VS Code
+npm run package     # builds ukemi-0.1.0.vsix
+```
+
+### Install the VSIX
+
+```sh
+code --install-extension ukemi-0.1.0.vsix
+```
+
+Then run **Developer: Reload Window**. To remove it, run `code --uninstall-extension ukemi.ukemi`.
