@@ -143,7 +143,14 @@ export class RepoModel {
 
     const views: CommitView[] = commits.map((commit, index) => ({
       ...commit,
-      row: rows[index] ?? { id: commit.commitId, column: 0, width: 1, incoming: [], outgoing: [], passThrough: [] },
+      row: rows[index] ?? {
+        id: commit.commitId,
+        column: 0,
+        width: 1,
+        incoming: [],
+        outgoing: [],
+        passThrough: [],
+      },
       isTrunk: commit.commitId === trunkId,
       requests: [],
     }))
@@ -166,9 +173,10 @@ export class RepoModel {
   private attachRequests(commits: readonly CommitView[]): CommitView[] {
     return commits.map((commit) => ({
       ...commit,
-      requests: this.requests.filter((r) =>
-        commit.localBookmarks.some((b) => b.name === r.headBranch) ||
-        commit.remoteBookmarks.some((b) => b.name === r.headBranch),
+      requests: this.requests.filter(
+        (r) =>
+          commit.localBookmarks.some((b) => b.name === r.headBranch) ||
+          commit.remoteBookmarks.some((b) => b.name === r.headBranch),
       ),
     }))
   }

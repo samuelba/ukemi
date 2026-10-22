@@ -66,7 +66,9 @@ export function createMessageHandler(env: CommandEnv) {
         if (!commit) {
           return
         }
-        const files = commit.isWorkingCopy ? (graph?.workingCopyFiles ?? []) : await model.filesFor(commit.commitId)
+        const files = commit.isWorkingCopy
+          ? (graph?.workingCopyFiles ?? [])
+          : await model.filesFor(commit.commitId)
         const file = files.find((f) => f.path === message.path)
         if (message.mode === 'file' || !file) {
           await openFileAtRevision(model, commit, message.path)

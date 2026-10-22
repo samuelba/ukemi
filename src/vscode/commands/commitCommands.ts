@@ -30,9 +30,17 @@ function mutable(commit: CommitView): boolean {
   return true
 }
 
-export async function describeCommit(env: CommandEnv, model: RepoModel, commit: CommitView): Promise<void> {
+export async function describeCommit(
+  env: CommandEnv,
+  model: RepoModel,
+  commit: CommitView,
+): Promise<void> {
   if (env.graphView.isVisible) {
-    env.graphView.post({ type: 'describe', commitId: commit.commitId, description: commit.description })
+    env.graphView.post({
+      type: 'describe',
+      commitId: commit.commitId,
+      description: commit.description,
+    })
     return
   }
   const message = await vscode.window.showInputBox({
@@ -45,7 +53,11 @@ export async function describeCommit(env: CommandEnv, model: RepoModel, commit: 
   }
 }
 
-export async function editOrNew(env: CommandEnv, model: RepoModel, commit: CommitView): Promise<void> {
+export async function editOrNew(
+  env: CommandEnv,
+  model: RepoModel,
+  commit: CommitView,
+): Promise<void> {
   if (commit.isImmutable) {
     await env.operations.run('New change', model, () => model.repo.newChange([commit.commitId]))
     return
@@ -108,18 +120,28 @@ async function pickBookmarkName(model: RepoModel, commit: CommitView): Promise<s
 async function splitByFiles(env: CommandEnv, { model, commit }: Target): Promise<void> {
   const files = await model.filesFor(commit.commitId)
   if (files.length < 2) {
-    void vscode.window.showInformationMessage('Ukemi: Split by files needs at least two changed files.')
+    void vscode.window.showInformationMessage(
+      'Ukemi: Split by files needs at least two changed files.',
+    )
     return
   }
   const picks = await vscode.window.showQuickPick(
     files.map((f) => ({ label: f.path, description: f.status })),
-    { canPickMany: true, title: `Split ${shortId(commit)}`, placeHolder: 'Pick the files for the new change below' },
+    {
+      canPickMany: true,
+      title: `Split ${shortId(commit)}`,
+      placeHolder: 'Pick the files for the new change below',
+    },
   )
   if (!picks || picks.length === 0 || picks.length === files.length) {
     return
   }
   await env.operations.run('Split', model, () =>
-    model.repo.splitFiles(commit.commitId, picks.map((p) => p.label), 'below'),
+    model.repo.splitFiles(
+      commit.commitId,
+      picks.map((p) => p.label),
+      'below',
+    ),
   )
 }
 
@@ -131,17 +153,27 @@ async function shipNow(env: CommandEnv, { model, commit }: Target): Promise<void
   }
   const onTrunk = await model.repo.commitIds(`present(trunk()) & ::${commit.commitId}`)
   if (onTrunk.length === 0) {
-    void vscode.window.showWarningMessage(`Ukemi: rebase ${shortId(commit)} on ${trunk} before shipping.`)
+    void vscode.window.showWarningMessage(
+      `Ukemi: rebase ${shortId(commit)} on ${trunk} before shipping.`,
+    )
     return
   }
   const blocked = await model.repo.commitIds(
     `(trunk()..${commit.commitId}) & (conflicts() | description(exact:""))`,
   )
   if (blocked.length > 0) {
-    void vscode.window.showWarningMessage('Ukemi: changes with conflicts or without description cannot ship.')
+    void vscode.window.showWarningMessage(
+      'Ukemi: changes with conflicts or without description cannot ship.',
+    )
     return
   }
-  if (!(await confirm(`Ship ${shortId(commit)} "${commitTitle(commit)}" to ${trunk}?`, 'Ship Now', `This pushes ${trunk} directly to the remote.`))) {
+  if (
+    !(await confirm(
+      `Ship ${shortId(commit)} "${commitTitle(commit)}" to ${trunk}?`,
+      'Ship Now',
+      `This pushes ${trunk} directly to the remote.`,
+    ))
+  ) {
     return
   }
   await env.operations.run('Ship', model, async () => {
@@ -160,7 +192,9 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
     })
 
   return {
-    'ukemi.commit.new': run('New change', ({ model, commit }) => model.repo.newChange([commit.commitId])),
+    'ukemi.commit.new': run('New change', ({ model, commit }) =>
+      model.repo.newChange([commit.commitId]),
+    ),
     'ukemi.commit.newBefore': run(
       'Insert change',
       ({ model, commit }) => model.repo.newChange([commit.commitId], { insertBefore: true }),
@@ -168,8 +202,16 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
     ),
     'ukemi.commit.edit': withTarget(env, ({ model, commit }) => editOrNew(env, model, commit)),
     'ukemi.commit.makeEditable': withTarget(env, async ({ model, commit }) => {
-      if (await confirm(`Edit immutable change ${shortId(commit)}?`, 'Edit Anyway', 'Rewriting immutable changes can rewrite shared history.')) {
-        await env.operations.run('Edit', model, () => model.repo.edit(commit.commitId, { ignoreImmutable: true }))
+      if (
+        await confirm(
+          `Edit immutable change ${shortId(commit)}?`,
+          'Edit Anyway',
+          'Rewriting immutable changes can rewrite shared history.',
+        )
+      ) {
+        await env.operations.run('Edit', model, () =>
+          model.repo.edit(commit.commitId, { ignoreImmutable: true }),
+        )
       }
     }),
     'ukemi.commit.describe': withTarget(env, async ({ model, commit }) => {
@@ -181,17 +223,23 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
       openCommitDiff(model, commit, await model.filesFor(commit.commitId)),
     ),
     'ukemi.commit.squash': withTarget(env, async ({ model, commit }) => {
-      const parent = commit.parents.length === 1 ? model.findCommit(commit.parents[0] ?? '') : undefined
+      const parent =
+        commit.parents.length === 1 ? model.findCommit(commit.parents[0] ?? '') : undefined
       if (!mutable(commit) || (parent && !mutable(parent))) {
         return
       }
       const parentDescription = parent?.description ?? ''
       const message = combineDescriptions(parentDescription, commit.description)
-      await env.operations.run('Squash', model, () => model.repo.squashIntoParent(commit.commitId, message))
+      await env.operations.run('Squash', model, () =>
+        model.repo.squashIntoParent(commit.commitId, message),
+      )
     }),
     'ukemi.commit.split': withTarget(env, async ({ model, commit }) => {
       if (mutable(commit)) {
-        await vscode.commands.executeCommand('ukemi.split.open', { repoId: model.root, commitId: commit.commitId })
+        await vscode.commands.executeCommand('ukemi.split.open', {
+          repoId: model.root,
+          commitId: commit.commitId,
+        })
       }
     }),
     'ukemi.commit.splitByFiles': withTarget(env, async (target) => {
@@ -200,17 +248,25 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
       }
     }),
     'ukemi.commit.abandon': withTarget(env, async ({ model, commit }) => {
-      if (mutable(commit) && (await confirm(`Abandon ${shortId(commit)} "${commitTitle(commit)}"?`, 'Abandon'))) {
+      if (
+        mutable(commit) &&
+        (await confirm(`Abandon ${shortId(commit)} "${commitTitle(commit)}"?`, 'Abandon'))
+      ) {
         await env.operations.run('Abandon', model, () => model.repo.abandon(commit.commitId))
       }
     }),
     'ukemi.commit.abandonSubtree': withTarget(env, async ({ model, commit }) => {
       const count = (await model.repo.commitIds(`${commit.commitId}::`)).length
-      if (mutable(commit) && (await confirm(`Abandon ${shortId(commit)} and ${count - 1} descendants?`, 'Abandon All'))) {
+      if (
+        mutable(commit) &&
+        (await confirm(`Abandon ${shortId(commit)} and ${count - 1} descendants?`, 'Abandon All'))
+      ) {
         await env.operations.run('Abandon', model, () => model.repo.abandon(`${commit.commitId}::`))
       }
     }),
-    'ukemi.commit.duplicate': run('Duplicate', ({ model, commit }) => model.repo.duplicate(commit.commitId)),
+    'ukemi.commit.duplicate': run('Duplicate', ({ model, commit }) =>
+      model.repo.duplicate(commit.commitId),
+    ),
     'ukemi.commit.duplicateSubtree': run('Duplicate', ({ model, commit }) =>
       model.repo.duplicate(`${commit.commitId}::`),
     ),
@@ -223,13 +279,17 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
     'ukemi.commit.rebaseOnto': withTarget(env, async ({ model, commit }) => {
       const destination = mutable(commit) ? await pickRebaseDestination(model) : undefined
       if (destination) {
-        await env.operations.run('Rebase', model, () => model.repo.rebase(commit.commitId, destination, 'source'))
+        await env.operations.run('Rebase', model, () =>
+          model.repo.rebase(commit.commitId, destination, 'source'),
+        )
       }
     }),
     'ukemi.commit.setBookmark': withTarget(env, async ({ model, commit }) => {
       const name = await pickBookmarkName(model, commit)
       if (name) {
-        await env.operations.run('Set bookmark', model, () => model.repo.setBookmark(name, commit.commitId))
+        await env.operations.run('Set bookmark', model, () =>
+          model.repo.setBookmark(name, commit.commitId),
+        )
       }
     }),
     'ukemi.commit.copyChangeId': withTarget(env, async ({ commit }) => {

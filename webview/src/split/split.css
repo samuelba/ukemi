@@ -1,0 +1,124 @@
+body {
+  background: var(--vscode-editor-background);
+}
+
+.split {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 12px 16px 32px;
+}
+
+.split-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--vscode-widget-border, transparent);
+  background: var(--vscode-editor-background);
+}
+
+.split-header h1 {
+  margin: 0;
+  font-size: 1.2em;
+}
+
+.split-header p {
+  margin: 0;
+}
+
+.split-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.split-file {
+  margin-top: 12px;
+  border: 1px solid var(--vscode-widget-border, var(--vscode-contrastBorder, transparent));
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.split-file-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: var(--vscode-sideBarSectionHeader-background, var(--vscode-editorWidget-background));
+}
+
+.split-file-head label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.split-file-head .path {
+  overflow: hidden;
+  font-family: var(--vscode-editor-font-family);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status {
+  padding: 0 4px;
+  border-radius: 2px;
+  font-size: 0.85em;
+  text-transform: uppercase;
+  color: var(--vscode-descriptionForeground);
+}
+
+.whole-note {
+  padding: 6px 12px;
+}
+
+.hunk {
+  border-top: 1px solid var(--vscode-widget-border, transparent);
+  border-left: 3px solid transparent;
+}
+
+.hunk.selected {
+  border-left-color: var(--ukemi-accent);
+}
+
+.hunk-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+  cursor: pointer;
+}
+
+.hunk-body {
+  margin: 0;
+  padding: 2px 0 4px;
+  overflow-x: auto;
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--vscode-editor-font-size);
+  cursor: pointer;
+  user-select: text;
+}
+
+.line {
+  padding: 0 8px;
+  white-space: pre;
+}
+
+.line.context {
+  color: var(--vscode-descriptionForeground);
+}
+
+.line.added {
+  background: var(--vscode-diffEditor-insertedLineBackground, rgba(141, 176, 119, 0.2));
+}
+
+.line.removed {
+  background: var(--vscode-diffEditor-removedLineBackground, rgba(228, 87, 46, 0.2));
+}

@@ -1,6 +1,12 @@
 import { z } from 'zod'
 import type { CiState, RequestBadge, RequestState } from '../../shared/protocol'
-import { requestJson, type CreateRequestInput, type ForgeClient, type HttpFetch, type MergeMethod } from './types'
+import {
+  requestJson,
+  type CreateRequestInput,
+  type ForgeClient,
+  type HttpFetch,
+  type MergeMethod,
+} from './types'
 
 const LIST_LIMIT = 50
 
@@ -40,7 +46,9 @@ const restPullSchema = z.object({
 
 type GithubPull = z.infer<typeof pullSchema>
 
-export function githubState(pull: Pick<GithubPull, 'state' | 'isDraft' | 'reviewDecision' | 'latestReviews'>): RequestState {
+export function githubState(
+  pull: Pick<GithubPull, 'state' | 'isDraft' | 'reviewDecision' | 'latestReviews'>,
+): RequestState {
   if (pull.state === 'MERGED') {
     return 'merged'
   }
@@ -104,7 +112,9 @@ export class GithubClient implements ForgeClient {
   }
 
   private get graphqlUrl(): string {
-    return this.host === 'github.com' ? 'https://api.github.com/graphql' : `https://${this.host}/api/graphql`
+    return this.host === 'github.com'
+      ? 'https://api.github.com/graphql'
+      : `https://${this.host}/api/graphql`
   }
 
   private call(url: string, init: RequestInit = {}): Promise<unknown> {

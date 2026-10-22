@@ -28,7 +28,10 @@ function bookmarkHandler(
   }
 }
 
-function requestFor(model: RepoModel, ctx: ReturnType<typeof parseContext>): RequestBadge | undefined {
+function requestFor(
+  model: RepoModel,
+  ctx: ReturnType<typeof parseContext>,
+): RequestBadge | undefined {
   return model.graph?.commits.flatMap((c) => c.requests).find((r) => r.number === ctx.number)
 }
 
@@ -105,19 +108,29 @@ async function createRequest(env: CommandEnv, arg: unknown, askName: boolean): P
     await env.operations.run('New change', model, () => model.repo.newChange([commit.commitId]))
   }
   await env.forge.refreshRequests(model, { force: true })
-  const open = await vscode.window.showInformationMessage(`Created #${created.number}: ${created.title}`, 'Open')
+  const open = await vscode.window.showInformationMessage(
+    `Created #${created.number}: ${created.title}`,
+    'Open',
+  )
   if (open) {
     await vscode.env.openExternal(vscode.Uri.parse(created.url))
   }
 }
 
-async function mergeRequest(env: CommandEnv, model: RepoModel, request: RequestBadge): Promise<void> {
+async function mergeRequest(
+  env: CommandEnv,
+  model: RepoModel,
+  request: RequestBadge,
+): Promise<void> {
   const client = await env.forge.client(model, true)
   if (!client) {
     return
   }
-  const methods: MergeMethod[] = client.kind === 'github' ? ['squash', 'merge', 'rebase'] : ['merge', 'squash']
-  const method = await vscode.window.showQuickPick(methods, { title: `Ship #${request.number} "${request.title}"` })
+  const methods: MergeMethod[] =
+    client.kind === 'github' ? ['squash', 'merge', 'rebase'] : ['merge', 'squash']
+  const method = await vscode.window.showQuickPick(methods, {
+    title: `Ship #${request.number} "${request.title}"`,
+  })
   if (!method) {
     return
   }
@@ -128,11 +141,21 @@ async function mergeRequest(env: CommandEnv, model: RepoModel, request: RequestB
   await env.forge.refreshRequests(model, { force: true })
 }
 
-async function cleanupRequest(env: CommandEnv, model: RepoModel, request: RequestBadge): Promise<void> {
+async function cleanupRequest(
+  env: CommandEnv,
+  model: RepoModel,
+  request: RequestBadge,
+): Promise<void> {
   const bookmark = `bookmarks(exact:${quoteRevsetString(request.headBranch)})`
   const revset = `(::${bookmark} ~ ::trunk()) & mutable()`
   const count = (await model.repo.commitIds(revset)).length
-  if (!(await confirm(`Clean up #${request.number}?`, 'Clean Up', `Abandons ${count} local changes and forgets bookmark "${request.headBranch}".`))) {
+  if (
+    !(await confirm(
+      `Clean up #${request.number}?`,
+      'Clean Up',
+      `Abandons ${count} local changes and forgets bookmark "${request.headBranch}".`,
+    ))
+  ) {
     return
   }
   await env.operations.run('Clean up', model, async () => {
@@ -151,7 +174,10 @@ async function deleteWorkspace(env: CommandEnv, model: RepoModel, name: string):
   const canDeleteFiles = workspace.root !== null && workspace.root !== model.root
   const choice = await vscode.window.showWarningMessage(
     `Delete workspace "${name}"?`,
-    { modal: true, detail: canDeleteFiles ? `Files in ${workspace.root} can also be deleted.` : undefined },
+    {
+      modal: true,
+      detail: canDeleteFiles ? `Files in ${workspace.root} can also be deleted.` : undefined,
+    },
     ...(canDeleteFiles ? ['Forget and Delete Files'] : []),
     'Forget Only',
   )
@@ -166,7 +192,10 @@ async function deleteWorkspace(env: CommandEnv, model: RepoModel, name: string):
   })
 }
 
-function workspaceHandler(env: CommandEnv, fn: (model: RepoModel, name: string) => Promise<unknown>): Handler {
+function workspaceHandler(
+  env: CommandEnv,
+  fn: (model: RepoModel, name: string) => Promise<unknown>,
+): Handler {
   return async (arg?: unknown) => {
     const ctx = parseContext(arg)
     const model = contextModel(env, ctx)
@@ -181,9 +210,17 @@ export function refCommands(env: CommandEnv): Record<string, Handler> {
     env.operations.run(label, model, task)
 
   return {
-    'ukemi.bookmark.push': bookmarkHandler(env, (model, name) => op('Push', model, () => model.repo.push(name))),
+    'ukemi.bookmark.push': bookmarkHandler(env, (model, name) =>
+      op('Push', model, () => model.repo.push(name)),
+    ),
     'ukemi.bookmark.delete': bookmarkHandler(env, async (model, name) => {
-      if (await confirm(`Delete bookmark "${name}"?`, 'Delete', 'The remote branch is deleted on the next push.')) {
+      if (
+        await confirm(
+          `Delete bookmark "${name}"?`,
+          'Delete',
+          'The remote branch is deleted on the next push.',
+        )
+      ) {
         await op('Delete bookmark', model, () => model.repo.deleteBookmark(name))
       }
     }),
@@ -205,8 +242,12 @@ export function refCommands(env: CommandEnv): Record<string, Handler> {
     'ukemi.request.pushUpdates': requestHandler(env, (model, request) =>
       op('Push', model, () => model.repo.push(request.headBranch)),
     ),
-    'ukemi.request.merge': requestHandler(env, (model, request) => mergeRequest(env, model, request)),
-    'ukemi.request.cleanup': requestHandler(env, (model, request) => cleanupRequest(env, model, request)),
+    'ukemi.request.merge': requestHandler(env, (model, request) =>
+      mergeRequest(env, model, request),
+    ),
+    'ukemi.request.cleanup': requestHandler(env, (model, request) =>
+      cleanupRequest(env, model, request),
+    ),
     'ukemi.workspace.newChange': workspaceHandler(env, async (model, name) => {
       const workspace = model.graph?.workspaces.find((w) => w.name === name)
       if (workspace?.root) {
@@ -223,9 +264,13 @@ export function refCommands(env: CommandEnv): Record<string, Handler> {
     'ukemi.workspace.open': workspaceHandler(env, async (model, name) => {
       const root = model.graph?.workspaces.find((w) => w.name === name)?.root
       if (root) {
-        await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), { forceNewWindow: true })
+        await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), {
+          forceNewWindow: true,
+        })
       }
     }),
-    'ukemi.workspace.delete': workspaceHandler(env, (model, name) => deleteWorkspace(env, model, name)),
+    'ukemi.workspace.delete': workspaceHandler(env, (model, name) =>
+      deleteWorkspace(env, model, name),
+    ),
   }
 }

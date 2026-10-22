@@ -1,0 +1,12 @@
+**
+!dist/extension.js
+!dist/splitTool.js
+!dist/webview/*.js
+!dist/webview/*.css
+!dist/webview/*.ttf
+!resources/icon.png
+!resources/activity.svg
+!package.json
+!README.md
+!CHANGELOG.md
+!LICENSE

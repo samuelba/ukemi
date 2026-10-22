@@ -49,7 +49,12 @@ describe('forge detection', () => {
 
 describe('request state mapping', () => {
   test('maps GitHub pull request states', () => {
-    const base = { state: 'OPEN' as const, isDraft: false, reviewDecision: null, latestReviews: { totalCount: 0 } }
+    const base = {
+      state: 'OPEN' as const,
+      isDraft: false,
+      reviewDecision: null,
+      latestReviews: { totalCount: 0 },
+    }
     expect(githubState(base)).toBe('open')
     expect(githubState({ ...base, isDraft: true })).toBe('draft')
     expect(githubState({ ...base, latestReviews: { totalCount: 2 } })).toBe('reviewed')
@@ -99,13 +104,25 @@ describe('GithubClient', () => {
       'github.com',
       'o/r',
       'token',
-      fakeFetch({ graphql: { data: { repository: { pullRequests: { nodes: [node(1, 'mine'), node(2, 'other')] } } } } }),
+      fakeFetch({
+        graphql: {
+          data: { repository: { pullRequests: { nodes: [node(1, 'mine'), node(2, 'other')] } } },
+        },
+      }),
     )
 
     const requests = await client.listRequests(['mine'])
 
     expect(requests).toEqual([
-      { number: 1, title: 'PR 1', url: 'https://github.com/o/r/pull/1', state: 'open', ci: 'success', headBranch: 'mine', baseBranch: 'main' },
+      {
+        number: 1,
+        title: 'PR 1',
+        url: 'https://github.com/o/r/pull/1',
+        state: 'open',
+        ci: 'success',
+        headBranch: 'mine',
+        baseBranch: 'main',
+      },
     ])
   })
 
@@ -115,10 +132,28 @@ describe('GithubClient', () => {
       'ghe.corp',
       'o/r',
       't',
-      fakeFetch({ '/pulls': { number: 5, title: 't', html_url: 'u', draft: true, head: { ref: 'h' }, base: { ref: 'b' } } }, calls),
+      fakeFetch(
+        {
+          '/pulls': {
+            number: 5,
+            title: 't',
+            html_url: 'u',
+            draft: true,
+            head: { ref: 'h' },
+            base: { ref: 'b' },
+          },
+        },
+        calls,
+      ),
     )
 
-    const created = await client.createRequest({ head: 'h', base: 'b', title: 't', body: '', isDraft: true })
+    const created = await client.createRequest({
+      head: 'h',
+      base: 'b',
+      title: 't',
+      body: '',
+      isDraft: true,
+    })
 
     expect(calls).toEqual(['POST https://ghe.corp/api/v3/repos/o/r/pulls'])
     expect(created.state).toBe('draft')
@@ -137,7 +172,15 @@ describe('GitlabClient', () => {
           '/merge_requests/7/approvals': { approved: true, approved_by: [{}] },
           '/merge_requests/7': { head_pipeline: { status: 'failed' } },
           '/merge_requests?': [
-            { iid: 7, title: 'MR', web_url: 'w', state: 'opened', draft: false, source_branch: 'feat', target_branch: 'main' },
+            {
+              iid: 7,
+              title: 'MR',
+              web_url: 'w',
+              state: 'opened',
+              draft: false,
+              source_branch: 'feat',
+              target_branch: 'main',
+            },
           ],
         },
         calls,
@@ -151,8 +194,11 @@ describe('GitlabClient', () => {
   })
 
   test('surfaces API errors with the status code', async () => {
-    const client = new GitlabClient('gitlab.com', 'a/b', 't', async () =>
-      new Response(JSON.stringify({ message: '401 Unauthorized' }), { status: 401 }),
+    const client = new GitlabClient(
+      'gitlab.com',
+      'a/b',
+      't',
+      async () => new Response(JSON.stringify({ message: '401 Unauthorized' }), { status: 401 }),
     )
 
     const error = await client.listRequests([]).catch((e: unknown) => e)

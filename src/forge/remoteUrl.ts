@@ -29,7 +29,10 @@ export function parseRemoteUrl(url: string): RemoteLocation | null {
     host = match[1]
     path = match[2]
   }
-  const projectPath = path.replace(/^\/+/, '').replace(/\/+$/, '').replace(/\.git$/, '')
+  const projectPath = path
+    .replace(/^\/+/, '')
+    .replace(/\/+$/, '')
+    .replace(/\.git$/, '')
   if (!host || !projectPath.includes('/')) {
     return null
   }

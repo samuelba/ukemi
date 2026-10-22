@@ -2,7 +2,11 @@ import * as vscode from 'vscode'
 import type { RepoRegistry } from './registry'
 
 export class RepoStatusBar implements vscode.Disposable {
-  private readonly item = vscode.window.createStatusBarItem('ukemi.repo', vscode.StatusBarAlignment.Left, 50)
+  private readonly item = vscode.window.createStatusBarItem(
+    'ukemi.repo',
+    vscode.StatusBarAlignment.Left,
+    50,
+  )
   private readonly subscription: vscode.Disposable
 
   constructor(private readonly registry: RepoRegistry) {

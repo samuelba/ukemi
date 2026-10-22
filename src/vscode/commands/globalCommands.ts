@@ -31,7 +31,12 @@ async function selectRepository(env: CommandEnv): Promise<void> {
   const pick = await vscode.window.showQuickPick(
     repos.map((r) => ({
       label: r.label,
-      description: r.kind === 'git' ? 'Git only, not initialized for jj' : r.changedFiles ? `${r.changedFiles} changed` : '',
+      description:
+        r.kind === 'git'
+          ? 'Git only, not initialized for jj'
+          : r.changedFiles
+            ? `${r.changedFiles} changed`
+            : '',
       detail: r.id,
       id: r.id,
       repoKind: r.kind,
@@ -51,8 +56,13 @@ async function selectRepository(env: CommandEnv): Promise<void> {
 export async function initRepo(env: CommandEnv, root?: string): Promise<void> {
   const folder =
     root ??
-    (await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, openLabel: 'Initialize jj' }))?.[0]
-      ?.fsPath
+    (
+      await vscode.window.showOpenDialog({
+        canSelectFolders: true,
+        canSelectFiles: false,
+        openLabel: 'Initialize jj',
+      })
+    )?.[0]?.fsPath
   if (!folder) {
     return
   }
@@ -76,7 +86,10 @@ async function goTo(env: CommandEnv, model: RepoModel): Promise<void> {
   const graph = model.graph
   type Item = vscode.QuickPickItem & { revision?: string; workspaceRoot?: string }
   const bookmarkEntries = (graph?.commits ?? []).flatMap((c): Array<[string, Item]> => [
-    ...c.localBookmarks.map((b): [string, Item] => [b.name, { label: `$(bookmark) ${b.name}`, revision: c.commitId }]),
+    ...c.localBookmarks.map((b): [string, Item] => [
+      b.name,
+      { label: `$(bookmark) ${b.name}`, revision: c.commitId },
+    ]),
     ...c.remoteBookmarks.map((b): [string, Item] => [
       `${b.name}@${b.remote}`,
       { label: `$(cloud) ${b.name}@${b.remote}`, revision: c.commitId },
@@ -84,11 +97,18 @@ async function goTo(env: CommandEnv, model: RepoModel): Promise<void> {
   ])
   const bookmarks: Item[] = [...new Map(bookmarkEntries).values()]
   const requests: Item[] = (graph?.commits ?? []).flatMap((c) =>
-    c.requests.map((r) => ({ label: `$(git-pull-request) #${r.number} ${r.title}`, revision: c.commitId })),
+    c.requests.map((r) => ({
+      label: `$(git-pull-request) #${r.number} ${r.title}`,
+      revision: c.commitId,
+    })),
   )
   const workspaces: Item[] = (graph?.workspaces ?? [])
     .filter((w) => w.root && w.root !== model.root)
-    .map((w) => ({ label: `$(folder) ${w.name}`, description: 'workspace', workspaceRoot: w.root ?? undefined }))
+    .map((w) => ({
+      label: `$(folder) ${w.name}`,
+      description: 'workspace',
+      workspaceRoot: w.root ?? undefined,
+    }))
 
   const pick = vscode.window.createQuickPick<Item>()
   pick.title = 'Go to branch, request or workspace'
@@ -109,9 +129,13 @@ async function goTo(env: CommandEnv, model: RepoModel): Promise<void> {
     return
   }
   if (typeof choice !== 'string' && choice.workspaceRoot) {
-    await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(choice.workspaceRoot), {
-      forceNewWindow: true,
-    })
+    await vscode.commands.executeCommand(
+      'vscode.openFolder',
+      vscode.Uri.file(choice.workspaceRoot),
+      {
+        forceNewWindow: true,
+      },
+    )
     return
   }
   const revision = typeof choice === 'string' ? choice : choice.revision
@@ -136,9 +160,14 @@ async function addWorkspace(env: CommandEnv, model: RepoModel): Promise<void> {
     return true
   })
   if (created) {
-    const open = await vscode.window.showInformationMessage(`Workspace "${name}" created in ${path}.`, 'Open in New Window')
+    const open = await vscode.window.showInformationMessage(
+      `Workspace "${name}" created in ${path}.`,
+      'Open in New Window',
+    )
     if (open) {
-      await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(path), { forceNewWindow: true })
+      await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(path), {
+        forceNewWindow: true,
+      })
     }
   }
 }
@@ -164,9 +193,15 @@ export function globalCommands(env: CommandEnv): Record<string, Handler> {
       await env.operations.run('Fetch', model, () => model.repo.fetch())
       await env.forge.refreshRequests(model, { force: true })
     }),
-    'ukemi.push': withModel(env, (model) => env.operations.run('Push', model, () => model.repo.push())),
-    'ukemi.undo': withModel(env, (model) => env.operations.run('Undo', model, () => model.repo.undo())),
-    'ukemi.redo': withModel(env, (model) => env.operations.run('Redo', model, () => model.repo.redo())),
+    'ukemi.push': withModel(env, (model) =>
+      env.operations.run('Push', model, () => model.repo.push()),
+    ),
+    'ukemi.undo': withModel(env, (model) =>
+      env.operations.run('Undo', model, () => model.repo.undo()),
+    ),
+    'ukemi.redo': withModel(env, (model) =>
+      env.operations.run('Redo', model, () => model.repo.redo()),
+    ),
     'ukemi.goTo': withModel(env, (model) => goTo(env, model)),
     'ukemi.addWorkspace': withModel(env, (model) => addWorkspace(env, model)),
     'ukemi.openCommitDiff': withModel(env, async (model) => {
@@ -178,11 +213,15 @@ export function globalCommands(env: CommandEnv): Record<string, Handler> {
     'ukemi.forge.signIn': withModel(env, async (model) => {
       const client = await env.forge.client(model, true)
       if (!client) {
-        void vscode.window.showWarningMessage('Ukemi: no GitHub or GitLab remote found for this repository.')
+        void vscode.window.showWarningMessage(
+          'Ukemi: no GitHub or GitLab remote found for this repository.',
+        )
         return
       }
       await env.forge.refreshRequests(model, { force: true })
     }),
     'ukemi.forge.signOut': withModel(env, (model) => env.forge.signOut(model)),
+    'ukemi.openSettings': () =>
+      vscode.commands.executeCommand('workbench.action.openSettings', 'ukemi'),
   }
 }

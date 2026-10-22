@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <mask id="gap">
+      <rect width="256" height="256" fill="#fff"/>
+      <polygon points="128,124 176,-8 255,65" fill="#000"/>
+    </mask>
+  </defs>
+  <rect width="256" height="256" rx="44" fill="#F4EFE6"/>
+  <path mask="url(#gap)" fill="#1F1D1A" fill-rule="evenodd"
+    d="M 36 124 A 92 92 0 1 0 220 124 A 92 92 0 1 0 36 124 Z M 63 120 A 71 71 0 1 0 205 120 A 71 71 0 1 0 63 120 Z"/>
+  <path d="M 106 174 L 106 128 C 106 104 150 116 150 96" fill="none" stroke="#1F1D1A" stroke-width="9" stroke-linecap="round"/>
+  <circle cx="106" cy="174" r="13" fill="#1F1D1A"/>
+  <circle cx="106" cy="128" r="13" fill="#1F1D1A"/>
+  <g transform="rotate(-8 150 84)">
+    <rect x="130" y="64" width="40" height="40" rx="6" fill="#E4572E"/>
+    <rect x="137" y="71" width="26" height="26" rx="3" fill="none" stroke="#F4EFE6" stroke-width="3"/>
+  </g>
+</svg>

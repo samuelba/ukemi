@@ -12,7 +12,11 @@ function isBinary(data: Buffer | null): boolean {
   return data !== null && data.subarray(0, BINARY_PROBE_BYTES).includes(0)
 }
 
-async function readOrNull(repo: JjRepo, commitId: string | undefined, path: string): Promise<Buffer | null> {
+async function readOrNull(
+  repo: JjRepo,
+  commitId: string | undefined,
+  path: string,
+): Promise<Buffer | null> {
   if (!commitId) {
     return null
   }
@@ -35,12 +39,18 @@ export class SplitSession {
     private readonly contents: ReadonlyMap<string, FileContents>,
   ) {}
 
-  static async load(repo: JjRepo, commit: SplitCommitInfo, files: readonly ChangedFile[]): Promise<SplitSession> {
+  static async load(
+    repo: JjRepo,
+    commit: SplitCommitInfo,
+    files: readonly ChangedFile[],
+  ): Promise<SplitSession> {
     const contents = new Map<string, FileContents>()
     const splitFiles: SplitFile[] = await Promise.all(
       files.map(async (file) => {
-        const left = file.status === 'added' ? null : await readOrNull(repo, commit.parentId, file.sourcePath)
-        const right = file.status === 'removed' ? null : await readOrNull(repo, commit.commitId, file.path)
+        const left =
+          file.status === 'added' ? null : await readOrNull(repo, commit.parentId, file.sourcePath)
+        const right =
+          file.status === 'removed' ? null : await readOrNull(repo, commit.commitId, file.path)
         contents.set(file.path, { left, right })
         const binary = isBinary(left) || isBinary(right)
         return {
@@ -48,7 +58,9 @@ export class SplitSession {
           sourcePath: file.sourcePath,
           status: file.status,
           isBinary: binary,
-          segments: binary ? [] : computeSegments(left?.toString('utf8') ?? '', right?.toString('utf8') ?? ''),
+          segments: binary
+            ? []
+            : computeSegments(left?.toString('utf8') ?? '', right?.toString('utf8') ?? ''),
         }
       }),
     )

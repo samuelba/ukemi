@@ -17,7 +17,11 @@ import { openSplitPanel } from './vscode/splitPanel'
 import { RepoStatusBar } from './vscode/statusBar'
 import { createMessageHandler } from './vscode/webviewMessages'
 
-export async function activate(context: vscode.ExtensionContext): Promise<void> {
+export interface UkemiApi {
+  readonly registry: RepoRegistry
+}
+
+export async function activate(context: vscode.ExtensionContext): Promise<UkemiApi> {
   const channel = vscode.window.createOutputChannel('Ukemi', { log: true })
   const logger = createOutputLogger(channel)
   const storageDir = context.globalStorageUri.fsPath
@@ -65,11 +69,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.window.registerWebviewViewProvider(GRAPH_VIEW_ID, graphView, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
-    vscode.workspace.registerTextDocumentContentProvider(DIFF_SCHEME, new RevisionContentProvider(registry)),
+    vscode.workspace.registerTextDocumentContentProvider(
+      DIFF_SCHEME,
+      new RevisionContentProvider(registry),
+    ),
     vscode.workspace.onDidChangeConfiguration(async (e) => {
-      if (e.affectsConfiguration('ukemi.jjPath') || e.affectsConfiguration('ukemi.addJjToTerminalPath')) {
+      if (
+        e.affectsConfiguration('ukemi.jjPath') ||
+        e.affectsConfiguration('ukemi.addJjToTerminalPath')
+      ) {
         await reloadJj()
-      } else if (e.affectsConfiguration('ukemi.repoScanDepth') || e.affectsConfiguration('ukemi.repoScanExclude')) {
+      } else if (
+        e.affectsConfiguration('ukemi.repoScanDepth') ||
+        e.affectsConfiguration('ukemi.repoScanExclude')
+      ) {
         await registry.discover()
       }
     }),
@@ -98,6 +111,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     void offerInstall(storageDir, logger).then((installed) => (installed ? reloadJj() : undefined))
   }
   await registry.discover()
+  return { registry }
 }
 
 export function deactivate(): void {

@@ -42,6 +42,8 @@ export function buildPlan(
     }
     const text = buildContent(file.segments, hunks)
     const isAbsent = text.length === 0 && (data.left === null || data.right === null)
-    return [{ path: file.path, content: isAbsent ? null : Buffer.from(text, 'utf8').toString('base64') }]
+    return [
+      { path: file.path, content: isAbsent ? null : Buffer.from(text, 'utf8').toString('base64') },
+    ]
   })
 }

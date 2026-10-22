@@ -73,9 +73,10 @@ function diffSides(model: RepoModel, commit: CommitView, file: ChangedFile) {
   const parent = commit.parents[0]
   const left = parent ? revisionUri(model.root, parent, file.sourcePath) : undefined
   const fileUri = vscode.Uri.file(join(model.root, file.path))
-  const right = commit.isWorkingCopy && file.status !== 'removed'
-    ? fileUri
-    : revisionUri(model.root, commit.commitId, file.path)
+  const right =
+    commit.isWorkingCopy && file.status !== 'removed'
+      ? fileUri
+      : revisionUri(model.root, commit.commitId, file.path)
   return { left, right, fileUri }
 }
 
@@ -93,7 +94,11 @@ export async function openCommitDiff(model: RepoModel, commit: CommitView, files
   const title = `${changeLabel(commit)}: ${commit.description.split('\n')[0] || '(no description)'}`
   const resources = files.map((file) => {
     const { left, right, fileUri } = diffSides(model, commit, file)
-    return [fileUri, file.status === 'added' ? undefined : left, file.status === 'removed' ? undefined : right]
+    return [
+      fileUri,
+      file.status === 'added' ? undefined : left,
+      file.status === 'removed' ? undefined : right,
+    ]
   })
   await vscode.commands.executeCommand('vscode.changes', title, resources)
 }

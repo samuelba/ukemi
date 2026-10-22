@@ -64,9 +64,17 @@ describe('resolveJj', () => {
     const fake = join(fixture.dir, 'old-jj')
     writeFileSync(fake, '#!/bin/sh\necho "jj 0.20.0"\n', { mode: 0o755 })
 
-    const result = await resolveJj({ configuredPath: fake, storageDir: fixture.dir, searchPaths: [] })
+    const result = await resolveJj({
+      configuredPath: fake,
+      storageDir: fixture.dir,
+      searchPaths: [],
+    })
 
-    expect(result).toEqual({ kind: 'too-old', path: fake, version: { major: 0, minor: 20, patch: 0 } })
+    expect(result).toEqual({
+      kind: 'too-old',
+      path: fake,
+      version: { major: 0, minor: 20, patch: 0 },
+    })
   })
 
   test('reports a missing jj and an invalid configured path', async () => {

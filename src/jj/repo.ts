@@ -67,7 +67,14 @@ export class JjRepo {
   }
 
   async commitIds(revset: string): Promise<string[]> {
-    const { stdout } = await this.read(['log', '--no-graph', '-r', revset, '-T', COMMIT_ID_TEMPLATE])
+    const { stdout } = await this.read([
+      'log',
+      '--no-graph',
+      '-r',
+      revset,
+      '-T',
+      COMMIT_ID_TEMPLATE,
+    ])
     return parseCommitIds(stdout)
   }
 
@@ -125,7 +132,11 @@ export class JjRepo {
   }
 
   edit(commitId: string, options: { ignoreImmutable?: boolean } = {}) {
-    return this.mutate(['edit', commitId, ...(options.ignoreImmutable ? ['--ignore-immutable'] : [])])
+    return this.mutate([
+      'edit',
+      commitId,
+      ...(options.ignoreImmutable ? ['--ignore-immutable'] : []),
+    ])
   }
 
   describe(commitId: string, message: string) {

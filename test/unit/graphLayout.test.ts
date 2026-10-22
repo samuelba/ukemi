@@ -48,7 +48,12 @@ describe('layoutGraph', () => {
   })
 
   test('reports the width needed for each row', () => {
-    const rows = layoutGraph([node('x', 'base'), node('y', 'base'), node('z', 'base'), node('base')])
+    const rows = layoutGraph([
+      node('x', 'base'),
+      node('y', 'base'),
+      node('z', 'base'),
+      node('base'),
+    ])
 
     expect(rows.map((r) => r.width)).toEqual([1, 2, 2, 1])
     expect(rows.map((r) => r.column)).toEqual([0, 1, 1, 0])

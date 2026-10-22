@@ -10,7 +10,8 @@ export function jjString(text: string): string {
 
 export function jsonObject(fields: Record<string, string>): string {
   const parts = Object.entries(fields).map(
-    ([key, expr], index) => `${jjString(`${index === 0 ? '{' : ','}${JSON.stringify(key)}:`)} ++ ${expr}`,
+    ([key, expr], index) =>
+      `${jjString(`${index === 0 ? '{' : ','}${JSON.stringify(key)}:`)} ++ ${expr}`,
   )
   return `${parts.join(' ++ ')} ++ ${jjString('}')}`
 }

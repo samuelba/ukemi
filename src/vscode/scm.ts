@@ -49,7 +49,11 @@ class RepoSourceControl implements vscode.Disposable {
     private readonly model: RepoModel,
     label: string,
   ) {
-    this.sourceControl = vscode.scm.createSourceControl('ukemi', `Ukemi: ${label}`, vscode.Uri.file(model.root))
+    this.sourceControl = vscode.scm.createSourceControl(
+      'ukemi',
+      `Ukemi: ${label}`,
+      vscode.Uri.file(model.root),
+    )
     this.sourceControl.inputBox.visible = false
     this.sourceControl.quickDiffProvider = {
       provideOriginalResource: (uri) => this.originalResource(uri),

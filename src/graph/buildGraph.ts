@@ -26,7 +26,10 @@ export async function buildGraphNodes(
     ),
   )
 
-  return commits.map((commit) => ({ id: commit.commitId, parents: edgesFor(commit, displayed, resolved) }))
+  return commits.map((commit) => ({
+    id: commit.commitId,
+    parents: edgesFor(commit, displayed, resolved),
+  }))
 }
 
 function edgesFor(

@@ -3,7 +3,15 @@ import * as vscode from 'vscode'
 import type { ChangedFile } from '../../../shared/model'
 import type { RepoModel } from '../../repo/repoModel'
 import { openFileAtRevision, openFileDiff } from '../diff'
-import { confirm, contextCommit, parseContext, shortId, type CommandEnv, type Handler, type Target } from './context'
+import {
+  confirm,
+  contextCommit,
+  parseContext,
+  shortId,
+  type CommandEnv,
+  type Handler,
+  type Target,
+} from './context'
 
 interface FileTarget extends Target {
   file: ChangedFile
@@ -16,7 +24,7 @@ async function fileTarget(env: CommandEnv, arg: unknown): Promise<FileTarget | n
     return null
   }
   const files = target.commit.isWorkingCopy
-    ? target.model.graph?.workingCopyFiles ?? []
+    ? (target.model.graph?.workingCopyFiles ?? [])
     : await target.model.filesFor(target.commit.commitId)
   const file = files.find((f) => f.path === ctx.path) ?? {
     path: ctx.path,
@@ -41,11 +49,16 @@ async function discard(env: CommandEnv, { model, commit, file }: FileTarget): Pr
     return
   }
   if (await confirm(`Discard changes to ${file.path} in ${shortId(commit)}?`, 'Discard')) {
-    await env.operations.run('Discard', model, () => model.repo.restoreFiles(commit.commitId, [file.path]))
+    await env.operations.run('Discard', model, () =>
+      model.repo.restoreFiles(commit.commitId, [file.path]),
+    )
   }
 }
 
-function editorTarget(env: CommandEnv, uri?: vscode.Uri): { model: RepoModel; path: string } | null {
+function editorTarget(
+  env: CommandEnv,
+  uri?: vscode.Uri,
+): { model: RepoModel; path: string } | null {
   const fileUri = uri ?? vscode.window.activeTextEditor?.document.uri
   if (!fileUri || fileUri.scheme !== 'file') {
     return null
@@ -66,23 +79,36 @@ function workingCopyContext(model: RepoModel, path: string) {
 
 function scmContext(env: CommandEnv, arg: unknown) {
   const ctx = parseContext(arg)
-  const root = typeof (arg as { root?: unknown })?.root === 'string' ? (arg as { root: string }).root : ctx.repoId
+  const root =
+    typeof (arg as { root?: unknown })?.root === 'string'
+      ? (arg as { root: string }).root
+      : ctx.repoId
   const model = root ? env.registry.modelFor(root) : null
   return model && ctx.path ? workingCopyContext(model, ctx.path) : null
 }
 
 export function fileCommands(env: CommandEnv): Record<string, Handler> {
   return {
-    'ukemi.file.open': withFile(env, ({ model, commit, file }) => openFileAtRevision(model, commit, file.path)),
-    'ukemi.file.openDiff': withFile(env, ({ model, commit, file }) => openFileDiff(model, commit, file)),
+    'ukemi.file.open': withFile(env, ({ model, commit, file }) =>
+      openFileAtRevision(model, commit, file.path),
+    ),
+    'ukemi.file.openDiff': withFile(env, ({ model, commit, file }) =>
+      openFileDiff(model, commit, file),
+    ),
     'ukemi.file.splitAbove': withFile(env, ({ model, commit, file }) =>
-      env.operations.run('Split', model, () => model.repo.splitFiles(commit.commitId, [file.path], 'above')),
+      env.operations.run('Split', model, () =>
+        model.repo.splitFiles(commit.commitId, [file.path], 'above'),
+      ),
     ),
     'ukemi.file.splitBelow': withFile(env, ({ model, commit, file }) =>
-      env.operations.run('Split', model, () => model.repo.splitFiles(commit.commitId, [file.path], 'below')),
+      env.operations.run('Split', model, () =>
+        model.repo.splitFiles(commit.commitId, [file.path], 'below'),
+      ),
     ),
     'ukemi.file.discard': withFile(env, (target) => discard(env, target)),
-    'ukemi.file.copyPath': withFile(env, async ({ file }) => vscode.env.clipboard.writeText(file.path)),
+    'ukemi.file.copyPath': withFile(env, async ({ file }) =>
+      vscode.env.clipboard.writeText(file.path),
+    ),
     'ukemi.scm.openDiff': async (arg?: unknown) => {
       const ctx = scmContext(env, arg)
       if (ctx) {

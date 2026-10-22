@@ -1,8 +1,7 @@
 import type { FileStatus } from './model'
 
 export type Segment =
-  | { kind: 'same'; text: string }
-  | { kind: 'change'; id: number; removed: string; added: string }
+  { kind: 'same'; text: string } | { kind: 'change'; id: number; removed: string; added: string }
 
 export interface SplitFile {
   path: string

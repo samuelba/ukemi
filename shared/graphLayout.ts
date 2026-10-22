@@ -78,7 +78,8 @@ export function layoutGraph(nodes: readonly GraphNodeInput[]): GraphRow[] {
         outgoing.push({ toColumn: existing, isElided: parent.isElided })
         return
       }
-      const slot = index === 0 && (lanes[column] ?? null) === null ? column : firstFree(lanes, column)
+      const slot =
+        index === 0 && (lanes[column] ?? null) === null ? column : firstFree(lanes, column)
       lanes = withLane(lanes, slot, { target: parent.id, isElided: parent.isElided })
       outgoing.push({ toColumn: slot, isElided: parent.isElided })
     })

@@ -17,7 +17,8 @@
     "test:coverage": "vitest run --coverage",
     "icons": "node scripts/render-icons.mjs",
     "package": "vsce package --no-dependencies",
-    "vscode:prepublish": "npm run package:build"
+    "vscode:prepublish": "npm run package:build",
+    "test:e2e": "npm run build && node test/e2e/runE2e.mjs"
   },
   "dependencies": {
     "@vscode/codicons": "^0.0.46-24",
@@ -33,6 +34,7 @@
     "@types/react-dom": "^19.3.0",
     "@types/vscode": "^1.90.0",
     "@vitest/coverage-v8": "^3.2.7",
+    "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^4.0.0",
     "esbuild": "^0.28.2",
     "eslint": "^9.39.5",
@@ -40,5 +42,988 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.72.0",
     "vitest": "^3.2.7"
+  },
+  "publisher": "ukemi",
+  "description": "Jujutsu (jj) version control GUI: change graph, drag and drop rebase, hunk split, undo, GitHub PRs and GitLab MRs.",
+  "license": "MIT",
+  "icon": "resources/icon.png",
+  "galleryBanner": {
+    "color": "#F4EFE6",
+    "theme": "light"
+  },
+  "categories": [
+    "SCM Providers",
+    "Visualization"
+  ],
+  "keywords": [
+    "jj",
+    "jujutsu",
+    "jj-vcs",
+    "vcs",
+    "scm",
+    "git",
+    "graph",
+    "stacked",
+    "gitlab",
+    "github"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ukemi",
+          "title": "Ukemi (jj)",
+          "icon": "resources/activity.svg"
+        }
+      ]
+    },
+    "views": {
+      "ukemi": [
+        {
+          "type": "webview",
+          "id": "ukemi.graph",
+          "name": "Changes",
+          "icon": "resources/activity.svg",
+          "contextualTitle": "Ukemi"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "ukemi.refresh",
+        "title": "Refresh",
+        "category": "Ukemi",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "ukemi.openView",
+        "title": "Show Change Graph",
+        "category": "Ukemi",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "ukemi.openPanel",
+        "title": "Open Change Graph in Editor",
+        "category": "Ukemi",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "ukemi.selectRepository",
+        "title": "Select Repository…",
+        "category": "Ukemi",
+        "icon": "$(repo)"
+      },
+      {
+        "command": "ukemi.initRepo",
+        "title": "Initialize jj Repository…",
+        "category": "Ukemi",
+        "icon": "$(add)"
+      },
+      {
+        "command": "ukemi.installJj",
+        "title": "Download Jujutsu (jj)",
+        "category": "Ukemi",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "ukemi.openSettings",
+        "title": "Open Settings",
+        "category": "Ukemi",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "ukemi.showLog",
+        "title": "Show Log",
+        "category": "Ukemi",
+        "icon": "$(output)"
+      },
+      {
+        "command": "ukemi.fetch",
+        "title": "Fetch",
+        "category": "Ukemi",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "ukemi.push",
+        "title": "Push Tracked Bookmarks",
+        "category": "Ukemi",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "ukemi.undo",
+        "title": "Undo Last Operation",
+        "category": "Ukemi",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "ukemi.redo",
+        "title": "Redo",
+        "category": "Ukemi",
+        "icon": "$(redo)"
+      },
+      {
+        "command": "ukemi.goTo",
+        "title": "Go to Bookmark, Request or Revision…",
+        "category": "Ukemi",
+        "icon": "$(search)"
+      },
+      {
+        "command": "ukemi.addWorkspace",
+        "title": "Add Workspace…",
+        "category": "Ukemi",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "ukemi.openCommitDiff",
+        "title": "Open Working Copy Changes",
+        "category": "Ukemi",
+        "icon": "$(diff-multiple)"
+      },
+      {
+        "command": "ukemi.openFileDiff",
+        "title": "Open Changes (jj)",
+        "category": "Ukemi",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "ukemi.revertFile",
+        "title": "Discard Changes in File (jj)",
+        "category": "Ukemi",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "ukemi.forge.signIn",
+        "title": "Sign In to GitHub or GitLab",
+        "category": "Ukemi",
+        "icon": "$(account)"
+      },
+      {
+        "command": "ukemi.forge.signOut",
+        "title": "Sign Out of GitLab",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.new",
+        "title": "New Change on Top",
+        "category": "Ukemi",
+        "icon": "$(add)"
+      },
+      {
+        "command": "ukemi.commit.newBefore",
+        "title": "New Change Before",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.edit",
+        "title": "Edit This Change",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.makeEditable",
+        "title": "Edit Immutable Change",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.describe",
+        "title": "Describe…",
+        "category": "Ukemi",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "ukemi.commit.viewDiff",
+        "title": "View Changes",
+        "category": "Ukemi",
+        "icon": "$(diff-multiple)"
+      },
+      {
+        "command": "ukemi.commit.squash",
+        "title": "Squash into Parent",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.split",
+        "title": "Split…",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.splitByFiles",
+        "title": "Split by Files…",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.split.open",
+        "title": "Split Change",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.abandon",
+        "title": "Abandon",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.abandonSubtree",
+        "title": "Abandon with Descendants",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.duplicate",
+        "title": "Duplicate",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.duplicateSubtree",
+        "title": "Duplicate with Descendants",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.revert",
+        "title": "Revert onto Working Copy",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.rebaseTrunk",
+        "title": "Rebase onto Trunk",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.rebaseOnto",
+        "title": "Rebase onto…",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.setBookmark",
+        "title": "Set Bookmark…",
+        "category": "Ukemi",
+        "icon": "$(bookmark)"
+      },
+      {
+        "command": "ukemi.commit.createRequest",
+        "title": "Create Pull/Merge Request…",
+        "category": "Ukemi",
+        "icon": "$(git-pull-request-create)"
+      },
+      {
+        "command": "ukemi.commit.createRequestNamed",
+        "title": "Create Pull/Merge Request with Bookmark Name…",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.shipNow",
+        "title": "Ship to Trunk Now…",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.copyChangeId",
+        "title": "Copy Change ID",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.copyCommitId",
+        "title": "Copy Commit ID",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.file.open",
+        "title": "Open File at Revision",
+        "category": "Ukemi",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "ukemi.file.openDiff",
+        "title": "Open Changes",
+        "category": "Ukemi",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "ukemi.file.splitAbove",
+        "title": "Move to New Change After",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.file.splitBelow",
+        "title": "Move to New Change Before",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.file.discard",
+        "title": "Discard Changes",
+        "category": "Ukemi",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "ukemi.file.copyPath",
+        "title": "Copy Path",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.scm.openDiff",
+        "title": "Open Changes",
+        "category": "Ukemi",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "ukemi.scm.discard",
+        "title": "Discard Changes",
+        "category": "Ukemi",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "ukemi.bookmark.push",
+        "title": "Push Bookmark",
+        "category": "Ukemi",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "ukemi.bookmark.delete",
+        "title": "Delete Bookmark",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.bookmark.forget",
+        "title": "Forget Bookmark",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.bookmark.track",
+        "title": "Track Remote Bookmark",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.bookmark.createRequest",
+        "title": "Create Pull/Merge Request…",
+        "category": "Ukemi",
+        "icon": "$(git-pull-request-create)"
+      },
+      {
+        "command": "ukemi.request.open",
+        "title": "Open in Browser",
+        "category": "Ukemi",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "ukemi.request.copyUrl",
+        "title": "Copy URL",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.request.pushUpdates",
+        "title": "Push Updates",
+        "category": "Ukemi",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "ukemi.request.merge",
+        "title": "Merge…",
+        "category": "Ukemi",
+        "icon": "$(git-merge)"
+      },
+      {
+        "command": "ukemi.request.cleanup",
+        "title": "Clean Up Merged Changes",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.workspace.newChange",
+        "title": "New Change in Workspace",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.workspace.open",
+        "title": "Open Workspace in New Window",
+        "category": "Ukemi",
+        "icon": "$(empty-window)"
+      },
+      {
+        "command": "ukemi.workspace.copyPath",
+        "title": "Copy Workspace Path",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.workspace.delete",
+        "title": "Delete Workspace…",
+        "category": "Ukemi"
+      }
+    ],
+    "menus": {
+      "webview/context": [
+        {
+          "command": "ukemi.commit.new",
+          "group": "1_new@1",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit'"
+        },
+        {
+          "command": "ukemi.commit.newBefore",
+          "group": "1_new@2",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isImmutable"
+        },
+        {
+          "command": "ukemi.commit.edit",
+          "group": "1_new@3",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isWorkingCopy && !isImmutable"
+        },
+        {
+          "command": "ukemi.commit.makeEditable",
+          "group": "1_new@4",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && isImmutable"
+        },
+        {
+          "command": "ukemi.commit.describe",
+          "group": "2_describe@1",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isImmutable"
+        },
+        {
+          "command": "ukemi.commit.viewDiff",
+          "group": "2_describe@2",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isEmpty"
+        },
+        {
+          "command": "ukemi.commit.squash",
+          "group": "3_rewrite@1",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isImmutable"
+        },
+        {
+          "command": "ukemi.commit.split",
+          "group": "3_rewrite@2",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isImmutable && !isEmpty",
+          "alt": "ukemi.commit.splitByFiles"
+        },
+        {
+          "command": "ukemi.commit.rebaseTrunk",
+          "group": "3_rewrite@3",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isImmutable"
+        },
+        {
+          "command": "ukemi.commit.rebaseOnto",
+          "group": "3_rewrite@4",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isImmutable"
+        },
+        {
+          "command": "ukemi.commit.duplicate",
+          "group": "3_rewrite@5",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit'",
+          "alt": "ukemi.commit.duplicateSubtree"
+        },
+        {
+          "command": "ukemi.commit.revert",
+          "group": "3_rewrite@6",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isEmpty"
+        },
+        {
+          "command": "ukemi.commit.abandon",
+          "group": "3_rewrite@7",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isImmutable",
+          "alt": "ukemi.commit.abandonSubtree"
+        },
+        {
+          "command": "ukemi.commit.setBookmark",
+          "group": "4_share@1",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit'"
+        },
+        {
+          "command": "ukemi.commit.createRequest",
+          "group": "4_share@2",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && hasForge && !isImmutable && !hasRequest",
+          "alt": "ukemi.commit.createRequestNamed"
+        },
+        {
+          "command": "ukemi.commit.shipNow",
+          "group": "4_share@3",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && hasRemotes && !isImmutable"
+        },
+        {
+          "command": "ukemi.commit.copyChangeId",
+          "group": "9_copy@1",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit'",
+          "alt": "ukemi.commit.copyCommitId"
+        },
+        {
+          "command": "ukemi.bookmark.push",
+          "group": "1_bookmark@1",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'bookmark' && !isRemoteOnly && !isSynced"
+        },
+        {
+          "command": "ukemi.bookmark.createRequest",
+          "group": "1_bookmark@2",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'bookmark' && hasForge && !isRemoteOnly && !isTrunk"
+        },
+        {
+          "command": "ukemi.bookmark.track",
+          "group": "1_bookmark@3",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'bookmark' && isRemoteOnly && !isTracked"
+        },
+        {
+          "command": "ukemi.bookmark.delete",
+          "group": "2_remove@1",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'bookmark' && !isRemoteOnly"
+        },
+        {
+          "command": "ukemi.bookmark.forget",
+          "group": "2_remove@2",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'bookmark'"
+        },
+        {
+          "command": "ukemi.request.open",
+          "group": "1_request@1",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'request'"
+        },
+        {
+          "command": "ukemi.request.pushUpdates",
+          "group": "1_request@2",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'request' && isOpen"
+        },
+        {
+          "command": "ukemi.request.merge",
+          "group": "1_request@3",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'request' && isOpen"
+        },
+        {
+          "command": "ukemi.request.cleanup",
+          "group": "1_request@4",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'request' && isMerged"
+        },
+        {
+          "command": "ukemi.request.copyUrl",
+          "group": "9_copy@1",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'request'"
+        },
+        {
+          "command": "ukemi.workspace.newChange",
+          "group": "1_workspace@1",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'workspace'"
+        },
+        {
+          "command": "ukemi.workspace.open",
+          "group": "1_workspace@2",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'workspace'"
+        },
+        {
+          "command": "ukemi.workspace.copyPath",
+          "group": "9_copy@1",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'workspace'"
+        },
+        {
+          "command": "ukemi.workspace.delete",
+          "group": "2_remove@1",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'workspace' && !isDefault"
+        },
+        {
+          "command": "ukemi.file.openDiff",
+          "group": "1_open@1",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'file'"
+        },
+        {
+          "command": "ukemi.file.open",
+          "group": "1_open@2",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'file'"
+        },
+        {
+          "command": "ukemi.file.splitBelow",
+          "group": "2_split@1",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'file' && canSplit"
+        },
+        {
+          "command": "ukemi.file.splitAbove",
+          "group": "2_split@2",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'file' && canSplit"
+        },
+        {
+          "command": "ukemi.file.discard",
+          "group": "3_discard@1",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'file' && !isImmutable"
+        },
+        {
+          "command": "ukemi.file.copyPath",
+          "group": "9_copy@1",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'file'"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "ukemi.openCommitDiff",
+          "group": "navigation@1",
+          "when": "view == ukemi.graph"
+        },
+        {
+          "command": "ukemi.openPanel",
+          "group": "navigation@2",
+          "when": "view == ukemi.graph"
+        },
+        {
+          "command": "ukemi.selectRepository",
+          "group": "1_repo@1",
+          "when": "view == ukemi.graph"
+        },
+        {
+          "command": "ukemi.addWorkspace",
+          "group": "1_repo@2",
+          "when": "view == ukemi.graph"
+        },
+        {
+          "command": "ukemi.initRepo",
+          "group": "1_repo@3",
+          "when": "view == ukemi.graph"
+        },
+        {
+          "command": "ukemi.forge.signIn",
+          "group": "2_forge@1",
+          "when": "view == ukemi.graph"
+        },
+        {
+          "command": "ukemi.forge.signOut",
+          "group": "2_forge@2",
+          "when": "view == ukemi.graph"
+        },
+        {
+          "command": "ukemi.showLog",
+          "group": "9_misc@1",
+          "when": "view == ukemi.graph"
+        },
+        {
+          "command": "ukemi.openSettings",
+          "group": "9_misc@2",
+          "when": "view == ukemi.graph"
+        }
+      ],
+      "scm/title": [
+        {
+          "command": "ukemi.openView",
+          "group": "navigation@1",
+          "when": "scmProvider == ukemi"
+        },
+        {
+          "command": "ukemi.refresh",
+          "group": "navigation@2",
+          "when": "scmProvider == ukemi"
+        }
+      ],
+      "scm/resourceState/context": [
+        {
+          "command": "ukemi.scm.discard",
+          "group": "inline",
+          "when": "scmProvider == ukemi"
+        },
+        {
+          "command": "ukemi.scm.openDiff",
+          "group": "1_open@1",
+          "when": "scmProvider == ukemi"
+        },
+        {
+          "command": "ukemi.scm.discard",
+          "group": "2_discard@1",
+          "when": "scmProvider == ukemi"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "ukemi.openFileDiff",
+          "group": "navigation",
+          "when": "resourceScheme == file && config.ukemi.showEditorTitleDiff"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "ukemi.commit.new",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.newBefore",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.edit",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.makeEditable",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.describe",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.viewDiff",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.squash",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.split",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.splitByFiles",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.abandon",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.abandonSubtree",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.duplicate",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.duplicateSubtree",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.revert",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.rebaseTrunk",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.rebaseOnto",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.setBookmark",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.createRequest",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.createRequestNamed",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.shipNow",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.copyChangeId",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.copyCommitId",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.file.open",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.file.openDiff",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.file.splitAbove",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.file.splitBelow",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.file.discard",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.file.copyPath",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.scm.openDiff",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.scm.discard",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.bookmark.push",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.bookmark.delete",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.bookmark.forget",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.bookmark.track",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.bookmark.createRequest",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.request.open",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.request.copyUrl",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.request.pushUpdates",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.request.merge",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.request.cleanup",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.workspace.newChange",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.workspace.open",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.workspace.copyPath",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.workspace.delete",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.split.open",
+          "when": "false"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Ukemi",
+      "properties": {
+        "ukemi.jjPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "Path to the jj binary. Empty means search PATH and common install folders."
+        },
+        "ukemi.addJjToTerminalPath": {
+          "type": "boolean",
+          "default": true,
+          "description": "Add the jj binary that Ukemi downloaded to PATH in integrated terminals."
+        },
+        "ukemi.showSourceControl": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "always",
+            "never"
+          ],
+          "default": "auto",
+          "enumDescriptions": [
+            "Show for jj repositories that the Git extension does not show.",
+            "Always show.",
+            "Never show."
+          ],
+          "description": "Show jj working copy changes in the Source Control view."
+        },
+        "ukemi.showInPanel": {
+          "type": "boolean",
+          "default": false,
+          "description": "Open the change graph in an editor tab instead of the side bar."
+        },
+        "ukemi.showEditorTitleDiff": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show an \"Open Changes (jj)\" button in the editor title."
+        },
+        "ukemi.followActiveEditor": {
+          "type": "boolean",
+          "default": true,
+          "description": "Switch to the repository of the active editor."
+        },
+        "ukemi.repoScanDepth": {
+          "type": "integer",
+          "default": 4,
+          "minimum": 0,
+          "maximum": 10,
+          "description": "How many folder levels to search for repositories inside each workspace folder."
+        },
+        "ukemi.repoScanExclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "node_modules",
+            "build",
+            "install",
+            "log",
+            "dist",
+            "out",
+            "target",
+            "venv",
+            ".venv",
+            "__pycache__"
+          ],
+          "description": "Folder names to skip during the repository search."
+        },
+        "ukemi.historyDepth": {
+          "type": "string",
+          "enum": [
+            "7d",
+            "30d",
+            "1y",
+            "all"
+          ],
+          "default": "7d",
+          "description": "Default history depth of the change graph."
+        },
+        "ukemi.changeIdLength": {
+          "type": "integer",
+          "default": 4,
+          "minimum": 1,
+          "maximum": 12,
+          "description": "Minimum number of change ID characters to show."
+        },
+        "ukemi.showFullPaths": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show full file paths in the change graph."
+        },
+        "ukemi.github.hosts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Additional GitHub Enterprise hosts, for example github.example.com."
+        },
+        "ukemi.gitlab.hosts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Additional self-hosted GitLab hosts, for example git.example.com."
+        }
+      }
+    },
+    "configurationDefaults": {
+      "files.exclude": {
+        "**/.jj": true
+      }
+    }
   }
 }

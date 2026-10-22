@@ -89,7 +89,10 @@ export class RepoRegistry implements vscode.Disposable {
     const found = (
       await Promise.all(
         folders.map((f) =>
-          discoverRepos(f.uri.fsPath, { maxDepth: config.repoScanDepth, exclude: config.repoScanExclude }),
+          discoverRepos(f.uri.fsPath, {
+            maxDepth: config.repoScanDepth,
+            exclude: config.repoScanExclude,
+          }),
         ),
       )
     ).flat()
@@ -186,7 +189,9 @@ export class RepoRegistry implements vscode.Disposable {
   }
 
   private createWatchers(entry: RepoEntry, model: RepoModel): vscode.Disposable[] {
-    const files = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(entry.root, '**/*'))
+    const files = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(entry.root, '**/*'),
+    )
     const onFile = (uri: vscode.Uri) => {
       if (isInternalPath(uri.fsPath)) {
         return
@@ -211,7 +216,8 @@ export class RepoRegistry implements vscode.Disposable {
     if (entry.timer) {
       clearTimeout(entry.timer)
     }
-    const delay = entry.root === this.activeRoot ? ACTIVE_REFRESH_DELAY_MS : BACKGROUND_REFRESH_DELAY_MS
+    const delay =
+      entry.root === this.activeRoot ? ACTIVE_REFRESH_DELAY_MS : BACKGROUND_REFRESH_DELAY_MS
     entry.timer = setTimeout(() => {
       entry.timer = null
       void model.refresh()

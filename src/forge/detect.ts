@@ -14,7 +14,10 @@ export interface HostLists {
 
 export function forgeKindForHost(host: string, lists: HostLists): ForgeKind | null {
   const normalized = host.toLowerCase()
-  if (lists.githubHosts.some((h) => h.toLowerCase() === normalized) || normalized === 'github.com') {
+  if (
+    lists.githubHosts.some((h) => h.toLowerCase() === normalized) ||
+    normalized === 'github.com'
+  ) {
     return 'github'
   }
   if (

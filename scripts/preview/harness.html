@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="../../dist/webview/graph.css" />
+    <style>
+      :root {
+        --vscode-font-family: system-ui, 'Ubuntu', sans-serif;
+        --vscode-font-size: 13px;
+        --vscode-editor-font-family: 'Ubuntu Mono', 'DejaVu Sans Mono', monospace;
+        --vscode-editor-font-size: 13px;
+        --vscode-foreground: #cccccc;
+        --vscode-descriptionForeground: #9d9d9d;
+        --vscode-errorForeground: #f85149;
+        --vscode-icon-foreground: #cccccc;
+        --vscode-sideBar-background: #181818;
+        --vscode-editor-background: #1f1f1f;
+        --vscode-sideBarSectionHeader-border: #2b2b2b;
+        --vscode-widget-border: #313131;
+        --vscode-list-hoverBackground: #2a2d2e;
+        --vscode-list-inactiveSelectionBackground: #37373d;
+        --vscode-list-activeSelectionBackground: #04395e;
+        --vscode-list-dropBackground: #383b3d;
+        --vscode-toolbar-hoverBackground: #5a5d5e50;
+        --vscode-badge-background: #616161;
+        --vscode-badge-foreground: #f8f8f8;
+        --vscode-button-background: #0078d4;
+        --vscode-button-foreground: #ffffff;
+        --vscode-button-hoverBackground: #026ec1;
+        --vscode-button-secondaryBackground: #313131;
+        --vscode-button-secondaryForeground: #cccccc;
+        --vscode-dropdown-background: #313131;
+        --vscode-dropdown-foreground: #cccccc;
+        --vscode-dropdown-border: #3c3c3c;
+        --vscode-focusBorder: #0078d4;
+        --vscode-gitDecoration-addedResourceForeground: #81b88b;
+        --vscode-gitDecoration-modifiedResourceForeground: #e2c08d;
+        --vscode-gitDecoration-deletedResourceForeground: #c74e39;
+        --vscode-gitDecoration-renamedResourceForeground: #73c991;
+        --vscode-gitDecoration-conflictingResourceForeground: #e4676b;
+      }
+      body {
+        width: 400px;
+        background: var(--vscode-sideBar-background);
+      }
+    </style>
+  </head>
+  <body class="vscode-dark">
+    <div id="root"></div>
+    <script>
+      window.acquireVsCodeApi = () => ({ postMessage: () => undefined, getState: () => undefined, setState: () => undefined })
+    </script>
+    <script src="state.generated.js"></script>
+    <script src="../../dist/webview/graph.js"></script>
+    <script>
+      window.postMessage({ type: 'state', state: window.UKEMI_STATE }, '*')
+    </script>
+  </body>
+</html>

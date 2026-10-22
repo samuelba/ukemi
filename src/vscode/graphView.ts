@@ -15,7 +15,11 @@ export interface JjAvailability {
   isAvailable: boolean
 }
 
-export function webviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri, entry: string): string {
+export function webviewHtml(
+  webview: vscode.Webview,
+  extensionUri: vscode.Uri,
+  entry: string,
+): string {
   const base = vscode.Uri.joinPath(extensionUri, 'dist', 'webview')
   const script = webview.asWebviewUri(vscode.Uri.joinPath(base, `${entry}.js`))
   const style = webview.asWebviewUri(vscode.Uri.joinPath(base, `${entry}.css`))
@@ -94,11 +98,16 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable 
       this.panel.reveal()
       return
     }
-    const panel = vscode.window.createWebviewPanel(PANEL_VIEW_TYPE, 'Ukemi', vscode.ViewColumn.Active, {
-      enableScripts: true,
-      retainContextWhenHidden: true,
-      localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview')],
-    })
+    const panel = vscode.window.createWebviewPanel(
+      PANEL_VIEW_TYPE,
+      'Ukemi',
+      vscode.ViewColumn.Active,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview')],
+      },
+    )
     panel.iconPath = vscode.Uri.joinPath(this.extensionUri, 'resources', 'activity.svg')
     this.panel = panel
     this.attach(panel.webview)
@@ -176,7 +185,8 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable 
       return
     }
     const count = state.graph?.workingCopyFiles.length ?? 0
-    this.view.badge = count > 0 ? { value: count, tooltip: `${count} changed files in @` } : undefined
+    this.view.badge =
+      count > 0 ? { value: count, tooltip: `${count} changed files in @` } : undefined
     const active = state.repos.find((r) => r.id === state.activeRepoId)
     this.view.description = state.repos.length > 1 ? active?.label : undefined
   }

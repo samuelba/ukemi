@@ -1,6 +1,12 @@
 import { z } from 'zod'
 import type { CiState, RequestBadge, RequestState } from '../../shared/protocol'
-import { requestJson, type CreateRequestInput, type ForgeClient, type HttpFetch, type MergeMethod } from './types'
+import {
+  requestJson,
+  type CreateRequestInput,
+  type ForgeClient,
+  type HttpFetch,
+  type MergeMethod,
+} from './types'
 
 const LIST_LIMIT = 50
 const DETAIL_LIMIT = 10
@@ -84,7 +90,11 @@ export class GitlabClient implements ForgeClient {
   }
 
   private call(url: string, init: RequestInit = {}): Promise<unknown> {
-    return requestJson(this.fetchImpl, url, { ...init, token: this.token, authScheme: 'PRIVATE-TOKEN' })
+    return requestJson(this.fetchImpl, url, {
+      ...init,
+      token: this.token,
+      authScheme: 'PRIVATE-TOKEN',
+    })
   }
 
   async listRequests(branches: readonly string[]): Promise<RequestBadge[]> {
@@ -92,8 +102,16 @@ export class GitlabClient implements ForgeClient {
       this.url(`/merge_requests?state=all&order_by=updated_at&per_page=${LIST_LIMIT}`),
     )
     const wanted = new Set(branches)
-    const mrs = z.array(mergeRequestSchema).parse(body).filter((mr) => wanted.has(mr.source_branch))
-    const detailed = new Set(mrs.filter((mr) => mr.state === 'opened').slice(0, DETAIL_LIMIT).map((mr) => mr.iid))
+    const mrs = z
+      .array(mergeRequestSchema)
+      .parse(body)
+      .filter((mr) => wanted.has(mr.source_branch))
+    const detailed = new Set(
+      mrs
+        .filter((mr) => mr.state === 'opened')
+        .slice(0, DETAIL_LIMIT)
+        .map((mr) => mr.iid),
+    )
     return Promise.all(mrs.map((mr) => this.toBadge(mr, detailed.has(mr.iid))))
   }
 

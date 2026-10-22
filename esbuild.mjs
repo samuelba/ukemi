@@ -36,6 +36,7 @@ const builds = [
     format: 'iife',
     target: 'es2022',
     loader: { '.ttf': 'file' },
+    define: { 'process.env.NODE_ENV': JSON.stringify(isProduction ? 'production' : 'development') },
   },
 ]
 

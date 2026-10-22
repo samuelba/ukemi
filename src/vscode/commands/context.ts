@@ -60,7 +60,9 @@ export function contextCommit(env: CommandEnv, arg: unknown): Target | null {
     ? model.findCommit(ctx.commitId)
     : model.graph?.commits.find((c) => c.isWorkingCopy)
   if (!commit) {
-    void vscode.window.showWarningMessage('Ukemi: the change is no longer visible. Refresh and try again.')
+    void vscode.window.showWarningMessage(
+      'Ukemi: the change is no longer visible. Refresh and try again.',
+    )
     return null
   }
   return { model, commit }

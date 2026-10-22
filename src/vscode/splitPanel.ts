@@ -27,10 +27,15 @@ export async function openSplitPanel(env: CommandEnv, { model, commit }: Target)
     { commitId: commit.commitId, parentId: commit.parents[0], description: commit.description },
     files,
   )
-  const panel = vscode.window.createWebviewPanel('ukemi.split', `Split ${shortId(commit)}`, vscode.ViewColumn.Active, {
-    enableScripts: true,
-    localResourceRoots: [vscode.Uri.joinPath(env.extensionUri, 'dist', 'webview')],
-  })
+  const panel = vscode.window.createWebviewPanel(
+    'ukemi.split',
+    `Split ${shortId(commit)}`,
+    vscode.ViewColumn.Active,
+    {
+      enableScripts: true,
+      localResourceRoots: [vscode.Uri.joinPath(env.extensionUri, 'dist', 'webview')],
+    },
+  )
   panel.iconPath = vscode.Uri.joinPath(env.extensionUri, 'resources', 'activity.svg')
   panel.webview.html = webviewHtml(panel.webview, env.extensionUri, 'split')
   panel.webview.onDidReceiveMessage(async (message: SplitWebviewMessage) => {

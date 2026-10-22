@@ -16,8 +16,12 @@ const logEntrySchema = z.object({
   description: z.string(),
   author: signatureSchema,
   committer: signatureSchema,
-  local_bookmarks: z.array(z.object({ name: z.string(), synced: z.boolean(), conflict: z.boolean() })),
-  remote_bookmarks: z.array(z.object({ name: z.string(), remote: z.string(), tracked: z.boolean() })),
+  local_bookmarks: z.array(
+    z.object({ name: z.string(), synced: z.boolean(), conflict: z.boolean() }),
+  ),
+  remote_bookmarks: z.array(
+    z.object({ name: z.string(), remote: z.string(), tracked: z.boolean() }),
+  ),
   tags: z.array(z.string()),
   working_copies: z.array(z.string()),
   change_offset: z.number().nullable(),
@@ -63,7 +67,9 @@ function parseLines<T>(output: string, schema: z.ZodType<T>, what: string): T[] 
       }
       const result = schema.safeParse(value)
       if (!result.success) {
-        throw new Error(`Unexpected ${what} output from jj: ${result.error.issues[0]?.message ?? ''}`)
+        throw new Error(
+          `Unexpected ${what} output from jj: ${result.error.issues[0]?.message ?? ''}`,
+        )
       }
       return result.data
     })

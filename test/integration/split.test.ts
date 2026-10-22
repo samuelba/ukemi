@@ -64,7 +64,9 @@ describe('SplitSession', () => {
     const fileA = session.request.files.find((f) => f.path === 'a.txt')
     expect(fileA?.segments.filter((s) => s.kind === 'change')).toHaveLength(2)
 
-    await session.apply(repo, tool, 'first part', [{ path: 'a.txt', hunks: [0], isWholeFile: false }])
+    await session.apply(repo, tool, 'first part', [
+      { path: 'a.txt', hunks: [0], isWholeFile: false },
+    ])
 
     const [top, bottom] = await repo.log('@ | @-')
     expect(bottom?.description).toBe('first part\n')
@@ -73,7 +75,9 @@ describe('SplitSession', () => {
       'ONE\ntwo\nthree\nfour\nfive\nsix\nseven\n',
     )
     expect((await repo.files(bottom?.commitId ?? '')).map((f) => f.path)).toEqual(['a.txt'])
-    expect(readFileSync(join(root, 'a.txt'), 'utf8')).toBe('ONE\ntwo\nthree\nfour\nfive\nsix\nSEVEN\n')
+    expect(readFileSync(join(root, 'a.txt'), 'utf8')).toBe(
+      'ONE\ntwo\nthree\nfour\nfive\nsix\nSEVEN\n',
+    )
   })
 
   test('moves a whole added file', async () => {

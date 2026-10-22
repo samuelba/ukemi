@@ -52,6 +52,23 @@ export function summarizeStderr(stderr: string): string {
   return (withoutHints.join('\n') || 'jj failed').replace(/^Error:\s*/, '')
 }
 
+const MAX_LOGGED_ARG = 120
+
+export function describeArgs(args: readonly string[]): string {
+  return args
+    .map((arg, index) => {
+      if (args[index - 1] === '-T') {
+        return '<template>'
+      }
+      const configValue = arg.startsWith('--config=') ? arg.indexOf('=', '--config='.length) : -1
+      if (configValue >= 0) {
+        return `${arg.slice(0, configValue)}=…`
+      }
+      return arg.length > MAX_LOGGED_ARG ? `${arg.slice(0, MAX_LOGGED_ARG)}…` : arg
+    })
+    .join(' ')
+}
+
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
 export class JjRunner {
@@ -122,7 +139,7 @@ export class JjRunner {
         const out = Buffer.concat(stdout).toString('utf8')
         const err = Buffer.concat(stderr).toString('utf8')
         const elapsed = Date.now() - started
-        this.logger.info(`jj ${options.args.join(' ')} (${elapsed} ms, exit ${code ?? signal})`)
+        this.logger.info(`jj ${describeArgs(options.args)} (${elapsed} ms, exit ${code ?? signal})`)
         if (hasTimedOut) {
           reject(new JjError(`jj timed out after ${timeoutMs / 1000} s`, args, err, code))
           return
