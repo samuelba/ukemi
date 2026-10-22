@@ -161,25 +161,27 @@ export function Toolbar({ repos, activeRepoId, graph, isBusy }: ToolbarProps) {
       </div>
       {graph && (
         <div className="toolbar-row filters">
-          <div className="segmented" role="tablist">
+          <select
+            className="compact-select"
+            value={graph.filter}
+            title={FILTERS.find((f) => f.id === graph.filter)?.hint}
+            aria-label="Filter"
+            onChange={(e) =>
+              postMessage({ type: 'setFilter', filter: e.target.value as GraphFilter })
+            }
+          >
             {FILTERS.map((f) => (
-              <button
-                key={f.id}
-                role="tab"
-                aria-selected={graph.filter === f.id}
-                className={graph.filter === f.id ? 'active' : ''}
-                title={f.hint}
-                onClick={() => postMessage({ type: 'setFilter', filter: f.id })}
-              >
+              <option key={f.id} value={f.id} title={f.hint}>
                 {f.label}
-              </button>
+              </option>
             ))}
-          </div>
+          </select>
           <span className="toolbar-spacer" />
           <select
-            className="depth-select"
+            className="compact-select"
             value={graph.depth}
-            title={ignoresDepth ? 'Stack shows the whole stack, whatever its age' : 'History depth'}
+            title={ignoresDepth ? 'This filter ignores the time range' : 'History depth'}
+            aria-label="History depth"
             disabled={ignoresDepth}
             onChange={(e) =>
               postMessage({ type: 'setDepth', depth: e.target.value as HistoryDepth })
