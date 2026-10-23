@@ -259,8 +259,8 @@ export class JjRepo {
     return this.mutate(['abandon', revset])
   }
 
-  duplicate(revset: string) {
-    return this.mutate(['duplicate', revset])
+  duplicate(revset: string, onto?: string) {
+    return this.mutate(['duplicate', revset, ...(onto ? ['--onto', onto] : [])])
   }
 
   revert(commitId: string) {

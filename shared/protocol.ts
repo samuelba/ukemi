@@ -78,6 +78,7 @@ export interface ViewState {
 }
 
 export type DropMode = 'source' | 'revision'
+export type DropAction = 'rebase' | 'duplicate'
 
 export type HostMessage =
   | { type: 'state'; state: ViewState }
@@ -97,7 +98,13 @@ export type WebviewMessage =
   | { type: 'command'; command: string; context: Record<string, unknown> }
   | { type: 'describe'; commitId: string; message: string; startNew: boolean }
   | { type: 'openFile'; commitId: string; path: string; mode: 'diff' | 'file' }
-  | { type: 'dropCommit'; sourceId: string; targetId: string; mode: DropMode }
+  | {
+      type: 'dropCommit'
+      sourceId: string
+      targetId: string
+      mode: DropMode
+      action: DropAction
+    }
   | { type: 'dropFile'; fromCommitId: string; path: string; targetId: string }
   | { type: 'dropBookmark'; name: string; targetId: string }
   | { type: 'doubleClickCommit'; commitId: string }

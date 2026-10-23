@@ -197,6 +197,7 @@
 }
 
 .commit.drop-commit,
+.commit.drop-duplicate,
 .commit.drop-file,
 .commit.drop-bookmark {
   outline: 1px dashed var(--vscode-focusBorder);

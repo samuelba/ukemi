@@ -88,7 +88,17 @@ export function createMessageHandler(env: CommandEnv) {
         return
       }
       case 'dropCommit': {
-        if (message.sourceId === message.targetId) {
+        if (message.action === 'duplicate') {
+          const revset = message.mode === 'source' ? `${message.sourceId}::` : message.sourceId
+          await env.operations.run('Duplicate', model, () =>
+            model.repo.duplicate(revset, message.targetId),
+          )
+          return
+        }
+        if (
+          message.sourceId === message.targetId ||
+          model.findCommit(message.sourceId)?.isImmutable
+        ) {
           return
         }
         await env.operations.run('Rebase', model, () =>

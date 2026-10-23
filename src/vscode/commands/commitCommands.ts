@@ -65,7 +65,7 @@ export async function editOrNew(
   await env.operations.run('Edit', model, () => model.repo.edit(commit.commitId))
 }
 
-async function pickRebaseDestination(model: RepoModel): Promise<string | undefined> {
+async function pickDestination(model: RepoModel, title: string): Promise<string | undefined> {
   const bookmarks = [
     ...new Set((model.graph?.commits ?? []).flatMap((c) => c.localBookmarks.map((b) => b.name))),
   ]
@@ -74,7 +74,7 @@ async function pickRebaseDestination(model: RepoModel): Promise<string | undefin
     ...bookmarks.map((name) => ({ label: name, description: 'bookmark' })),
   ]
   const pick = vscode.window.createQuickPick()
-  pick.title = 'Rebase onto'
+  pick.title = title
   pick.placeholder = 'Pick a bookmark or type a change id, commit hash or revset'
   pick.items = items
   return new Promise((resolve) => {
@@ -182,6 +182,16 @@ async function shipNow(env: CommandEnv, { model, commit }: Target): Promise<void
   })
 }
 
+function duplicateOnto(env: CommandEnv, withDescendants: boolean): Handler {
+  return withTarget(env, async ({ model, commit }) => {
+    const destination = await pickDestination(model, 'Duplicate onto')
+    if (destination) {
+      const revset = withDescendants ? `${commit.commitId}::` : commit.commitId
+      await env.operations.run('Duplicate', model, () => model.repo.duplicate(revset, destination))
+    }
+  })
+}
+
 export function commitCommands(env: CommandEnv): Record<string, Handler> {
   const run = (label: string, fn: (t: Target) => Promise<unknown>, needsMutable = false): Handler =>
     withTarget(env, async (target) => {
@@ -270,6 +280,8 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
     'ukemi.commit.duplicateSubtree': run('Duplicate', ({ model, commit }) =>
       model.repo.duplicate(`${commit.commitId}::`),
     ),
+    'ukemi.commit.duplicateOnto': duplicateOnto(env, false),
+    'ukemi.commit.duplicateOntoSubtree': duplicateOnto(env, true),
     'ukemi.commit.revert': run('Revert', ({ model, commit }) => model.repo.revert(commit.commitId)),
     'ukemi.commit.rebaseTrunk': run(
       'Rebase',
@@ -277,7 +289,7 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
       true,
     ),
     'ukemi.commit.rebaseOnto': withTarget(env, async ({ model, commit }) => {
-      const destination = mutable(commit) ? await pickRebaseDestination(model) : undefined
+      const destination = mutable(commit) ? await pickDestination(model, 'Rebase onto') : undefined
       if (destination) {
         await env.operations.run('Rebase', model, () =>
           model.repo.rebase(commit.commitId, destination, 'source'),

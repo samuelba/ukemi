@@ -290,6 +290,16 @@
         "category": "Ukemi"
       },
       {
+        "command": "ukemi.commit.duplicateOnto",
+        "title": "Duplicate onto…",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.duplicateOntoSubtree",
+        "title": "Duplicate with Descendants onto…",
+        "category": "Ukemi"
+      },
+      {
         "command": "ukemi.commit.revert",
         "title": "Revert onto Working Copy",
         "category": "Ukemi"
@@ -536,13 +546,19 @@
           "alt": "ukemi.commit.duplicateSubtree"
         },
         {
-          "command": "ukemi.commit.revert",
+          "command": "ukemi.commit.duplicateOnto",
           "group": "3_rewrite@6",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit'",
+          "alt": "ukemi.commit.duplicateOntoSubtree"
+        },
+        {
+          "command": "ukemi.commit.revert",
+          "group": "3_rewrite@7",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isEmpty"
         },
         {
           "command": "ukemi.commit.abandon",
-          "group": "3_rewrite@7",
+          "group": "3_rewrite@8",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isImmutable",
           "alt": "ukemi.commit.abandonSubtree"
         },
@@ -820,6 +836,14 @@
         },
         {
           "command": "ukemi.commit.duplicateSubtree",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.duplicateOnto",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.duplicateOntoSubtree",
           "when": "false"
         },
         {

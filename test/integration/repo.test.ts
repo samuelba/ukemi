@@ -150,6 +150,46 @@ describe('mutations', () => {
     expect((await repo.files(after?.commitId ?? '')).map((f) => f.path)).toEqual(['a.txt', 'b.txt'])
   })
 
+  test('duplicate without a destination copies onto the same parents', async () => {
+    writeFile(root, 'a.txt', 'a\n')
+    jj(root, 'describe', '-m', 'source')
+    const source = await current()
+    const parent = source.parents[0] ?? ''
+    jj(root, 'new')
+
+    await repo.duplicate(source.commitId)
+
+    const [still] = await repo.log(source.commitId)
+    expect(still?.parents).toEqual([parent])
+    const copies = (await repo.log(`children(${parent})`)).filter(
+      (commit) => commit.description === 'source\n',
+    )
+    expect(copies).toHaveLength(2)
+    expect(copies.every((commit) => commit.parents.length === 1 && commit.parents[0] === parent)).toBe(
+      true,
+    )
+  })
+
+  test('duplicate onto a destination makes the copy a child of that commit', async () => {
+    writeFile(root, 'a.txt', 'a\n')
+    jj(root, 'describe', '-m', 'source')
+    const source = await current()
+    const parent = source.parents[0] ?? ''
+    jj(root, 'new', parent, '-m', 'dest')
+    writeFile(root, 'b.txt', 'b\n')
+    const dest = await current()
+    jj(root, 'new')
+
+    await repo.duplicate(source.commitId, dest.commitId)
+
+    const [still] = await repo.log(source.commitId)
+    expect(still?.parents).toEqual([parent])
+    const copy = (await repo.log(`children(${dest.commitId})`)).find(
+      (commit) => commit.description === 'source\n',
+    )
+    expect(copy?.parents).toEqual([dest.commitId])
+  })
+
   test('squashIntoParent uses the combined message', async () => {
     writeFile(root, 'a.txt', 'a\n')
     jj(root, 'describe', '-m', 'parent')

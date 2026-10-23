@@ -1,10 +1,12 @@
-import { useState, type DragEvent } from 'react'
+import { useEffect, useState, useSyncExternalStore, type DragEvent } from 'react'
 import type { ChangedFile } from '../../../shared/model'
 import type { CommitView, ViewSettings } from '../../../shared/protocol'
 import { relativeTime, splitId, title } from '../shared/format'
 import { postMessage, vscodeContext } from '../shared/vscodeApi'
 import { BOOKMARK_MIME, Badges } from './Badges'
 import { canSquashIntoParent } from './canSquashIntoParent'
+import { dropCommitAction } from './dropCommit'
+import { dragModifiers, installDragModifiers } from './dragModifiers'
 import { FileList, FILE_MIME } from './FileList'
 import { GraphCell } from './GraphCell'
 
@@ -27,7 +29,16 @@ interface CommitRowProps {
   onDescribe: (commit: CommitView) => void
 }
 
-type DropKind = 'commit' | 'file' | 'bookmark'
+type DropKind = 'commit' | 'duplicate' | 'file' | 'bookmark'
+
+function useCopyModifier() {
+  useEffect(() => installDragModifiers(), [])
+  return useSyncExternalStore(
+    dragModifiers.subscribe,
+    () => dragModifiers.copyDown,
+    () => false,
+  )
+}
 
 function dropKind(event: DragEvent): DropKind | null {
   const types = event.dataTransfer.types
@@ -47,6 +58,7 @@ function runCommand(command: string, repoId: string, commitId: string) {
 export function CommitRow(props: CommitRowProps) {
   const { commit, repoId, settings, isExpanded } = props
   const [dropTarget, setDropTarget] = useState<DropKind | null>(null)
+  const copyModifier = useCopyModifier()
   const change = splitId(commit.changeId, commit.changePrefix, settings.changeIdLength)
   const summary = title(commit.description)
   const fileCount = commit.isWorkingCopy ? (props.files?.length ?? 0) : null
@@ -64,8 +76,10 @@ export function CommitRow(props: CommitRowProps) {
     const kind = dropKind(event)
     if (kind && accepts(kind)) {
       event.preventDefault()
-      event.dataTransfer.dropEffect = 'move'
-      setDropTarget(kind)
+      dragModifiers.onDragOver(event)
+      const copy = kind === 'commit' && dragModifiers.snapshot().copy
+      event.dataTransfer.dropEffect = copy ? 'copy' : 'move'
+      setDropTarget(copy ? 'duplicate' : kind)
     }
   }
 
@@ -74,12 +88,15 @@ export function CommitRow(props: CommitRowProps) {
     setDropTarget(null)
     const kind = dropKind(event)
     if (kind === 'commit') {
-      const sourceId = event.dataTransfer.getData(COMMIT_MIME)
+      dragModifiers.onDragOver(event)
+      const modifiers = dragModifiers.snapshot()
+      const { action, mode } = dropCommitAction(modifiers.copy, modifiers.alt)
       postMessage({
         type: 'dropCommit',
-        sourceId,
+        sourceId: event.dataTransfer.getData(COMMIT_MIME),
         targetId: commit.commitId,
-        mode: event.altKey ? 'revision' : 'source',
+        action,
+        mode,
       })
     } else if (kind === 'file') {
       const data = JSON.parse(event.dataTransfer.getData(FILE_MIME)) as {
@@ -115,11 +132,19 @@ export function CommitRow(props: CommitRowProps) {
   return (
     <div
       className={classes}
-      draggable={!commit.isImmutable}
+      draggable={!commit.isImmutable || copyModifier}
       onDragStart={(event) => {
+        const copy =
+          event.ctrlKey || event.metaKey || dragModifiers.snapshot().copy
+        if (commit.isImmutable && !copy) {
+          event.preventDefault()
+          return
+        }
+        dragModifiers.onDragStart(event, commit.isImmutable)
         event.dataTransfer.setData(COMMIT_MIME, commit.commitId)
-        event.dataTransfer.effectAllowed = 'move'
+        event.dataTransfer.effectAllowed = 'copyMove'
       }}
+      onDragEnd={() => dragModifiers.onDragEnd()}
       onDragOver={onDragOver}
       onDragLeave={() => setDropTarget(null)}
       onDrop={onDrop}
