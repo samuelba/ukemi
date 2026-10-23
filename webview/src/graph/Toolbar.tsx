@@ -92,32 +92,39 @@ export function Toolbar({
 }: ToolbarProps) {
   const repoId = graph?.repoId
   const ignoresDepth = graph !== null && DEPTHLESS_FILTERS.includes(graph.filter)
+  const singleLabel = repos.length === 1 ? (repos[0]?.label ?? '') : ''
+  const showRepoRow = repos.length > 1 || singleLabel !== ''
   return (
     <div className="toolbar">
+      {showRepoRow && (
+        <div className="toolbar-row">
+          {repos.length > 1 ? (
+            <select
+              className="repo-select"
+              value={activeRepoId ?? ''}
+              title="Repository"
+              aria-label="Repository"
+              onChange={(e) => postMessage({ type: 'selectRepo', repoId: e.target.value })}
+            >
+              {repos.map((repo) => (
+                <option key={repo.id} value={repo.id}>
+                  {repo.label}
+                  {repo.kind === 'git'
+                    ? ' (git)'
+                    : repo.changedFiles > 0
+                      ? ` (${repo.changedFiles} changed)`
+                      : ''}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="repo-label" title={activeRepoId ?? undefined}>
+              {singleLabel}
+            </span>
+          )}
+        </div>
+      )}
       <div className="toolbar-row">
-        {repos.length > 1 ? (
-          <select
-            className="repo-select"
-            value={activeRepoId ?? ''}
-            title="Repository"
-            onChange={(e) => postMessage({ type: 'selectRepo', repoId: e.target.value })}
-          >
-            {repos.map((repo) => (
-              <option key={repo.id} value={repo.id}>
-                {repo.label}
-                {repo.kind === 'git'
-                  ? ' (git)'
-                  : repo.changedFiles > 0
-                    ? ` (${repo.changedFiles} changed)`
-                    : ''}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <span className="repo-label" title={activeRepoId ?? undefined}>
-            {repos[0]?.label ?? ''}
-          </span>
-        )}
         <span className="toolbar-spacer" />
         {graph && (
           <>
