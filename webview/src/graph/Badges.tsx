@@ -43,6 +43,9 @@ export function Badges({ commit, repoId, hasForge }: BadgesProps) {
   return (
     <span className="badges">
       {commit.isWorkingCopy && <span className="badge here">you are here</span>}
+      {commit.isWorkingCopy && commit.isEmpty && (
+        <span className="badge is-empty" title="No file changes yet">empty</span>
+      )}
       {commit.localBookmarks.map((b) => (
         <span
           key={`l-${b.name}`}

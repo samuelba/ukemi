@@ -15,6 +15,8 @@
   --ukemi-bookmark-fg: var(--vscode-foreground);
   --ukemi-here-bg: color-mix(in srgb, var(--shu) 16%, transparent);
   --ukemi-here-fg: var(--shu);
+  --ukemi-empty-bg: color-mix(in srgb, var(--vscode-foreground) 14%, transparent);
+  --ukemi-empty-fg: var(--vscode-descriptionForeground);
   --ukemi-hover: var(--vscode-list-hoverBackground);
   --ukemi-selected: var(--vscode-list-inactiveSelectionBackground);
   --ukemi-radius: 3px;

@@ -354,6 +354,7 @@
 .badges {
   display: inline-flex;
   flex: 0 1 auto;
+  align-items: center;
   gap: 4px;
   min-width: 0;
   overflow: hidden;
@@ -382,6 +383,11 @@
   color: var(--ukemi-here-fg);
   background: var(--ukemi-here-bg);
   font-weight: 600;
+}
+
+.badge.is-empty {
+  color: var(--ukemi-empty-fg);
+  background: var(--ukemi-empty-bg);
 }
 
 .badge.bookmark {
