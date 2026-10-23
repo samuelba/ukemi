@@ -1,19 +1,37 @@
 import * as vscode from 'vscode'
 import type { ForgeState } from '../../shared/protocol'
-import { detectForge, type ForgeTarget } from '../forge/detect'
+import type { CredentialRequest } from '../askpass/prompt'
+import { detectForge, forgeKindForHost, type ForgeTarget } from '../forge/detect'
 import { GithubClient } from '../forge/github'
+import { GithubCredentials, type GithubCredential } from '../forge/githubCredentials'
 import { GitlabClient } from '../forge/gitlab'
 import { ForgeError, type ForgeClient } from '../forge/types'
 import type { RepoModel } from '../repo/repoModel'
 import { errorMessage, type Logger } from '../util/logger'
 import { readConfig } from './config'
+import { githubTokenUi } from './githubTokenUi'
 import type { RepoRegistry } from './registry'
 
 const REQUEST_REFRESH_INTERVAL_MS = 60_000
 const GITHUB_SCOPES = ['repo']
+const GITLAB_TOKEN_USER = 'oauth2'
+
+type ForgeHost = Pick<ForgeTarget, 'kind' | 'host'>
 
 function secretKey(host: string): string {
   return `ukemi.gitlab.token.${host}`
+}
+
+async function githubSession(
+  host: string,
+  interactive: boolean,
+): Promise<GithubCredential | null> {
+  const provider = host === 'github.com' ? 'github' : 'github-enterprise'
+  const session = await vscode.authentication.getSession(provider, GITHUB_SCOPES, {
+    createIfNone: interactive,
+    silent: !interactive,
+  })
+  return session ? { username: session.account.label, token: session.accessToken } : null
 }
 
 function makeClient(target: ForgeTarget, token: string): ForgeClient {
@@ -25,12 +43,14 @@ function makeClient(target: ForgeTarget, token: string): ForgeClient {
 export class ForgeService implements vscode.Disposable {
   private readonly lastRefresh = new Map<string, number>()
   private readonly subscription: vscode.Disposable
+  private readonly github: GithubCredentials
 
   constructor(
     private readonly registry: RepoRegistry,
     private readonly secrets: vscode.SecretStorage,
     private readonly logger: Logger,
   ) {
+    this.github = new GithubCredentials(secrets, githubSession, githubTokenUi)
     this.subscription = registry.onDidChangeModel((model) => {
       if (model === registry.activeModel) {
         void this.refreshRequests(model)
@@ -43,14 +63,10 @@ export class ForgeService implements vscode.Disposable {
     return detectForge(await model.repo.remotes(), config)
   }
 
-  private async token(target: ForgeTarget, interactive: boolean): Promise<string | null> {
+  private async token(target: ForgeHost, interactive: boolean): Promise<string | null> {
     if (target.kind === 'github') {
-      const provider = target.host === 'github.com' ? 'github' : 'github-enterprise'
-      const session = await vscode.authentication.getSession(provider, GITHUB_SCOPES, {
-        createIfNone: interactive,
-        silent: !interactive,
-      })
-      return session?.accessToken ?? null
+      const credential = await this.github.get(target.host, interactive ? 'ask-if-missing' : 'silent')
+      return credential?.token ?? null
     }
     const stored = await this.secrets.get(secretKey(target.host))
     if (stored || !interactive) {
@@ -93,10 +109,43 @@ export class ForgeService implements vscode.Disposable {
     return token ? makeClient(target, token) : null
   }
 
+  async gitCredential(request: CredentialRequest): Promise<string | null> {
+    const kind = forgeKindForHost(request.host, readConfig())
+    if (kind === 'github') {
+      const credential = await this.github.get(request.host, 'ask-if-missing')
+      if (!credential) {
+        return null
+      }
+      return request.field === 'username' ? credential.username : credential.token
+    }
+    if (kind === 'gitlab') {
+      const token = await this.token({ kind, host: request.host }, true)
+      if (!token) {
+        return null
+      }
+      return request.field === 'username' ? GITLAB_TOKEN_USER : token
+    }
+    return null
+  }
+
+  async signIn(model: RepoModel): Promise<ForgeClient | null> {
+    const target = await this.target(model)
+    if (target?.kind !== 'github') {
+      return this.client(model, true)
+    }
+    const credential = await this.github.get(target.host, 'always-ask')
+    return credential ? makeClient(target, credential.token) : null
+  }
+
   async signOut(model: RepoModel): Promise<void> {
     const target = await this.target(model)
     if (target?.kind === 'gitlab') {
       await this.secrets.delete(secretKey(target.host))
+    }
+    if (target?.kind === 'github' && !(await this.github.forget(target.host))) {
+      void vscode.window.showInformationMessage(
+        'Ukemi uses the GitHub account of the editor. Sign out of it in the Accounts menu.',
+      )
     }
     model.setForge(target ? { kind: target.kind, host: target.host, isSignedIn: false } : null, [])
   }

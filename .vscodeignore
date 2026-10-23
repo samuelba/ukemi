@@ -1,6 +1,7 @@
 **
 !dist/extension.js
 !dist/splitTool.js
+!dist/askpass.js
 !dist/webview/*.js
 !dist/webview/*.css
 !dist/webview/*.ttf

@@ -1,5 +1,24 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, test } from 'vitest'
-import { describeArgs, summarizeStderr } from '../../src/jj/runner'
+import { describeArgs, JjRunner, summarizeStderr } from '../../src/jj/runner'
+import { NULL_LOGGER } from '../../src/util/logger'
+
+describe('JjRunner environment', () => {
+  test('passes the extra environment to jj and keeps terminal prompts off', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ukemi-runner-'))
+    const fake = join(dir, 'jj')
+    writeFileSync(fake, '#!/bin/sh\necho "$GIT_ASKPASS $GIT_TERMINAL_PROMPT"\n', { mode: 0o700 })
+    const runner = new JjRunner(fake, NULL_LOGGER)
+
+    runner.setEnvironment({ GIT_ASKPASS: '/x/askpass.sh' })
+    const { stdout } = await runner.run({ cwd: dir, args: ['status'] })
+    rmSync(dir, { recursive: true, force: true })
+
+    expect(stdout).toBe('/x/askpass.sh 0\n')
+  })
+})
 
 describe('describeArgs', () => {
   test('hides templates and config values', () => {

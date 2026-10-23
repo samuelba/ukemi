@@ -227,7 +227,7 @@ export function globalCommands(env: CommandEnv): Record<string, Handler> {
       }
     }),
     'ukemi.forge.signIn': withModel(env, async (model) => {
-      const client = await env.forge.client(model, true)
+      const client = await env.forge.signIn(model)
       if (!client) {
         void vscode.window.showWarningMessage(
           'Ukemi: no GitHub or GitLab remote found for this repository.',
