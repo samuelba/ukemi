@@ -101,6 +101,11 @@ export function App() {
     [graph],
   )
 
+  const commitsById = useMemo(
+    () => new Map((graph?.commits ?? []).map((commit) => [commit.commitId, commit])),
+    [graph],
+  )
+
   const isExpanded = useCallback(
     (commit: CommitView) =>
       commit.isWorkingCopy ? !isWorkingCopyCollapsed : expanded.has(commit.changeId),
@@ -181,6 +186,7 @@ export function App() {
             <CommitRow
               key={commit.commitId}
               commit={commit}
+              commitsById={commitsById}
               repoId={repoId}
               lanes={lanes}
               files={filesFor(commit)}

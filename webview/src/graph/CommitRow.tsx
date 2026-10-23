@@ -4,6 +4,7 @@ import type { CommitView, ViewSettings } from '../../../shared/protocol'
 import { relativeTime, splitId, title } from '../shared/format'
 import { postMessage, vscodeContext } from '../shared/vscodeApi'
 import { BOOKMARK_MIME, Badges } from './Badges'
+import { canSquashIntoParent } from './canSquashIntoParent'
 import { FileList, FILE_MIME } from './FileList'
 import { GraphCell } from './GraphCell'
 
@@ -11,6 +12,7 @@ export const COMMIT_MIME = 'application/x-ukemi-commit'
 
 interface CommitRowProps {
   commit: CommitView
+  commitsById: ReadonlyMap<string, CommitView>
   repoId: string
   lanes: number
   files: ChangedFile[] | undefined
@@ -188,6 +190,18 @@ export function CommitRow(props: CommitRowProps) {
                 }}
               >
                 <i className="codicon codicon-comment-discussion-quote" />
+              </button>
+            )}
+            {canSquashIntoParent(commit, props.commitsById) && (
+              <button
+                className="icon-button"
+                title="Squash into parent"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  runCommand('ukemi.commit.squash', repoId, commit.commitId)
+                }}
+              >
+                <i className="codicon codicon-fold-down" />
               </button>
             )}
             <button

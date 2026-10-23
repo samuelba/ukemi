@@ -511,7 +511,7 @@
         {
           "command": "ukemi.commit.squash",
           "group": "3_rewrite@1",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isImmutable"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isImmutable && !(isWorkingCopy && isEmpty)"
         },
         {
           "command": "ukemi.commit.split",
