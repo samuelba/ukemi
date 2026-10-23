@@ -6,7 +6,7 @@ const root = resolve(__dirname, '../..')
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
   contributes: {
     commands: Array<{ command: string }>
-    menus: Record<string, Array<{ command: string; alt?: string }>>
+    menus: Record<string, Array<{ command?: string; alt?: string; submenu?: string }>>
     configuration: { properties: Record<string, unknown> }
   }
 }
@@ -38,9 +38,11 @@ describe('package.json manifest', () => {
 
   test('menus only reference declared commands', () => {
     const used = Object.values(pkg.contributes.menus).flatMap((items) =>
-      items.flatMap((i) => (i.alt ? [i.command, i.alt] : [i.command])),
+      items.flatMap((item) =>
+        [item.command, item.alt].filter((command): command is string => command !== undefined),
+      ),
     )
-    expect(used.filter((c) => !declared.has(c))).toEqual([])
+    expect(used.filter((command) => !declared.has(command))).toEqual([])
   })
 
   test('the webview only sends registered commands', () => {

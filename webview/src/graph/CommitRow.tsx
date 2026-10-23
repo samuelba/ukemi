@@ -196,6 +196,7 @@ export function CommitRow(props: CommitRowProps) {
             files={props.files}
             repoId={repoId}
             showFullPaths={settings.showFullPaths}
+            changedFilesView={settings.changedFilesView}
           />
         )}
       </div>

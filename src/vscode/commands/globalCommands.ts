@@ -1,5 +1,6 @@
 import { basename, dirname, join } from 'node:path'
 import * as vscode from 'vscode'
+import type { ChangedFilesView } from '../../../shared/protocol'
 import { JjRepo } from '../../jj/repo'
 import type { RepoModel } from '../../repo/repoModel'
 import { errorMessage } from '../../util/logger'
@@ -172,6 +173,18 @@ async function addWorkspace(env: CommandEnv, model: RepoModel): Promise<void> {
   }
 }
 
+async function setChangedFilesView(view: ChangedFilesView): Promise<void> {
+  const config = vscode.workspace.getConfiguration('ukemi')
+  const inspected = config.inspect<ChangedFilesView>('changedFilesView')
+  const target =
+    inspected?.workspaceFolderValue !== undefined
+      ? vscode.ConfigurationTarget.WorkspaceFolder
+      : inspected?.workspaceValue !== undefined
+        ? vscode.ConfigurationTarget.Workspace
+        : vscode.ConfigurationTarget.Global
+  await config.update('changedFilesView', view, target)
+}
+
 export function globalCommands(env: CommandEnv): Record<string, Handler> {
   return {
     'ukemi.refresh': withModel(env, (model) =>
@@ -239,5 +252,7 @@ export function globalCommands(env: CommandEnv): Record<string, Handler> {
     'ukemi.forge.signOut': withModel(env, (model) => env.forge.signOut(model)),
     'ukemi.openSettings': () =>
       vscode.commands.executeCommand('workbench.action.openSettings', '@ext:ukemi.ukemi'),
+    'ukemi.view.asList': () => setChangedFilesView('list'),
+    'ukemi.view.asTree': () => setChangedFilesView('tree'),
   }
 }

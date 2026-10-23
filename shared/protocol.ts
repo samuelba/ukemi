@@ -59,9 +59,12 @@ export interface RepoSummary {
 
 export type ViewStatus = 'loading' | 'ready' | 'no-folder' | 'no-repo' | 'no-jj' | 'error'
 
+export type ChangedFilesView = 'list' | 'tree'
+
 export interface ViewSettings {
   changeIdLength: number
   showFullPaths: boolean
+  changedFilesView: ChangedFilesView
 }
 
 export interface ViewState {

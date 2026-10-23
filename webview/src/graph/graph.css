@@ -36,7 +36,8 @@
   flex-direction: column;
   max-height: 40vh;
   margin-top: auto;
-  border-top: 1px solid var(--vscode-sideBarSectionHeader-border, var(--vscode-widget-border, transparent));
+  border-top: 1px solid
+    var(--vscode-sideBarSectionHeader-border, var(--vscode-widget-border, transparent));
   background: var(--vscode-sideBar-background, var(--vscode-editor-background));
 }
 
@@ -464,6 +465,31 @@
   margin: 0 0 4px;
   padding: 0;
   list-style: none;
+}
+
+.file-children {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.file-tree .file {
+  padding-left: calc(4px + var(--file-depth, 0) * 12px);
+}
+
+button.file-dir-row {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.file-dir-row .codicon {
+  flex: none;
+  width: 12px;
+  font-size: 12px;
 }
 
 div.files {

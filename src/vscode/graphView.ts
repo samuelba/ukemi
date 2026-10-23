@@ -170,7 +170,11 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable 
       graph: model?.graph ?? null,
       busy: this.operations.busy,
       error: this.operations.error ?? model?.error ?? null,
-      settings: { changeIdLength: config.changeIdLength, showFullPaths: config.showFullPaths },
+      settings: {
+        changeIdLength: config.changeIdLength,
+        showFullPaths: config.showFullPaths,
+        changedFilesView: config.changedFilesView,
+      },
     }
   }
 

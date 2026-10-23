@@ -5,6 +5,7 @@ import {
   type GraphFilter,
   type HistoryDepth,
 } from '../../shared/model'
+import type { ChangedFilesView } from '../../shared/protocol'
 import { DEFAULT_EXCLUDES } from '../repo/discovery'
 
 export type SourceControlMode = 'auto' | 'always' | 'never'
@@ -20,10 +21,13 @@ export interface UkemiConfig {
   defaultFilter: GraphFilter
   changeIdLength: number
   showFullPaths: boolean
+  changedFilesView: ChangedFilesView
   addJjToTerminalPath: boolean
   gitlabHosts: string[]
   githubHosts: string[]
 }
+
+const CHANGED_FILES_VIEWS = ['list', 'tree'] as const satisfies readonly ChangedFilesView[]
 
 function oneOf<T extends string>(value: string, allowed: readonly T[], fallback: T): T {
   return (allowed as readonly string[]).includes(value) ? (value as T) : fallback
@@ -42,6 +46,7 @@ export function readConfig(): UkemiConfig {
     defaultFilter: oneOf(c.get<string>('defaultFilter', 'recent'), GRAPH_FILTERS, 'recent'),
     changeIdLength: c.get<number>('changeIdLength', 4),
     showFullPaths: c.get<boolean>('showFullPaths', false),
+    changedFilesView: oneOf(c.get<string>('changedFilesView', 'list'), CHANGED_FILES_VIEWS, 'list'),
     addJjToTerminalPath: c.get<boolean>('addJjToTerminalPath', true),
     gitlabHosts: c.get<string[]>('gitlab.hosts', []),
     githubHosts: c.get<string[]>('github.hosts', []),

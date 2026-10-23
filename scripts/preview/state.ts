@@ -30,7 +30,7 @@ async function main(root: string, output: string): Promise<void> {
     graph: model.graph,
     busy: null,
     error: null,
-    settings: { changeIdLength: 4, showFullPaths: false },
+    settings: { changeIdLength: 4, showFullPaths: false, changedFilesView: 'list' },
   }
   const target = model.graph?.commits.find(
     (c) => !c.isEmpty && c.localBookmarks.some((b) => b.name === 'main'),

@@ -455,6 +455,24 @@
         "command": "ukemi.workspace.delete",
         "title": "Delete Workspace…",
         "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.view.asList",
+        "title": "View as List",
+        "category": "Ukemi",
+        "icon": "$(list-flat)"
+      },
+      {
+        "command": "ukemi.view.asTree",
+        "title": "View as Tree",
+        "category": "Ukemi",
+        "icon": "$(list-tree)"
+      }
+    ],
+    "submenus": [
+      {
+        "id": "ukemi.viewMode",
+        "label": "View"
       }
     ],
     "menus": {
@@ -687,6 +705,11 @@
           "when": "view == ukemi.graph"
         },
         {
+          "submenu": "ukemi.viewMode",
+          "group": "3_view@1",
+          "when": "view == ukemi.graph"
+        },
+        {
           "command": "ukemi.showLog",
           "group": "9_misc@1",
           "when": "view == ukemi.graph"
@@ -695,6 +718,18 @@
           "command": "ukemi.openSettings",
           "group": "navigation@3",
           "when": "view == ukemi.graph"
+        }
+      ],
+      "ukemi.viewMode": [
+        {
+          "command": "ukemi.view.asList",
+          "group": "1_mode@1",
+          "toggled": "config.ukemi.changedFilesView == list"
+        },
+        {
+          "command": "ukemi.view.asTree",
+          "group": "1_mode@2",
+          "toggled": "config.ukemi.changedFilesView == tree"
         }
       ],
       "scm/title": [
@@ -1026,6 +1061,19 @@
           "type": "boolean",
           "default": false,
           "description": "Show full file paths in the change graph."
+        },
+        "ukemi.changedFilesView": {
+          "type": "string",
+          "enum": [
+            "list",
+            "tree"
+          ],
+          "default": "list",
+          "enumDescriptions": [
+            "One row per file.",
+            "Files grouped by folder."
+          ],
+          "description": "How changed files appear under a change in the graph."
         },
         "ukemi.github.hosts": {
           "type": "array",
