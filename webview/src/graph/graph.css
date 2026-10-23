@@ -519,6 +519,15 @@ div.files {
   color: var(--vscode-list-activeSelectionForeground, inherit);
 }
 
+.file .actions {
+  margin-left: auto;
+}
+
+.file:hover .actions,
+.file:focus-within .actions {
+  display: inline-flex;
+}
+
 .file-status {
   flex: none;
   width: 12px;
@@ -554,6 +563,7 @@ div.files {
 }
 
 .file-name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
