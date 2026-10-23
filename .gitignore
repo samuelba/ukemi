@@ -5,3 +5,4 @@ coverage/
 *.vsix
 .vscode-test/
 scripts/preview/state.generated.js
+mise.toml
