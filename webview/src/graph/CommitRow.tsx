@@ -166,6 +166,18 @@ export function CommitRow(props: CommitRowProps) {
             {relativeTime(commit.committer.timestamp, props.now)}
           </span>
           <span className="actions">
+            {!commit.isWorkingCopy && !commit.isImmutable && (
+              <button
+                className="icon-button"
+                title="Edit this change"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  runCommand('ukemi.commit.edit', repoId, commit.commitId)
+                }}
+              >
+                <i className="codicon codicon-edit" />
+              </button>
+            )}
             {!commit.isImmutable && (
               <button
                 className="icon-button"
@@ -175,7 +187,7 @@ export function CommitRow(props: CommitRowProps) {
                   props.onDescribe(commit)
                 }}
               >
-                <i className="codicon codicon-edit" />
+                <i className="codicon codicon-comment-discussion-quote" />
               </button>
             )}
             <button

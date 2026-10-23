@@ -229,7 +229,8 @@
       {
         "command": "ukemi.commit.edit",
         "title": "Edit This Change",
-        "category": "Ukemi"
+        "category": "Ukemi",
+        "icon": "$(edit)"
       },
       {
         "command": "ukemi.commit.makeEditable",
@@ -240,7 +241,7 @@
         "command": "ukemi.commit.describe",
         "title": "Describe…",
         "category": "Ukemi",
-        "icon": "$(edit)"
+        "icon": "$(comment-discussion-quote)"
       },
       {
         "command": "ukemi.commit.viewDiff",
