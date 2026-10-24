@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { DEPTHLESS_FILTERS, type GraphFilter, type HistoryDepth } from '../../../shared/model'
 import type { GraphState, RepoSummary } from '../../../shared/protocol'
 import { postMessage } from '../shared/vscodeApi'
+import { VersionsIcon } from './VersionsIcon'
 
 const FILTERS: ReadonlyArray<{ id: GraphFilter; label: string; hint: string }> = [
   { id: 'recent', label: 'Recent', hint: 'Mutable changes, bookmarks and tags' },
@@ -134,7 +135,7 @@ export function Toolbar({
               onClick={() => command('ukemi.goTo', { repoId })}
             />
             <ToolButton
-              icon="versions"
+              icon={<VersionsIcon />}
               label={isEvolutionOpen ? 'Hide evolution' : 'Show evolution of the selected change'}
               isPressed={isEvolutionOpen}
               onClick={onToggleEvolution}

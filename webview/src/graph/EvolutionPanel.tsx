@@ -4,6 +4,7 @@ import type { EvolutionEntry } from '../../../shared/model'
 import type { CommitView, ViewSettings } from '../../../shared/protocol'
 import { relativeTime, splitId, title } from '../shared/format'
 import { postMessage } from '../shared/vscodeApi'
+import { VersionsIcon } from './VersionsIcon'
 
 interface EvolutionPanelProps {
   commit: CommitView
@@ -108,7 +109,7 @@ export function EvolutionPanel({ commit, entries, settings, now, onClose }: Evol
   return (
     <section className="evolution" aria-label="Evolution">
       <header className="evolution-head">
-        <i className="codicon codicon-versions" />
+        <VersionsIcon />
         <span className="evolution-title">
           Evolution of{' '}
           <Id id={commit.changeId} prefix={commit.changePrefix} length={settings.changeIdLength} />{' '}
