@@ -53,6 +53,10 @@ const workspaceSchema = z.object({
   name: z.string(),
   root: z.string().nullable(),
   commit_id: z.string(),
+  change_id: z.string(),
+  description: z.string(),
+  is_empty: z.boolean(),
+  changed_files: z.number(),
 })
 
 const diffFileSchema = z.object({ path: z.string(), status: fileStatusSchema, source: z.string() })
@@ -144,6 +148,10 @@ export function parseWorkspaces(output: string): Workspace[] {
     name: entry.name,
     root: entry.root,
     commitId: entry.commit_id,
+    changeId: entry.change_id,
+    description: entry.description,
+    isEmpty: entry.is_empty,
+    changedFiles: entry.changed_files,
   }))
 }
 

@@ -268,4 +268,20 @@ describe('mutations', () => {
     const names = (await repo.workspaces()).map((w) => w.name).sort()
     expect(names).toEqual(['default', 'second'])
   })
+
+  test('snapshotWorkspace records a file edited in another workspace', async () => {
+    const wsPath = join(fixture.dir, 'repo-other')
+    await repo.addWorkspace(wsPath, 'other', '@')
+    writeFile(wsPath, 'note.txt', 'from the other workspace\n')
+
+    const before = (await repo.workspaces()).find((workspace) => workspace.name === 'other')
+    expect(before?.isEmpty).toBe(true)
+
+    await repo.snapshotWorkspace(wsPath)
+
+    const after = (await repo.workspaces()).find((workspace) => workspace.name === 'other')
+    expect(after?.isEmpty).toBe(false)
+    expect(after?.changedFiles).toBe(1)
+    expect(after?.description).toBe('')
+  })
 })

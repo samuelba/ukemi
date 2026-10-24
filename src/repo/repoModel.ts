@@ -1,5 +1,6 @@
+import { resolve } from 'node:path'
 import { layoutGraph } from '../../shared/graphLayout'
-import type { ChangedFile, Commit, GraphFilter, HistoryDepth } from '../../shared/model'
+import type { ChangedFile, Commit, GraphFilter, HistoryDepth, Workspace } from '../../shared/model'
 import type { CommitView, ForgeState, GraphState, RequestBadge } from '../../shared/protocol'
 import { buildGraphNodes } from '../graph/buildGraph'
 import { JjRepo } from '../jj/repo'
@@ -24,16 +25,18 @@ export class RepoModel {
   private isRefreshQueued = false
   private requests: RequestBadge[] = []
   private forge: ForgeState | null = null
+  private snapshotOtherWorkspaces = false
   private readonly fileCache = new Map<string, ChangedFile[]>()
   private readonly listeners = new Set<ChangeListener>()
 
   constructor(
     readonly repo: JjRepo,
     private readonly logger: Logger,
-    options: { depth?: HistoryDepth; filter?: GraphFilter } = {},
+    options: { depth?: HistoryDepth; filter?: GraphFilter; snapshotOtherWorkspaces?: boolean } = {},
   ) {
     this.depth = options.depth ?? this.depth
     this.filter = options.filter ?? this.filter
+    this.snapshotOtherWorkspaces = options.snapshotOtherWorkspaces ?? false
   }
 
   get root(): string {
@@ -61,6 +64,10 @@ export class RepoModel {
 
   markDirty(): void {
     this.isDirty = true
+  }
+
+  setSnapshotOtherWorkspaces(enabled: boolean): void {
+    this.snapshotOtherWorkspaces = enabled
   }
 
   setView(filter: GraphFilter, depth: HistoryDepth): Promise<void> {
@@ -113,6 +120,9 @@ export class RepoModel {
       if (this.isDirty) {
         this.isDirty = false
         await this.repo.snapshot()
+      }
+      if (this.snapshotOtherWorkspaces) {
+        await this.snapshotOthers()
       }
       this.current = await this.buildState()
       this.lastError = null
@@ -175,6 +185,26 @@ export class RepoModel {
       currentBookmarks,
       trunkName,
       forge: this.forge,
+    }
+  }
+
+  private async snapshotOthers(): Promise<void> {
+    let listed: Workspace[]
+    try {
+      listed = await this.repo.workspaces()
+    } catch (error: unknown) {
+      this.logger.warn(`workspace list failed: ${errorMessage(error)}`)
+      return
+    }
+    for (const workspace of listed) {
+      if (!workspace.root || resolve(workspace.root) === resolve(this.root)) {
+        continue
+      }
+      try {
+        await this.repo.snapshotWorkspace(workspace.root)
+      } catch (error: unknown) {
+        this.logger.warn(`snapshot ${workspace.name} failed: ${errorMessage(error)}`)
+      }
     }
   }
 

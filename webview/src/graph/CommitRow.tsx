@@ -132,6 +132,7 @@ export function CommitRow(props: CommitRowProps) {
   return (
     <div
       className={classes}
+      data-commit-id={commit.commitId}
       draggable={!commit.isImmutable || copyModifier}
       onDragStart={(event) => {
         const copy =

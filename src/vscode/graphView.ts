@@ -51,6 +51,8 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable 
   private view: vscode.WebviewView | null = null
   private panel: vscode.WebviewPanel | null = null
   private handler: MessageHandler = async () => undefined
+  private pendingReveal: string | null = null
+  private readonly readyWebviews = new WeakSet<vscode.Webview>()
   private readonly disposables: vscode.Disposable[] = []
 
   constructor(
@@ -93,6 +95,26 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable 
     })
   }
 
+  async focus(): Promise<void> {
+    if (this.panel || readConfig().showInPanel) {
+      this.openPanel()
+    }
+    if (!readConfig().showInPanel) {
+      await vscode.commands.executeCommand(`${GRAPH_VIEW_ID}.focus`)
+    }
+  }
+
+  async showCommit(commitId: string): Promise<void> {
+    await this.focus()
+    this.pendingReveal = commitId
+    const opened = this.panel?.webview
+    const waitingForNew = opened !== undefined && !this.readyWebviews.has(opened)
+    if (!waitingForNew && this.hasReadyWebview()) {
+      this.pendingReveal = null
+      this.post({ type: 'reveal', commitId })
+    }
+  }
+
   openPanel(): void {
     if (this.panel) {
       this.panel.reveal()
@@ -125,7 +147,9 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable 
     webview.html = webviewHtml(webview, this.extensionUri, 'graph')
     webview.onDidReceiveMessage(async (message: WebviewMessage) => {
       if (message.type === 'ready') {
+        this.readyWebviews.add(webview)
         this.postState()
+        this.flushReveal()
         return
       }
       try {
@@ -135,6 +159,24 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable 
       }
     })
     this.webviews.add(webview)
+  }
+
+  private hasReadyWebview(): boolean {
+    for (const webview of this.webviews) {
+      if (this.readyWebviews.has(webview)) {
+        return true
+      }
+    }
+    return false
+  }
+
+  private flushReveal(): void {
+    if (!this.pendingReveal || !this.hasReadyWebview()) {
+      return
+    }
+    const commitId = this.pendingReveal
+    this.pendingReveal = null
+    this.post({ type: 'reveal', commitId })
   }
 
   post(message: HostMessage): void {

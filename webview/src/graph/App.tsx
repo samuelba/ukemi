@@ -26,6 +26,7 @@ export function App() {
   const [isWorkingCopyCollapsed, setIsWorkingCopyCollapsed] = useState(false)
   const requested = useRef(new Set<string>())
   const [selected, setSelected] = useState<string | null>(null)
+  const [revealId, setRevealId] = useState<string | null>(null)
   const [describing, setDescribing] = useState<Describing | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const [isEvolutionOpen, setIsEvolutionOpen] = useState(false)
@@ -39,6 +40,10 @@ export function App() {
         case 'state':
           setState(message.state)
           setNow(Date.now())
+          return
+        case 'reveal':
+          setSelected(message.commitId)
+          setRevealId(message.commitId)
           return
         case 'files':
           setFiles((prev) =>
@@ -71,6 +76,18 @@ export function App() {
 
   const graph = state?.graph ?? null
   const repoId = graph?.repoId ?? ''
+
+  useEffect(() => {
+    if (!revealId) {
+      return
+    }
+    const row = document.querySelector(`[data-commit-id="${CSS.escape(revealId)}"]`)
+    if (!row) {
+      return
+    }
+    row.scrollIntoView({ block: 'nearest' })
+    setRevealId(null)
+  }, [revealId, graph])
 
   const selectedCommit = graph?.commits.find((c) => c.commitId === selected)
   const evolutionCommit =

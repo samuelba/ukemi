@@ -82,6 +82,7 @@ export type DropAction = 'rebase' | 'duplicate'
 
 export type HostMessage =
   | { type: 'state'; state: ViewState }
+  | { type: 'reveal'; commitId: string }
   | { type: 'files'; repoId: string; commitId: string; files: ChangedFile[] }
   | { type: 'describe'; commitId: string; description: string }
   | { type: 'evolution'; repoId: string; commitId: string; entries: EvolutionEntry[] }

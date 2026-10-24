@@ -53,6 +53,10 @@ export interface Workspace {
   name: string
   root: string | null
   commitId: string
+  changeId: string
+  description: string
+  isEmpty: boolean
+  changedFiles: number
 }
 
 export interface Operation {

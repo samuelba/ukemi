@@ -334,6 +334,13 @@ export class JjRepo {
     return this.mutations.run(() => this.runner.run({ cwd: workspaceRoot, args: ['new'] }))
   }
 
+  snapshotWorkspace(workspaceRoot: string): Promise<void> {
+    return this.mutations.run(async () => {
+      await this.runner.run({ cwd: workspaceRoot, args: ['workspace', 'update-stale'] })
+      await this.runner.run({ cwd: workspaceRoot, args: ['status'] })
+    })
+  }
+
   static async initColocated(runner: JjRunner, directory: string): Promise<void> {
     await runner.run({ cwd: directory, args: ['git', 'init', '--colocate'] })
   }

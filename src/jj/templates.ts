@@ -83,7 +83,7 @@ export const DIFF_FILES_TEMPLATE =
 export const COMMIT_ID_TEMPLATE = 'commit_id ++ "\\n"'
 
 export const WORKSPACE_TEMPLATE =
-  'json({"name" => name, "root" => root, "commit_id" => target.commit_id()}) ++ "\\n"'
+  'json({"name" => name, "root" => root, "commit_id" => target.commit_id(), "change_id" => target.change_id().short(8), "description" => target.description().first_line(), "is_empty" => target.empty(), "changed_files" => target.diff().files().len()}) ++ "\\n"'
 
 export const PUSHED_BOOKMARK_TEMPLATE = 'if(remote && remote != "git", name ++ "\\n")'
 

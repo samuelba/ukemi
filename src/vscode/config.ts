@@ -22,6 +22,7 @@ export interface UkemiConfig {
   changeIdLength: number
   showFullPaths: boolean
   changedFilesView: ChangedFilesView
+  snapshotOnRefresh: boolean
   addJjToTerminalPath: boolean
   gitlabHosts: string[]
   githubHosts: string[]
@@ -47,6 +48,7 @@ export function readConfig(): UkemiConfig {
     changeIdLength: c.get<number>('changeIdLength', 4),
     showFullPaths: c.get<boolean>('showFullPaths', false),
     changedFilesView: oneOf(c.get<string>('changedFilesView', 'list'), CHANGED_FILES_VIEWS, 'list'),
+    snapshotOnRefresh: c.get<boolean>('workspaces.snapshotOnRefresh', false),
     addJjToTerminalPath: c.get<boolean>('addJjToTerminalPath', true),
     gitlabHosts: c.get<string[]>('gitlab.hosts', []),
     githubHosts: c.get<string[]>('github.hosts', []),

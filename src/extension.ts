@@ -7,6 +7,7 @@ import { contextCommit, registerAll, type CommandEnv } from './vscode/commands/c
 import { fileCommands } from './vscode/commands/fileCommands'
 import { globalCommands } from './vscode/commands/globalCommands'
 import { refCommands } from './vscode/commands/refCommands'
+import { workspaceCommands } from './vscode/commands/workspaceCommands'
 import {
   DIFF_SCHEME,
   INTERDIFF_SCHEME,
@@ -22,6 +23,7 @@ import { RepoRegistry } from './vscode/registry'
 import { ScmController } from './vscode/scm'
 import { openSplitPanel } from './vscode/splitPanel'
 import { RepoStatusBar } from './vscode/statusBar'
+import { WorkspacesView } from './vscode/workspacesView'
 import { createMessageHandler } from './vscode/webviewMessages'
 
 export interface UkemiApi {
@@ -41,6 +43,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
   const registry = new RepoRegistry(runner, logger, context.workspaceState)
   const operations = new Operations(logger)
   const graphView = new GraphView(context.extensionUri, registry, operations, availability, logger)
+  const workspacesView = new WorkspacesView(registry)
   const forge = new ForgeService(registry, context.secrets, logger)
   const askpass = new AskpassServer(
     process.execPath,
@@ -85,6 +88,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
     forge,
     new ScmController(registry),
     new RepoStatusBar(registry),
+    workspacesView,
+    vscode.window.registerTreeDataProvider('ukemi.workspaces', workspacesView),
     vscode.window.registerWebviewViewProvider(GRAPH_VIEW_ID, graphView, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
@@ -107,6 +112,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
         e.affectsConfiguration('ukemi.repoScanExclude')
       ) {
         await registry.discover()
+      } else if (e.affectsConfiguration('ukemi.workspaces.snapshotOnRefresh')) {
+        registry.applyWorkspaceSettings()
       }
     }),
   )
@@ -116,6 +123,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
     ...commitCommands(env),
     ...fileCommands(env),
     ...refCommands(env),
+    ...workspaceCommands(env),
     'ukemi.split.open': async (arg?: unknown) => {
       const target = contextCommit(env, arg)
       if (target) {

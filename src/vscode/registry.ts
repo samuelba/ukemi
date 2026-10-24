@@ -144,6 +144,13 @@ export class RepoRegistry implements vscode.Disposable {
     }
   }
 
+  applyWorkspaceSettings(): void {
+    const enabled = readConfig().snapshotOnRefresh
+    for (const model of this.models) {
+      model.setSnapshotOtherWorkspaces(enabled)
+    }
+  }
+
   async addRepo(root: string): Promise<void> {
     const existing = this.entries.get(root)
     if (existing) {
@@ -176,6 +183,7 @@ export class RepoRegistry implements vscode.Disposable {
     const model = new RepoModel(new JjRepo(root, this.runner), this.logger, {
       depth: config.historyDepth,
       filter: config.defaultFilter,
+      snapshotOtherWorkspaces: config.snapshotOnRefresh,
     })
     entry.model = model
     entry.disposables.push(

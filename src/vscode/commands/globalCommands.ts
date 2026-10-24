@@ -1,10 +1,10 @@
-import { basename, dirname, join } from 'node:path'
+import { basename } from 'node:path'
 import * as vscode from 'vscode'
 import type { ChangedFilesView } from '../../../shared/protocol'
 import { JjRepo } from '../../jj/repo'
 import type { RepoModel } from '../../repo/repoModel'
+import { collectBookmarks } from '../../repo/workspaceItems'
 import { errorMessage } from '../../util/logger'
-import { validateBookmarkName } from '../../util/text'
 import { openCommitDiff } from '../diff'
 import { GRAPH_VIEW_ID } from '../graphView'
 import { readConfig } from '../config'
@@ -86,17 +86,17 @@ export async function initRepo(env: CommandEnv, root?: string): Promise<void> {
 async function goTo(env: CommandEnv, model: RepoModel): Promise<void> {
   const graph = model.graph
   type Item = vscode.QuickPickItem & { revision?: string; workspaceRoot?: string }
-  const bookmarkEntries = (graph?.commits ?? []).flatMap((c): Array<[string, Item]> => [
-    ...c.localBookmarks.map((b): [string, Item] => [
-      b.name,
-      { label: `$(bookmark) ${b.name}`, revision: c.commitId },
-    ]),
-    ...c.remoteBookmarks.map((b): [string, Item] => [
-      `${b.name}@${b.remote}`,
-      { label: `$(cloud) ${b.name}@${b.remote}`, revision: c.commitId },
-    ]),
-  ])
-  const bookmarks: Item[] = [...new Map(bookmarkEntries).values()]
+  const { local, remote } = collectBookmarks(graph?.commits ?? [])
+  const bookmarks: Item[] = [
+    ...local.map((bookmark) => ({
+      label: `$(bookmark) ${bookmark.name}`,
+      revision: bookmark.commitId,
+    })),
+    ...remote.map((bookmark) => ({
+      label: `$(cloud) ${bookmark.name}@${bookmark.remote}`,
+      revision: bookmark.commitId,
+    })),
+  ]
   const requests: Item[] = (graph?.commits ?? []).flatMap((c) =>
     c.requests.map((r) => ({
       label: `$(git-pull-request) #${r.number} ${r.title}`,
@@ -142,34 +142,6 @@ async function goTo(env: CommandEnv, model: RepoModel): Promise<void> {
   const revision = typeof choice === 'string' ? choice : choice.revision
   if (revision) {
     await env.operations.run('Go to', model, () => model.repo.newChange([revision]))
-  }
-}
-
-async function addWorkspace(env: CommandEnv, model: RepoModel): Promise<void> {
-  const name = await vscode.window.showInputBox({
-    title: 'Create workspace',
-    prompt: `Created as a sibling folder of ${basename(model.root)}`,
-    validateInput: validateBookmarkName,
-  })
-  if (!name) {
-    return
-  }
-  const path = join(dirname(model.root), `${basename(model.root)}-${name}`)
-  const revision = model.graph?.trunkName ? 'trunk()' : '@'
-  const created = await env.operations.run('Create workspace', model, async () => {
-    await model.repo.addWorkspace(path, name, revision)
-    return true
-  })
-  if (created) {
-    const open = await vscode.window.showInformationMessage(
-      `Workspace "${name}" created in ${path}.`,
-      'Open in New Window',
-    )
-    if (open) {
-      await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(path), {
-        forceNewWindow: true,
-      })
-    }
   }
 }
 
@@ -232,7 +204,6 @@ export function globalCommands(env: CommandEnv): Record<string, Handler> {
       await env.operations.run('Redo', model, () => model.repo.redo())
     }),
     'ukemi.goTo': withModel(env, (model) => goTo(env, model)),
-    'ukemi.addWorkspace': withModel(env, (model) => addWorkspace(env, model)),
     'ukemi.openCommitDiff': withModel(env, async (model) => {
       const commit = model.graph?.commits.find((c) => c.isWorkingCopy)
       if (commit) {

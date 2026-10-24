@@ -1,4 +1,3 @@
-import { rm } from 'node:fs/promises'
 import * as vscode from 'vscode'
 import type { CommitView, RequestBadge } from '../../../shared/protocol'
 import { quoteRevsetString } from '../../jj/revsets'
@@ -166,45 +165,6 @@ async function cleanupRequest(
   })
 }
 
-async function deleteWorkspace(env: CommandEnv, model: RepoModel, name: string): Promise<void> {
-  const workspace = model.graph?.workspaces.find((w) => w.name === name)
-  if (!workspace || name === 'default') {
-    return
-  }
-  const canDeleteFiles = workspace.root !== null && workspace.root !== model.root
-  const choice = await vscode.window.showWarningMessage(
-    `Delete workspace "${name}"?`,
-    {
-      modal: true,
-      detail: canDeleteFiles ? `Files in ${workspace.root} can also be deleted.` : undefined,
-    },
-    ...(canDeleteFiles ? ['Forget and Delete Files'] : []),
-    'Forget Only',
-  )
-  if (!choice) {
-    return
-  }
-  await env.operations.run('Delete workspace', model, async () => {
-    await model.repo.forgetWorkspace(name)
-    if (choice === 'Forget and Delete Files' && workspace.root) {
-      await rm(workspace.root, { recursive: true, force: true })
-    }
-  })
-}
-
-function workspaceHandler(
-  env: CommandEnv,
-  fn: (model: RepoModel, name: string) => Promise<unknown>,
-): Handler {
-  return async (arg?: unknown) => {
-    const ctx = parseContext(arg)
-    const model = contextModel(env, ctx)
-    if (model && ctx.workspace) {
-      await fn(model, ctx.workspace)
-    }
-  }
-}
-
 export function refCommands(env: CommandEnv): Record<string, Handler> {
   const op = (label: string, model: RepoModel, task: () => Promise<unknown>) =>
     env.operations.run(label, model, task)
@@ -247,30 +207,6 @@ export function refCommands(env: CommandEnv): Record<string, Handler> {
     ),
     'ukemi.request.cleanup': requestHandler(env, (model, request) =>
       cleanupRequest(env, model, request),
-    ),
-    'ukemi.workspace.newChange': workspaceHandler(env, async (model, name) => {
-      const workspace = model.graph?.workspaces.find((w) => w.name === name)
-      if (workspace?.root) {
-        const root = workspace.root
-        await op('New change', model, () => model.repo.newChangeInWorkspace(root))
-      }
-    }),
-    'ukemi.workspace.copyPath': workspaceHandler(env, async (model, name) => {
-      const root = model.graph?.workspaces.find((w) => w.name === name)?.root
-      if (root) {
-        await vscode.env.clipboard.writeText(root)
-      }
-    }),
-    'ukemi.workspace.open': workspaceHandler(env, async (model, name) => {
-      const root = model.graph?.workspaces.find((w) => w.name === name)?.root
-      if (root) {
-        await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), {
-          forceNewWindow: true,
-        })
-      }
-    }),
-    'ukemi.workspace.delete': workspaceHandler(env, (model, name) =>
-      deleteWorkspace(env, model, name),
     ),
   }
 }

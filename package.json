@@ -92,6 +92,10 @@
           "name": "Changes",
           "icon": "resources/activity.svg",
           "contextualTitle": "Ukemi"
+        },
+        {
+          "id": "ukemi.workspaces",
+          "name": "Workspaces"
         }
       ]
     },
@@ -468,6 +472,48 @@
         "category": "Ukemi"
       },
       {
+        "command": "ukemi.workspace.openHere",
+        "title": "Open Workspace in This Window",
+        "category": "Ukemi",
+        "icon": "$(window)"
+      },
+      {
+        "command": "ukemi.workspace.openTerminal",
+        "title": "Open Terminal",
+        "category": "Ukemi",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "ukemi.workspace.snapshot",
+        "title": "Refresh Workspace",
+        "category": "Ukemi",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "ukemi.workspace.reveal",
+        "title": "Reveal in Graph",
+        "category": "Ukemi",
+        "icon": "$(target)"
+      },
+      {
+        "command": "ukemi.workspaces.refreshAll",
+        "title": "Refresh All Workspaces",
+        "category": "Ukemi",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "ukemi.commit.newWorkspace",
+        "title": "New Workspace Here…",
+        "category": "Ukemi",
+        "icon": "$(empty-window)"
+      },
+      {
+        "command": "ukemi.bookmark.newWorkspace",
+        "title": "New Workspace from Bookmark…",
+        "category": "Ukemi",
+        "icon": "$(empty-window)"
+      },
+      {
         "command": "ukemi.view.asList",
         "title": "View as List",
         "category": "Ukemi",
@@ -579,6 +625,11 @@
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && hasRemotes && !isImmutable"
         },
         {
+          "command": "ukemi.commit.newWorkspace",
+          "group": "4_share@4",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit'"
+        },
+        {
           "command": "ukemi.commit.copyChangeId",
           "group": "9_copy@1",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit'",
@@ -610,6 +661,11 @@
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'bookmark'"
         },
         {
+          "command": "ukemi.bookmark.newWorkspace",
+          "group": "3_workspace@1",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'bookmark'"
+        },
+        {
           "command": "ukemi.request.open",
           "group": "1_request@1",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'request'"
@@ -635,13 +691,33 @@
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'request'"
         },
         {
-          "command": "ukemi.workspace.newChange",
+          "command": "ukemi.workspace.openHere",
           "group": "1_workspace@1",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'workspace'"
         },
         {
           "command": "ukemi.workspace.open",
           "group": "1_workspace@2",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'workspace'"
+        },
+        {
+          "command": "ukemi.workspace.openTerminal",
+          "group": "1_workspace@3",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'workspace'"
+        },
+        {
+          "command": "ukemi.workspace.snapshot",
+          "group": "1_workspace@4",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'workspace'"
+        },
+        {
+          "command": "ukemi.workspace.reveal",
+          "group": "1_workspace@5",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'workspace'"
+        },
+        {
+          "command": "ukemi.workspace.newChange",
+          "group": "1_workspace@6",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'workspace'"
         },
         {
@@ -707,6 +783,16 @@
           "when": "view == ukemi.graph"
         },
         {
+          "command": "ukemi.addWorkspace",
+          "group": "navigation@1",
+          "when": "view == ukemi.workspaces"
+        },
+        {
+          "command": "ukemi.workspaces.refreshAll",
+          "group": "navigation@2",
+          "when": "view == ukemi.workspaces"
+        },
+        {
           "command": "ukemi.initRepo",
           "group": "1_repo@3",
           "when": "view == ukemi.graph"
@@ -735,6 +821,48 @@
           "command": "ukemi.openSettings",
           "group": "navigation@3",
           "when": "view == ukemi.graph"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "ukemi.workspace.openHere",
+          "group": "inline@1",
+          "when": "view == ukemi.workspaces && viewItem =~ /^workspace/ && viewItem !~ /open/ && viewItem !~ /missing/"
+        },
+        {
+          "command": "ukemi.workspace.open",
+          "group": "inline@2",
+          "when": "view == ukemi.workspaces && viewItem =~ /^workspace/ && viewItem !~ /missing/"
+        },
+        {
+          "command": "ukemi.workspace.openTerminal",
+          "group": "1_nav@1",
+          "when": "view == ukemi.workspaces && viewItem =~ /^workspace/ && viewItem !~ /missing/"
+        },
+        {
+          "command": "ukemi.workspace.snapshot",
+          "group": "1_nav@2",
+          "when": "view == ukemi.workspaces && viewItem =~ /^workspace/ && viewItem !~ /missing/"
+        },
+        {
+          "command": "ukemi.workspace.reveal",
+          "group": "1_nav@3",
+          "when": "view == ukemi.workspaces && viewItem =~ /^workspace/"
+        },
+        {
+          "command": "ukemi.workspace.newChange",
+          "group": "1_nav@4",
+          "when": "view == ukemi.workspaces && viewItem =~ /^workspace/ && viewItem !~ /missing/"
+        },
+        {
+          "command": "ukemi.workspace.copyPath",
+          "group": "9_copy@1",
+          "when": "view == ukemi.workspaces && viewItem =~ /^workspace/ && viewItem !~ /missing/"
+        },
+        {
+          "command": "ukemi.workspace.delete",
+          "group": "2_remove@1",
+          "when": "view == ukemi.workspaces && viewItem =~ /^workspace/ && viewItem !~ /default/"
         }
       ],
       "ukemi.viewMode": [
@@ -971,6 +1099,30 @@
           "when": "false"
         },
         {
+          "command": "ukemi.workspace.openHere",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.workspace.openTerminal",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.workspace.snapshot",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.workspace.reveal",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.newWorkspace",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.bookmark.newWorkspace",
+          "when": "false"
+        },
+        {
           "command": "ukemi.split.open",
           "when": "false"
         }
@@ -1086,6 +1238,11 @@
           "type": "boolean",
           "default": false,
           "description": "Show full file paths in the change graph."
+        },
+        "ukemi.workspaces.snapshotOnRefresh": {
+          "type": "boolean",
+          "default": false,
+          "description": "On each refresh, snapshot every other workspace so its file changes show up. Each snapshot is a jj operation and can race with jj running in that workspace."
         },
         "ukemi.changedFilesView": {
           "type": "string",
