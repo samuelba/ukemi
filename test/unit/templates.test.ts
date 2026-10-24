@@ -73,4 +73,13 @@ describe('graphRevset', () => {
   test('uses the reachable stack of @ for the stack filter', () => {
     expect(graphRevset('stack', '7d')).toContain('reachable(@, mutable())')
   })
+
+  test('shows @ and five first-parent ancestors for the working copy filter', () => {
+    const revset = graphRevset('working', '30d')
+    expect(revset).toBe(graphRevset('working', '7d'))
+    expect(revset).toContain('first_ancestors(@, 6) & mutable()')
+    expect(revset).toContain('heads(first_ancestors(@, 6) & immutable())')
+    expect(revset).not.toContain('working_copies()')
+    expect(revset).not.toContain('trunk()')
+  })
 })

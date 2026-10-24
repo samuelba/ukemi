@@ -142,6 +142,45 @@ describe('RepoModel', () => {
     expect(stackModel.graph?.depth).toBe('14d')
   })
 
+  test('shows a short first-parent chain for the working copy filter', async () => {
+    writeFile(root, 'base.txt', 'base\n')
+    jj(root, 'describe', '-m', 'base')
+    jj(root, 'bookmark', 'set', 'main', '-r', '@')
+    jj(root, 'new', 'main', '-m', 'side')
+    const side = jj(root, 'log', '--no-graph', '-r', '@', '-T', 'commit_id')
+    jj(root, 'new', 'main', '-m', 'one')
+    for (const name of ['two', 'three', 'four', 'five', 'six', 'seven']) {
+      jj(root, 'new', '-m', name)
+    }
+    jj(root, 'new', '@', side, '-m', 'merge')
+    const working = new RepoModel(makeRepo(root), NULL_LOGGER, { filter: 'working' })
+
+    await working.refresh()
+
+    expect(working.graph?.commits.map((c) => c.description.trim())).toEqual([
+      'merge',
+      'seven',
+      'six',
+      'five',
+      'four',
+      'three',
+    ])
+  })
+
+  test('shows the immutable base under a short working copy chain', async () => {
+    writeFile(root, 'older.txt', 'older\n')
+    jj(root, 'describe', '-m', 'older')
+    jj(root, 'new', '-m', 'base')
+    jj(root, 'bookmark', 'set', 'base', '-r', '@')
+    jj(root, 'new', '-m', 'work')
+    jj(root, 'config', 'set', '--repo', 'revset-aliases."immutable_heads()"', 'base')
+    const working = new RepoModel(makeRepo(root), NULL_LOGGER, { filter: 'working' })
+
+    await working.refresh()
+
+    expect(working.graph?.commits.map((c) => c.description.trim())).toEqual(['work', 'base'])
+  })
+
   test('caches file lists by commit id', async () => {
     writeFile(root, 'a.txt', 'a\n')
     await model.refresh()

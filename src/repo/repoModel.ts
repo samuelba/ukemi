@@ -1,5 +1,5 @@
 import { resolve } from 'node:path'
-import { layoutGraph } from '../../shared/graphLayout'
+import { layoutGraph, type GraphRow } from '../../shared/graphLayout'
 import type { ChangedFile, Commit, GraphFilter, HistoryDepth, Workspace } from '../../shared/model'
 import type { CommitView, ForgeState, GraphState, RequestBadge } from '../../shared/protocol'
 import { buildGraphNodes } from '../graph/buildGraph'
@@ -7,6 +7,7 @@ import { JjRepo } from '../jj/repo'
 import { CURRENT_BOOKMARKS_REVSET, graphRevset } from '../jj/revsets'
 import type { Logger } from '../util/logger'
 import { errorMessage } from '../util/logger'
+import { resolveSelectedCommit } from './selection'
 import { canRedo, UNDO_HISTORY_LIMIT } from './undoState'
 
 const FILE_CACHE_LIMIT = 200
@@ -80,13 +81,25 @@ export class RepoModel {
     this.forge = forge
     this.requests = [...requests]
     if (this.current) {
-      this.current = { ...this.current, forge, commits: this.attachRequests(this.current.commits) }
+      this.current = {
+        ...this.current,
+        forge,
+        commits: this.attachRequests(this.current.commits),
+      }
       this.emit()
     }
   }
 
   findCommit(commitId: string): CommitView | undefined {
     return this.current?.commits.find((c) => c.commitId === commitId)
+  }
+
+  commitFor(commitId: string, changeId: string): CommitView | null {
+    return resolveSelectedCommit(
+      this.current?.commits ?? [],
+      { repoId: this.root, commitId, changeId },
+      this.root,
+    )
   }
 
   async refreshIfOperationChanged(): Promise<void> {
@@ -157,19 +170,7 @@ export class RepoModel {
     const head = operations[0]
     this.lastOperationId = head?.id ?? null
 
-    const views: CommitView[] = commits.map((commit, index) => ({
-      ...commit,
-      row: rows[index] ?? {
-        id: commit.commitId,
-        column: 0,
-        width: 1,
-        incoming: [],
-        outgoing: [],
-        passThrough: [],
-      },
-      isTrunk: commit.commitId === trunkId,
-      requests: [],
-    }))
+    const views = commits.map((commit, index) => toCommitView(commit, rows[index], trunkId))
 
     return {
       repoId: this.root,
@@ -233,6 +234,26 @@ export class RepoModel {
     }
     this.fileCache.set(commitId, files)
     return files
+  }
+}
+
+function toCommitView(
+  commit: Commit,
+  row: GraphRow | undefined,
+  trunkId: string | undefined,
+): CommitView {
+  return {
+    ...commit,
+    row: row ?? {
+      id: commit.commitId,
+      column: 0,
+      width: 1,
+      incoming: [],
+      outgoing: [],
+      passThrough: [],
+    },
+    isTrunk: commit.commitId === trunkId,
+    requests: [],
   }
 }
 

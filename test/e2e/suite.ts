@@ -57,6 +57,10 @@ export async function run(): Promise<void> {
     await vscode.commands.executeCommand('workbench.view.extension.ukemi')
   })
 
+  await step('resolves the evolution panel', async () => {
+    await vscode.commands.executeCommand('ukemi.evolution.focus')
+  })
+
   await step('creates a new change and undoes it', async () => {
     const before = commitOf('@')
     await vscode.commands.executeCommand('ukemi.commit.new', { repoId: root, commitId: before })

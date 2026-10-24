@@ -27,13 +27,18 @@ export const CURRENT_BOOKMARKS_REVSET = 'heads(::@ & bookmarks() & mutable())'
 const ANCHORS = 'present(@) | working_copies() | present(trunk())'
 const TRUNK_HISTORY_LENGTH = 10
 const TRUNK_HISTORY = `first_ancestors(present(trunk()), ${TRUNK_HISTORY_LENGTH})`
+const WORKING_COPY_CHAIN = 'first_ancestors(@, 6)'
+const WORKING_COPY_REVSET = `((${WORKING_COPY_CHAIN} & mutable()) | heads(${WORKING_COPY_CHAIN} & immutable())) ~ root()`
 
 export function graphRevset(filter: GraphFilter, depth: HistoryDepth): string {
+  if (filter === 'working') {
+    return WORKING_COPY_REVSET
+  }
   const base = graphBase(filter, depth)
   return `(${ANCHORS} | (${base}) | (roots((${base}) & mutable())-)) ~ root()`
 }
 
-function graphBase(filter: GraphFilter, depth: HistoryDepth): string {
+function graphBase(filter: Exclude<GraphFilter, 'working'>, depth: HistoryDepth): string {
   switch (filter) {
     case 'recent':
       return `((mutable() | bookmarks() | remote_bookmarks() | tags()) & ${dateFilter(depth)}) | ${TRUNK_HISTORY}`

@@ -2,13 +2,13 @@ import type { ReactNode } from 'react'
 import { DEPTHLESS_FILTERS, type GraphFilter, type HistoryDepth } from '../../../shared/model'
 import type { GraphState, RepoSummary } from '../../../shared/protocol'
 import { postMessage } from '../shared/vscodeApi'
-import { VersionsIcon } from './VersionsIcon'
 
 const FILTERS: ReadonlyArray<{ id: GraphFilter; label: string; hint: string }> = [
   { id: 'recent', label: 'Recent', hint: 'Mutable changes, bookmarks and tags' },
   { id: 'mine', label: 'Mine', hint: 'All your open changes' },
   { id: 'myHistory', label: 'My history', hint: 'Your open changes, and your history in the time range' },
   { id: 'stack', label: 'Stack', hint: 'Changes connected to the working copy' },
+  { id: 'working', label: 'Working copy', hint: 'The working copy and its last 5 parents' },
 ]
 
 const DEPTHS: ReadonlyArray<{ id: HistoryDepth; label: string }> = [
@@ -24,8 +24,6 @@ interface ToolbarProps {
   activeRepoId: string | null
   graph: GraphState | null
   isBusy: boolean
-  isEvolutionOpen: boolean
-  onToggleEvolution: () => void
 }
 
 function command(name: string, context: Record<string, unknown> = {}) {
@@ -38,21 +36,18 @@ function ToolButton({
   onClick,
   isAccent,
   isDisabled,
-  isPressed,
 }: {
   icon: string | ReactNode
   label: string
   onClick: () => void
   isAccent?: boolean
   isDisabled?: boolean
-  isPressed?: boolean
 }) {
   return (
     <button
-      className={`icon-button${isAccent ? ' accent' : ''}${isPressed ? ' pressed' : ''}`}
+      className={`icon-button${isAccent ? ' accent' : ''}`}
       title={label}
       aria-label={label}
-      aria-pressed={isPressed}
       disabled={isDisabled}
       onClick={onClick}
     >
@@ -88,8 +83,6 @@ export function Toolbar({
   activeRepoId,
   graph,
   isBusy,
-  isEvolutionOpen,
-  onToggleEvolution,
 }: ToolbarProps) {
   const repoId = graph?.repoId
   const ignoresDepth = graph !== null && DEPTHLESS_FILTERS.includes(graph.filter)
@@ -133,12 +126,6 @@ export function Toolbar({
               icon="search"
               label="Go to bookmark, request or revision"
               onClick={() => command('ukemi.goTo', { repoId })}
-            />
-            <ToolButton
-              icon={<VersionsIcon />}
-              label={isEvolutionOpen ? 'Hide evolution' : 'Show evolution of the selected change'}
-              isPressed={isEvolutionOpen}
-              onClick={onToggleEvolution}
             />
             {graph.hasRemotes && (
               <>

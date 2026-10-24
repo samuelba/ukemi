@@ -6,7 +6,10 @@ const root = resolve(__dirname, '../..')
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
   contributes: {
     commands: Array<{ command: string }>
-    menus: Record<string, Array<{ command?: string; alt?: string; submenu?: string }>>
+    menus: Record<
+      string,
+      Array<{ command?: string; alt?: string; submenu?: string; when?: string }>
+    >
     configuration: { properties: Record<string, unknown> }
   }
 }
@@ -43,6 +46,32 @@ describe('package.json manifest', () => {
       ),
     )
     expect(used.filter((command) => !declared.has(command))).toEqual([])
+  })
+
+  test('menu when clauses use only operators VS Code parses', () => {
+    const invalid = Object.values(pkg.contributes.menus)
+      .flatMap((items) => items.map((item) => item.when ?? ''))
+      .filter((when) => when.includes('!~'))
+    expect(invalid).toEqual([])
+  })
+
+  test('workspace item menus skip open, missing and default workspaces as declared', () => {
+    const items = pkg.contributes.menus['view/item/context'] ?? []
+    const pattern = (command: string) => {
+      const when = items.find((item) => item.command === command)?.when ?? ''
+      const source = /viewItem =~ \/(.+)\/$/.exec(when)?.[1] ?? '$^'
+      return new RegExp(source)
+    }
+    const context = (...flags: string[]) => ['workspace', ...flags].join('+')
+
+    expect(pattern('ukemi.workspace.openHere').test(context())).toBe(true)
+    expect(pattern('ukemi.workspace.openHere').test(context('open'))).toBe(false)
+    expect(pattern('ukemi.workspace.openHere').test(context('missing'))).toBe(false)
+    expect(pattern('ukemi.workspace.open').test(context('open'))).toBe(true)
+    expect(pattern('ukemi.workspace.open').test(context('missing'))).toBe(false)
+    expect(pattern('ukemi.workspace.delete').test(context('current'))).toBe(true)
+    expect(pattern('ukemi.workspace.delete').test(context('default'))).toBe(false)
+    expect(pattern('ukemi.workspace.open').test('version:openable:comparable')).toBe(false)
   })
 
   test('the webview only sends registered commands', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { ChangedFile } from '../../shared/model'
-import { buildFileTree } from '../../webview/src/graph/fileTree'
+import { buildFileTree } from '../../shared/fileTree'
 
 function file(path: string, sourcePath = path): ChangedFile {
   return { path, sourcePath, status: 'modified', isConflicted: false }

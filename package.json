@@ -89,13 +89,18 @@
         {
           "type": "webview",
           "id": "ukemi.graph",
-          "name": "Changes",
+          "name": "Graph",
           "icon": "resources/activity.svg",
           "contextualTitle": "Ukemi"
         },
         {
           "id": "ukemi.workspaces",
           "name": "Workspaces"
+        },
+        {
+          "id": "ukemi.evolution",
+          "name": "Evolution",
+          "icon": "$(versions)"
         }
       ]
     },
@@ -524,6 +529,30 @@
         "title": "View as Tree",
         "category": "Ukemi",
         "icon": "$(list-tree)"
+      },
+      {
+        "command": "ukemi.evolution.open",
+        "title": "Show Changes in This Version",
+        "category": "Ukemi",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "ukemi.evolution.compare",
+        "title": "Compare with the Current Version",
+        "category": "Ukemi",
+        "icon": "$(compare-changes)"
+      },
+      {
+        "command": "ukemi.evolution.restore",
+        "title": "Restore the Files of This Version",
+        "category": "Ukemi",
+        "icon": "$(history)"
+      },
+      {
+        "command": "ukemi.evolution.follow",
+        "title": "Follow the Selected Change",
+        "category": "Ukemi",
+        "icon": "$(target)"
       }
     ],
     "submenus": [
@@ -793,6 +822,12 @@
           "when": "view == ukemi.workspaces"
         },
         {
+          "command": "ukemi.evolution.follow",
+          "group": "navigation@1",
+          "when": "view == ukemi.evolution",
+          "toggled": "ukemi.evolution.following"
+        },
+        {
           "command": "ukemi.initRepo",
           "group": "1_repo@3",
           "when": "view == ukemi.graph"
@@ -827,22 +862,22 @@
         {
           "command": "ukemi.workspace.openHere",
           "group": "inline@1",
-          "when": "view == ukemi.workspaces && viewItem =~ /^workspace/ && viewItem !~ /open/ && viewItem !~ /missing/"
+          "when": "view == ukemi.workspaces && viewItem =~ /^workspace(?!.*\\+(open|missing)\\b)/"
         },
         {
           "command": "ukemi.workspace.open",
           "group": "inline@2",
-          "when": "view == ukemi.workspaces && viewItem =~ /^workspace/ && viewItem !~ /missing/"
+          "when": "view == ukemi.workspaces && viewItem =~ /^workspace(?!.*\\+missing\\b)/"
         },
         {
           "command": "ukemi.workspace.openTerminal",
           "group": "1_nav@1",
-          "when": "view == ukemi.workspaces && viewItem =~ /^workspace/ && viewItem !~ /missing/"
+          "when": "view == ukemi.workspaces && viewItem =~ /^workspace(?!.*\\+missing\\b)/"
         },
         {
           "command": "ukemi.workspace.snapshot",
           "group": "1_nav@2",
-          "when": "view == ukemi.workspaces && viewItem =~ /^workspace/ && viewItem !~ /missing/"
+          "when": "view == ukemi.workspaces && viewItem =~ /^workspace(?!.*\\+missing\\b)/"
         },
         {
           "command": "ukemi.workspace.reveal",
@@ -852,17 +887,32 @@
         {
           "command": "ukemi.workspace.newChange",
           "group": "1_nav@4",
-          "when": "view == ukemi.workspaces && viewItem =~ /^workspace/ && viewItem !~ /missing/"
+          "when": "view == ukemi.workspaces && viewItem =~ /^workspace(?!.*\\+missing\\b)/"
         },
         {
           "command": "ukemi.workspace.copyPath",
           "group": "9_copy@1",
-          "when": "view == ukemi.workspaces && viewItem =~ /^workspace/ && viewItem !~ /missing/"
+          "when": "view == ukemi.workspaces && viewItem =~ /^workspace(?!.*\\+missing\\b)/"
         },
         {
           "command": "ukemi.workspace.delete",
           "group": "2_remove@1",
-          "when": "view == ukemi.workspaces && viewItem =~ /^workspace/ && viewItem !~ /default/"
+          "when": "view == ukemi.workspaces && viewItem =~ /^workspace(?!.*\\+default\\b)/"
+        },
+        {
+          "command": "ukemi.evolution.open",
+          "group": "1_open@1",
+          "when": "view == ukemi.evolution && viewItem =~ /openable/"
+        },
+        {
+          "command": "ukemi.evolution.compare",
+          "group": "inline@1",
+          "when": "view == ukemi.evolution && viewItem =~ /comparable/"
+        },
+        {
+          "command": "ukemi.evolution.restore",
+          "group": "inline@2",
+          "when": "view == ukemi.evolution && viewItem =~ /restorable/"
         }
       ],
       "ukemi.viewMode": [
@@ -1125,6 +1175,22 @@
         {
           "command": "ukemi.split.open",
           "when": "false"
+        },
+        {
+          "command": "ukemi.evolution.open",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.evolution.compare",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.evolution.restore",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.evolution.follow",
+          "when": "false"
         }
       ]
     },
@@ -1204,14 +1270,16 @@
             "recent",
             "mine",
             "myHistory",
-            "stack"
+            "stack",
+            "working"
           ],
           "default": "recent",
           "enumDescriptions": [
             "Your open changes, bookmarks and tags in the time range.",
             "All your open changes.",
             "Your open changes, and your history in the time range.",
-            "The changes connected to the working copy."
+            "The changes connected to the working copy.",
+            "The working copy and its last 5 first parents."
           ],
           "description": "Filter that the change graph shows first."
         },

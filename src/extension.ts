@@ -4,6 +4,7 @@ import { JjRunner } from './jj/runner'
 import { errorMessage } from './util/logger'
 import { commitCommands } from './vscode/commands/commitCommands'
 import { contextCommit, registerAll, type CommandEnv } from './vscode/commands/context'
+import { evolutionCommands } from './vscode/commands/evolutionCommands'
 import { fileCommands } from './vscode/commands/fileCommands'
 import { globalCommands } from './vscode/commands/globalCommands'
 import { refCommands } from './vscode/commands/refCommands'
@@ -14,6 +15,8 @@ import {
   InterdiffContentProvider,
   RevisionContentProvider,
 } from './vscode/diff'
+import { ChangeSelection } from './vscode/changeSelection'
+import { EvolutionView } from './vscode/evolutionView'
 import { ForgeService } from './vscode/forgeService'
 import { GRAPH_VIEW_ID, GraphView } from './vscode/graphView'
 import { installJj, locateJj, offerInstall, updateTerminalPath } from './vscode/jjSetup'
@@ -43,6 +46,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
   const registry = new RepoRegistry(runner, logger, context.workspaceState)
   const operations = new Operations(logger)
   const graphView = new GraphView(context.extensionUri, registry, operations, availability, logger)
+  const selection = new ChangeSelection()
+  const evolutionView = new EvolutionView(registry, selection, logger)
   const workspacesView = new WorkspacesView(registry)
   const forge = new ForgeService(registry, context.secrets, logger)
   const askpass = new AskpassServer(
@@ -65,6 +70,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
     logger,
     extensionUri: context.extensionUri,
     storageUri: context.globalStorageUri,
+    selection,
   }
   graphView.setHandler(createMessageHandler(env))
 
@@ -85,6 +91,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
     registry,
     operations,
     graphView,
+    evolutionView,
+    selection,
     forge,
     new ScmController(registry),
     new RepoStatusBar(registry),
@@ -124,6 +132,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
     ...fileCommands(env),
     ...refCommands(env),
     ...workspaceCommands(env),
+    ...evolutionCommands(env),
+    'ukemi.evolution.follow': () => {
+      selection.toggleFollow(evolutionView.currentSelection())
+    },
     'ukemi.split.open': async (arg?: unknown) => {
       const target = contextCommit(env, arg)
       if (target) {

@@ -80,9 +80,15 @@ export interface Remote {
   url: string
 }
 
-export type GraphFilter = 'recent' | 'mine' | 'myHistory' | 'stack'
+export type GraphFilter = 'recent' | 'mine' | 'myHistory' | 'stack' | 'working'
 export type HistoryDepth = '7d' | '14d' | '30d' | '1y' | 'all'
 
 export const HISTORY_DEPTHS: readonly HistoryDepth[] = ['7d', '14d', '30d', '1y', 'all']
-export const GRAPH_FILTERS: readonly GraphFilter[] = ['recent', 'mine', 'myHistory', 'stack']
-export const DEPTHLESS_FILTERS: readonly GraphFilter[] = ['mine', 'stack']
+export const GRAPH_FILTERS: readonly GraphFilter[] = [
+  'recent',
+  'mine',
+  'myHistory',
+  'stack',
+  'working',
+]
+export const DEPTHLESS_FILTERS: readonly GraphFilter[] = ['mine', 'stack', 'working']

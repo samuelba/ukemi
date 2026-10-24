@@ -4,7 +4,6 @@ import type { CommandEnv } from './commands/context'
 import { editOrNew } from './commands/commitCommands'
 import { initRepo } from './commands/globalCommands'
 import { openFileAtRevision, openFileDiff } from './diff'
-import { handleEvolutionMessage } from './evolutionMessages'
 
 const ALLOWED_COMMAND = /^ukemi\./
 
@@ -53,11 +52,17 @@ export function createMessageHandler(env: CommandEnv) {
         env.graphView.post({ type: 'files', repoId: model.root, commitId: message.commitId, files })
         return
       }
-      case 'loadEvolution':
-      case 'openVersionDiff':
-      case 'restoreVersion':
-        await handleEvolutionMessage(env, model, message)
+      case 'selectCommit': {
+        const commit = model.findCommit(message.commitId)
+        if (commit) {
+          env.selection.select({
+            repoId: model.root,
+            commitId: commit.commitId,
+            changeId: commit.changeId,
+          })
+        }
         return
+      }
       case 'describe': {
         const commit = model.findCommit(message.commitId)
         if (!commit) {

@@ -3,7 +3,7 @@ import type { ChangedFile } from '../../../shared/model'
 import type { ChangedFilesView, CommitView } from '../../../shared/protocol'
 import { splitPath } from '../shared/format'
 import { postMessage, vscodeContext } from '../shared/vscodeApi'
-import { buildFileTree, type FileTreeNode } from './fileTree'
+import { buildFileTree, type FileTreeNode } from '../../../shared/fileTree'
 
 export const FILE_MIME = 'application/x-ukemi-file'
 

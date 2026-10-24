@@ -160,6 +160,11 @@ export class JjRunner {
         resolve({ stdout: out, stderr: err })
       })
 
+      child.stdin.on('error', (error: NodeJS.ErrnoException) => {
+        if (error.code !== 'EPIPE') {
+          this.logger.warn(`jj stdin: ${error.message}`)
+        }
+      })
       child.stdin.end(options.stdin ?? '')
     })
   }

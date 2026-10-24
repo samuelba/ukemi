@@ -4,6 +4,7 @@ import type { CommitView } from '../../../shared/protocol'
 import type { JjRunner } from '../../jj/runner'
 import type { RepoModel } from '../../repo/repoModel'
 import type { Logger } from '../../util/logger'
+import type { ChangeSelection } from '../changeSelection'
 import type { ForgeService } from '../forgeService'
 import type { GraphView } from '../graphView'
 import type { Operations } from '../operations'
@@ -18,6 +19,7 @@ export interface CommandEnv {
   logger: Logger
   extensionUri: vscode.Uri
   storageUri: vscode.Uri
+  selection: ChangeSelection
 }
 
 const contextSchema = z

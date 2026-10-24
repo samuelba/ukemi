@@ -1,12 +1,5 @@
 import type { GraphRow } from './graphLayout'
-import type {
-  ChangedFile,
-  Commit,
-  EvolutionEntry,
-  GraphFilter,
-  HistoryDepth,
-  Workspace,
-} from './model'
+import type { ChangedFile, Commit, GraphFilter, HistoryDepth, Workspace } from './model'
 
 export type RequestState = 'draft' | 'open' | 'reviewed' | 'approved' | 'merged' | 'closed'
 export type CiState = 'pending' | 'success' | 'failure' | 'none'
@@ -85,7 +78,6 @@ export type HostMessage =
   | { type: 'reveal'; commitId: string }
   | { type: 'files'; repoId: string; commitId: string; files: ChangedFile[] }
   | { type: 'describe'; commitId: string; description: string }
-  | { type: 'evolution'; repoId: string; commitId: string; entries: EvolutionEntry[] }
 
 export type WebviewMessage =
   | { type: 'ready' }
@@ -93,9 +85,7 @@ export type WebviewMessage =
   | { type: 'setFilter'; filter: GraphFilter }
   | { type: 'setDepth'; depth: HistoryDepth }
   | { type: 'loadFiles'; commitId: string }
-  | { type: 'loadEvolution'; commitId: string }
-  | { type: 'openVersionDiff'; commitId: string; fromCommitId: string; toCommitId: string }
-  | { type: 'restoreVersion'; commitId: string; fromCommitId: string }
+  | { type: 'selectCommit'; commitId: string }
   | { type: 'command'; command: string; context: Record<string, unknown> }
   | { type: 'describe'; commitId: string; message: string; startNew: boolean }
   | { type: 'openFile'; commitId: string; path: string; mode: 'diff' | 'file' }

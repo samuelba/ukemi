@@ -6,7 +6,6 @@ import { postMessage } from '../shared/vscodeApi'
 import { CommitRow } from './CommitRow'
 import { DescribeDialog } from './DescribeDialog'
 import { EmptyState } from './EmptyState'
-import { EvolutionPanel } from './EvolutionPanel'
 import { Toolbar } from './Toolbar'
 
 interface Describing {
@@ -14,8 +13,6 @@ interface Describing {
   description: string
   isWorkingCopy: boolean
 }
-
-type Evolution = Extract<HostMessage, { type: 'evolution' }>
 
 const fileKey = (repoId: string, commitId: string) => `${repoId}\n${commitId}`
 
@@ -29,9 +26,6 @@ export function App() {
   const [revealId, setRevealId] = useState<string | null>(null)
   const [describing, setDescribing] = useState<Describing | null>(null)
   const [now, setNow] = useState(() => Date.now())
-  const [isEvolutionOpen, setIsEvolutionOpen] = useState(false)
-  const [evolutionChangeId, setEvolutionChangeId] = useState<string | null>(null)
-  const [evolution, setEvolution] = useState<Evolution | null>(null)
 
   useEffect(() => {
     const onMessage = (event: MessageEvent<HostMessage>) => {
@@ -44,14 +38,12 @@ export function App() {
         case 'reveal':
           setSelected(message.commitId)
           setRevealId(message.commitId)
+          postMessage({ type: 'selectCommit', commitId: message.commitId })
           return
         case 'files':
           setFiles((prev) =>
             new Map(prev).set(fileKey(message.repoId, message.commitId), message.files),
           )
-          return
-        case 'evolution':
-          setEvolution(message)
           return
         case 'describe': {
           const commit = state?.graph?.commits.find((c) => c.commitId === message.commitId)
@@ -88,30 +80,6 @@ export function App() {
     row.scrollIntoView({ block: 'nearest' })
     setRevealId(null)
   }, [revealId, graph])
-
-  const selectedCommit = graph?.commits.find((c) => c.commitId === selected)
-  const evolutionCommit =
-    selectedCommit ??
-    graph?.commits.find((c) => c.changeId === evolutionChangeId) ??
-    graph?.commits.find((c) => c.isWorkingCopy) ??
-    null
-
-  useEffect(() => {
-    if (selectedCommit) {
-      setEvolutionChangeId(selectedCommit.changeId)
-    }
-  }, [selectedCommit])
-
-  useEffect(() => {
-    if (isEvolutionOpen && evolutionCommit) {
-      postMessage({ type: 'loadEvolution', commitId: evolutionCommit.commitId })
-    }
-  }, [isEvolutionOpen, evolutionCommit, graph])
-
-  const evolutionEntries =
-    evolution?.repoId === repoId && evolution.commitId === evolutionCommit?.commitId
-      ? evolution.entries
-      : undefined
 
   const lanes = useMemo(
     () => Math.max(1, ...(graph?.commits ?? []).map((c) => c.row.width)),
@@ -161,6 +129,11 @@ export function App() {
     })
   }, [])
 
+  const selectCommit = useCallback((commitId: string) => {
+    setSelected(commitId)
+    postMessage({ type: 'selectCommit', commitId })
+  }, [])
+
   if (!state) {
     return <EmptyState status="loading" repos={[]} activeRepoId={null} error={null} />
   }
@@ -175,8 +148,6 @@ export function App() {
         activeRepoId={state.activeRepoId}
         graph={graph}
         isBusy={state.busy !== null}
-        isEvolutionOpen={isEvolutionOpen}
-        onToggleEvolution={() => setIsEvolutionOpen((prev) => !prev)}
       />
       {state.busy && (
         <div className="busy" role="status">
@@ -214,7 +185,7 @@ export function App() {
               settings={state.settings}
               now={now}
               onToggle={toggle}
-              onSelect={setSelected}
+              onSelect={selectCommit}
               onDescribe={startDescribe}
             />
           ))}
@@ -228,15 +199,6 @@ export function App() {
           repos={state.repos}
           activeRepoId={state.activeRepoId}
           error={state.error}
-        />
-      )}
-      {state.status === 'ready' && isEvolutionOpen && evolutionCommit && (
-        <EvolutionPanel
-          commit={evolutionCommit}
-          entries={evolutionEntries}
-          settings={state.settings}
-          now={now}
-          onClose={() => setIsEvolutionOpen(false)}
         />
       )}
       {describing && (

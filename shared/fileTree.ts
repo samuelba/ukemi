@@ -1,4 +1,4 @@
-import type { ChangedFile } from '../../../shared/model'
+import type { ChangedFile } from './model'
 
 export interface FileTreeDir {
   kind: 'dir'
