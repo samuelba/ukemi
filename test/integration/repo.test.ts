@@ -190,6 +190,84 @@ describe('mutations', () => {
     expect(copy?.parents).toEqual([dest.commitId])
   })
 
+  async function family() {
+    writeFile(root, 'a.txt', 'a\n')
+    jj(root, 'describe', '-m', 'source')
+    const source = await current()
+    const parent = source.parents[0] ?? ''
+    jj(root, 'new', parent, '-m', 'dest')
+    writeFile(root, 'b.txt', 'b\n')
+    const dest = await current()
+    jj(root, 'new', '-m', 'child')
+    writeFile(root, 'c.txt', 'c\n')
+    const child = await current()
+    jj(root, 'new', parent, '-m', 'keeper')
+    writeFile(root, 'd.txt', 'd\n')
+    const keeper = await current()
+    jj(root, 'new', parent)
+    return { parent, source, dest, child, keeper }
+  }
+
+  test('duplicate insert-after parents the copy on the target and moves its child', async () => {
+    const { parent, source, dest, child } = await family()
+
+    await repo.duplicate(source.commitId, dest.commitId, 'after')
+
+    const [still] = await repo.log(source.commitId)
+    expect(still?.parents).toEqual([parent])
+    const copy = (await repo.log(`children(${dest.commitId})`)).find(
+      (commit) => commit.description === 'source\n',
+    )
+    expect(copy?.parents).toEqual([dest.commitId])
+    const [movedChild] = await repo.log(child.changeId)
+    expect(movedChild?.parents).toEqual([copy?.commitId])
+  })
+
+  test('duplicate insert-before parents the target on the copy', async () => {
+    const { parent, source, dest } = await family()
+
+    await repo.duplicate(source.commitId, dest.commitId, 'before')
+
+    const [still] = await repo.log(source.commitId)
+    expect(still?.parents).toEqual([parent])
+    const [movedDest] = await repo.log(dest.changeId)
+    const [copy] = await repo.log(movedDest?.parents[0] ?? 'none()')
+    expect(copy?.description).toBe('source\n')
+    expect(copy?.commitId).not.toBe(source.commitId)
+    expect(copy?.parents).toEqual([parent])
+    expect(movedDest?.parents).toEqual([copy?.commitId])
+  })
+
+  test('rebase insert-after moves the source onto the target and the child onto the source', async () => {
+    const { parent, source, dest, child, keeper } = await family()
+
+    await repo.rebase(source.commitId, dest.commitId, 'source', 'after')
+
+    const [movedSource] = await repo.log(source.changeId)
+    const [movedChild] = await repo.log(child.changeId)
+    const [stillDest] = await repo.log(dest.commitId)
+    const [stillKeeper] = await repo.log(keeper.commitId)
+    expect(stillDest?.parents).toEqual([parent])
+    expect(stillKeeper?.parents).toEqual([parent])
+    expect(movedSource?.parents).toEqual([dest.commitId])
+    expect(movedChild?.parents).toEqual([movedSource?.commitId])
+  })
+
+  test('rebase insert-before parents the target on the source and leaves the original parent', async () => {
+    const { parent, source, dest, child, keeper } = await family()
+
+    await repo.rebase(source.commitId, dest.commitId, 'source', 'before')
+
+    const [movedSource] = await repo.log(source.changeId)
+    const [movedDest] = await repo.log(dest.changeId)
+    const [movedChild] = await repo.log(child.changeId)
+    const [stillKeeper] = await repo.log(keeper.commitId)
+    expect(movedSource?.parents).toEqual([parent])
+    expect(movedDest?.parents).toEqual([movedSource?.commitId])
+    expect(movedChild?.parents).toEqual([movedDest?.commitId])
+    expect(stillKeeper?.parents).toEqual([parent])
+  })
+
   test('squashIntoParent uses the combined message', async () => {
     writeFile(root, 'a.txt', 'a\n')
     jj(root, 'describe', '-m', 'parent')

@@ -37,6 +37,13 @@ export const MAX_EVOLUTION_ENTRIES = 200
 
 export type SplitDirection = 'below' | 'above'
 export type RebaseMode = 'source' | 'revision'
+export type Placement = 'onto' | 'after' | 'before'
+
+const PLACEMENT_FLAGS: Record<Placement, string> = {
+  onto: '--onto',
+  after: '--insert-after',
+  before: '--insert-before',
+}
 
 export class JjRepo {
   private readonly mutations = new SerialQueue()
@@ -259,16 +266,26 @@ export class JjRepo {
     return this.mutate(['abandon', revset])
   }
 
-  duplicate(revset: string, onto?: string) {
-    return this.mutate(['duplicate', revset, ...(onto ? ['--onto', onto] : [])])
+  duplicate(revset: string, destination?: string, placement: Placement = 'onto') {
+    return this.mutate([
+      'duplicate',
+      revset,
+      ...(destination ? [PLACEMENT_FLAGS[placement], destination] : []),
+    ])
   }
 
   revert(commitId: string) {
     return this.mutate(['revert', '-r', commitId, '--onto', '@'])
   }
 
-  rebase(source: string, destination: string, mode: RebaseMode) {
-    return this.mutate(['rebase', mode === 'source' ? '-s' : '-r', source, '-d', destination])
+  rebase(source: string, destination: string, mode: RebaseMode, placement: Placement = 'onto') {
+    return this.mutate([
+      'rebase',
+      mode === 'source' ? '-s' : '-r',
+      source,
+      PLACEMENT_FLAGS[placement],
+      destination,
+    ])
   }
 
   restoreFiles(commitId: string, paths: readonly string[]) {

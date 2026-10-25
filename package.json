@@ -309,6 +309,26 @@
         "category": "Ukemi"
       },
       {
+        "command": "ukemi.commit.duplicateInsertAfter",
+        "title": "Duplicate Insert After…",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.duplicateInsertAfterSubtree",
+        "title": "Duplicate with Descendants Insert After…",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.duplicateInsertBefore",
+        "title": "Duplicate Insert Before…",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.duplicateInsertBeforeSubtree",
+        "title": "Duplicate with Descendants Insert Before…",
+        "category": "Ukemi"
+      },
+      {
         "command": "ukemi.commit.revert",
         "title": "Revert onto Working Copy",
         "category": "Ukemi"
@@ -321,6 +341,16 @@
       {
         "command": "ukemi.commit.rebaseOnto",
         "title": "Rebase onto…",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.rebaseInsertAfter",
+        "title": "Rebase Insert After…",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.rebaseInsertBefore",
+        "title": "Rebase Insert Before…",
         "category": "Ukemi"
       },
       {
@@ -557,6 +587,14 @@
     ],
     "submenus": [
       {
+        "id": "ukemi.duplicate",
+        "label": "Duplicate"
+      },
+      {
+        "id": "ukemi.rebase",
+        "label": "Rebase"
+      },
+      {
         "id": "ukemi.viewMode",
         "label": "View"
       }
@@ -605,35 +643,23 @@
           "alt": "ukemi.commit.splitByFiles"
         },
         {
-          "command": "ukemi.commit.rebaseTrunk",
+          "submenu": "ukemi.rebase",
           "group": "3_rewrite@3",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isImmutable"
         },
         {
-          "command": "ukemi.commit.rebaseOnto",
+          "submenu": "ukemi.duplicate",
           "group": "3_rewrite@4",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isImmutable"
-        },
-        {
-          "command": "ukemi.commit.duplicate",
-          "group": "3_rewrite@5",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit'",
-          "alt": "ukemi.commit.duplicateSubtree"
-        },
-        {
-          "command": "ukemi.commit.duplicateOnto",
-          "group": "3_rewrite@6",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit'",
-          "alt": "ukemi.commit.duplicateOntoSubtree"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit'"
         },
         {
           "command": "ukemi.commit.revert",
-          "group": "3_rewrite@7",
+          "group": "3_rewrite@5",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isEmpty"
         },
         {
           "command": "ukemi.commit.abandon",
-          "group": "3_rewrite@8",
+          "group": "3_rewrite@6",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isImmutable",
           "alt": "ukemi.commit.abandonSubtree"
         },
@@ -915,6 +941,46 @@
           "when": "view == ukemi.evolution && viewItem =~ /restorable/"
         }
       ],
+      "ukemi.duplicate": [
+        {
+          "command": "ukemi.commit.duplicate",
+          "group": "1_place@1",
+          "alt": "ukemi.commit.duplicateSubtree"
+        },
+        {
+          "command": "ukemi.commit.duplicateOnto",
+          "group": "1_place@2",
+          "alt": "ukemi.commit.duplicateOntoSubtree"
+        },
+        {
+          "command": "ukemi.commit.duplicateInsertAfter",
+          "group": "1_place@3",
+          "alt": "ukemi.commit.duplicateInsertAfterSubtree"
+        },
+        {
+          "command": "ukemi.commit.duplicateInsertBefore",
+          "group": "1_place@4",
+          "alt": "ukemi.commit.duplicateInsertBeforeSubtree"
+        }
+      ],
+      "ukemi.rebase": [
+        {
+          "command": "ukemi.commit.rebaseTrunk",
+          "group": "1_place@1"
+        },
+        {
+          "command": "ukemi.commit.rebaseOnto",
+          "group": "1_place@2"
+        },
+        {
+          "command": "ukemi.commit.rebaseInsertAfter",
+          "group": "1_place@3"
+        },
+        {
+          "command": "ukemi.commit.rebaseInsertBefore",
+          "group": "1_place@4"
+        }
+      ],
       "ukemi.viewMode": [
         {
           "command": "ukemi.view.asList",
@@ -1025,6 +1091,22 @@
           "when": "false"
         },
         {
+          "command": "ukemi.commit.duplicateInsertAfter",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.duplicateInsertAfterSubtree",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.duplicateInsertBefore",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.duplicateInsertBeforeSubtree",
+          "when": "false"
+        },
+        {
           "command": "ukemi.commit.revert",
           "when": "false"
         },
@@ -1034,6 +1116,14 @@
         },
         {
           "command": "ukemi.commit.rebaseOnto",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.rebaseInsertAfter",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.rebaseInsertBefore",
           "when": "false"
         },
         {

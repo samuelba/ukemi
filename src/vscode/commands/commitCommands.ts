@@ -1,5 +1,6 @@
 import * as vscode from 'vscode'
 import type { CommitView } from '../../../shared/protocol'
+import type { Placement } from '../../jj/repo'
 import type { RepoModel } from '../../repo/repoModel'
 import { combineDescriptions, validateBookmarkName } from '../../util/text'
 import { openCommitDiff } from '../diff'
@@ -182,12 +183,30 @@ async function shipNow(env: CommandEnv, { model, commit }: Target): Promise<void
   })
 }
 
-function duplicateOnto(env: CommandEnv, withDescendants: boolean): Handler {
+function duplicateAt(
+  env: CommandEnv,
+  withDescendants: boolean,
+  placement: Placement,
+  title: string,
+): Handler {
   return withTarget(env, async ({ model, commit }) => {
-    const destination = await pickDestination(model, 'Duplicate onto')
+    const destination = await pickDestination(model, title)
     if (destination) {
       const revset = withDescendants ? `${commit.commitId}::` : commit.commitId
-      await env.operations.run('Duplicate', model, () => model.repo.duplicate(revset, destination))
+      await env.operations.run('Duplicate', model, () =>
+        model.repo.duplicate(revset, destination, placement),
+      )
+    }
+  })
+}
+
+function rebaseAt(env: CommandEnv, placement: Placement, title: string): Handler {
+  return withTarget(env, async ({ model, commit }) => {
+    const destination = mutable(commit) ? await pickDestination(model, title) : undefined
+    if (destination) {
+      await env.operations.run('Rebase', model, () =>
+        model.repo.rebase(commit.commitId, destination, 'source', placement),
+      )
     }
   })
 }
@@ -280,22 +299,41 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
     'ukemi.commit.duplicateSubtree': run('Duplicate', ({ model, commit }) =>
       model.repo.duplicate(`${commit.commitId}::`),
     ),
-    'ukemi.commit.duplicateOnto': duplicateOnto(env, false),
-    'ukemi.commit.duplicateOntoSubtree': duplicateOnto(env, true),
+    'ukemi.commit.duplicateOnto': duplicateAt(env, false, 'onto', 'Duplicate onto'),
+    'ukemi.commit.duplicateOntoSubtree': duplicateAt(env, true, 'onto', 'Duplicate onto'),
+    'ukemi.commit.duplicateInsertAfter': duplicateAt(
+      env,
+      false,
+      'after',
+      'Duplicate insert after',
+    ),
+    'ukemi.commit.duplicateInsertAfterSubtree': duplicateAt(
+      env,
+      true,
+      'after',
+      'Duplicate insert after',
+    ),
+    'ukemi.commit.duplicateInsertBefore': duplicateAt(
+      env,
+      false,
+      'before',
+      'Duplicate insert before',
+    ),
+    'ukemi.commit.duplicateInsertBeforeSubtree': duplicateAt(
+      env,
+      true,
+      'before',
+      'Duplicate insert before',
+    ),
     'ukemi.commit.revert': run('Revert', ({ model, commit }) => model.repo.revert(commit.commitId)),
     'ukemi.commit.rebaseTrunk': run(
       'Rebase',
       ({ model, commit }) => model.repo.rebase(commit.commitId, 'trunk()', 'source'),
       true,
     ),
-    'ukemi.commit.rebaseOnto': withTarget(env, async ({ model, commit }) => {
-      const destination = mutable(commit) ? await pickDestination(model, 'Rebase onto') : undefined
-      if (destination) {
-        await env.operations.run('Rebase', model, () =>
-          model.repo.rebase(commit.commitId, destination, 'source'),
-        )
-      }
-    }),
+    'ukemi.commit.rebaseOnto': rebaseAt(env, 'onto', 'Rebase onto'),
+    'ukemi.commit.rebaseInsertAfter': rebaseAt(env, 'after', 'Rebase insert after'),
+    'ukemi.commit.rebaseInsertBefore': rebaseAt(env, 'before', 'Rebase insert before'),
     'ukemi.commit.setBookmark': withTarget(env, async ({ model, commit }) => {
       const name = await pickBookmarkName(model, commit)
       if (name) {
