@@ -434,7 +434,22 @@ div.files {
   color: var(--vscode-list-activeSelectionForeground, inherit);
 }
 
-.file .actions {
+.file-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  line-height: 16px;
+  text-align: center;
+  font-style: normal;
+  font-weight: normal;
+}
+
+.file-trailing {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
   margin-left: auto;
 }
 
@@ -448,7 +463,7 @@ div.files {
   width: 12px;
   font-family: var(--vscode-editor-font-family);
   font-weight: 600;
-  text-align: center;
+  text-align: right;
 }
 
 .status-added .file-status {

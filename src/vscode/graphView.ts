@@ -1,8 +1,10 @@
 import { randomBytes } from 'node:crypto'
 import * as vscode from 'vscode'
+import type { FileIconTheme } from '../../shared/fileIconTheme'
 import type { HostMessage, ViewState, ViewStatus, WebviewMessage } from '../../shared/protocol'
 import { errorMessage, type Logger } from '../util/logger'
 import { readConfig } from './config'
+import { iconThemeResourceRoots, loadFileIconTheme } from './fileIconTheme'
 import type { Operations } from './operations'
 import type { RepoRegistry } from './registry'
 
@@ -52,6 +54,7 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable 
   private panel: vscode.WebviewPanel | null = null
   private handler: MessageHandler = async () => undefined
   private pendingReveal: string | null = null
+  private iconGeneration = 0
   private readonly readyWebviews = new WeakSet<vscode.Webview>()
   private readonly disposables: vscode.Disposable[] = []
 
@@ -69,7 +72,11 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable 
         if (e.affectsConfiguration('ukemi')) {
           this.postState()
         }
+        if (e.affectsConfiguration('workbench.iconTheme')) {
+          this.postFileIcons()
+        }
       }),
+      vscode.window.onDidChangeActiveColorTheme(() => this.postFileIcons()),
     )
   }
 
@@ -127,7 +134,7 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable 
       {
         enableScripts: true,
         retainContextWhenHidden: true,
-        localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview')],
+        localResourceRoots: iconThemeResourceRoots(this.extensionUri),
       },
     )
     panel.iconPath = vscode.Uri.joinPath(this.extensionUri, 'resources', 'activity.svg')
@@ -142,13 +149,14 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable 
   private attach(webview: vscode.Webview): void {
     webview.options = {
       enableScripts: true,
-      localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview')],
+      localResourceRoots: iconThemeResourceRoots(this.extensionUri),
     }
     webview.html = webviewHtml(webview, this.extensionUri, 'graph')
     webview.onDidReceiveMessage(async (message: WebviewMessage) => {
       if (message.type === 'ready') {
         this.readyWebviews.add(webview)
         this.postState()
+        this.postFileIcons()
         this.flushReveal()
         return
       }
@@ -182,6 +190,30 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable 
   post(message: HostMessage): void {
     for (const webview of this.webviews) {
       void webview.postMessage(message)
+    }
+  }
+
+  private postFileIcons(): void {
+    const generation = ++this.iconGeneration
+    for (const webview of this.webviews) {
+      void this.sendFileIcons(webview, generation)
+    }
+  }
+
+  private async sendFileIcons(webview: vscode.Webview, generation: number): Promise<void> {
+    let theme: FileIconTheme | null = null
+    try {
+      theme = await loadFileIconTheme(webview)
+    } catch (error: unknown) {
+      this.logger.error(`file icons failed: ${errorMessage(error)}`)
+    }
+    if (generation !== this.iconGeneration || !this.webviews.has(webview)) {
+      return
+    }
+    try {
+      await webview.postMessage({ type: 'fileIcons', theme })
+    } catch (error: unknown) {
+      this.logger.error(`file icons post failed: ${errorMessage(error)}`)
     }
   }
 

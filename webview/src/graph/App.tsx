@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { FileIconTheme } from '../../../shared/fileIconTheme'
 import type { ChangedFile } from '../../../shared/model'
 import type { CommitView, HostMessage, ViewState } from '../../../shared/protocol'
 import { title } from '../shared/format'
@@ -6,6 +7,7 @@ import { postMessage } from '../shared/vscodeApi'
 import { CommitRow } from './CommitRow'
 import { DescribeDialog } from './DescribeDialog'
 import { EmptyState } from './EmptyState'
+import { FileIconFonts, FileIconThemeContext } from './FileIcon'
 import { Toolbar } from './Toolbar'
 
 interface Describing {
@@ -18,6 +20,7 @@ const fileKey = (repoId: string, commitId: string) => `${repoId}\n${commitId}`
 
 export function App() {
   const [state, setState] = useState<ViewState | null>(null)
+  const [fileIcons, setFileIcons] = useState<FileIconTheme | null>(null)
   const [files, setFiles] = useState<ReadonlyMap<string, ChangedFile[]>>(new Map())
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const [isWorkingCopyCollapsed, setIsWorkingCopyCollapsed] = useState(false)
@@ -44,6 +47,9 @@ export function App() {
           setFiles((prev) =>
             new Map(prev).set(fileKey(message.repoId, message.commitId), message.files),
           )
+          return
+        case 'fileIcons':
+          setFileIcons(message.theme)
           return
         case 'describe': {
           const commit = state?.graph?.commits.find((c) => c.commitId === message.commitId)
@@ -142,78 +148,81 @@ export function App() {
     commit.isWorkingCopy ? graph?.workingCopyFiles : files.get(fileKey(repoId, commit.commitId))
 
   return (
-    <div className="app">
-      <Toolbar
-        repos={state.repos}
-        activeRepoId={state.activeRepoId}
-        graph={graph}
-        isBusy={state.busy !== null}
-      />
-      {state.busy && (
-        <div className="busy" role="status">
-          <div className="busy-bar" />
-          <span>{state.busy}…</span>
-        </div>
-      )}
-      {state.error && state.status === 'ready' && (
-        <div className="error-box" role="alert">
-          <i className="codicon codicon-error" />
-          <span className="error-text">{state.error}</span>
-          <button
-            className="icon-button"
-            title="Dismiss"
-            onClick={() => postMessage({ type: 'dismissError' })}
-          >
-            <i className="codicon codicon-close" />
-          </button>
-        </div>
-      )}
-      {state.status === 'ready' && graph ? (
-        <div className="graph" role="list">
-          {graph.commits.map((commit) => (
-            <CommitRow
-              key={commit.commitId}
-              commit={commit}
-              commitsById={commitsById}
-              repoId={repoId}
-              lanes={lanes}
-              files={filesFor(commit)}
-              isExpanded={isExpanded(commit)}
-              isSelected={selected === commit.commitId}
-              hasRemotes={graph.hasRemotes}
-              hasForge={graph.forge !== null}
-              settings={state.settings}
-              now={now}
-              onToggle={toggle}
-              onSelect={selectCommit}
-              onDescribe={startDescribe}
-            />
-          ))}
-          {graph.commits.length === 0 && (
-            <div className="muted padded">No changes match this filter.</div>
-          )}
-        </div>
-      ) : (
-        <EmptyState
-          status={state.status}
+    <FileIconThemeContext.Provider value={fileIcons}>
+      <FileIconFonts theme={fileIcons} />
+      <div className="app">
+        <Toolbar
           repos={state.repos}
           activeRepoId={state.activeRepoId}
-          error={state.error}
+          graph={graph}
+          isBusy={state.busy !== null}
         />
-      )}
-      {describing && (
-        <DescribeDialog
-          key={describing.commitId}
-          heading={`Describe ${title(describing.description) || describing.commitId.slice(0, 8)}`}
-          initial={describing.description}
-          canStartNew={describing.isWorkingCopy}
-          onCancel={() => setDescribing(null)}
-          onSave={(message, startNew) => {
-            postMessage({ type: 'describe', commitId: describing.commitId, message, startNew })
-            setDescribing(null)
-          }}
-        />
-      )}
-    </div>
+        {state.busy && (
+          <div className="busy" role="status">
+            <div className="busy-bar" />
+            <span>{state.busy}…</span>
+          </div>
+        )}
+        {state.error && state.status === 'ready' && (
+          <div className="error-box" role="alert">
+            <i className="codicon codicon-error" />
+            <span className="error-text">{state.error}</span>
+            <button
+              className="icon-button"
+              title="Dismiss"
+              onClick={() => postMessage({ type: 'dismissError' })}
+            >
+              <i className="codicon codicon-close" />
+            </button>
+          </div>
+        )}
+        {state.status === 'ready' && graph ? (
+          <div className="graph" role="list">
+            {graph.commits.map((commit) => (
+              <CommitRow
+                key={commit.commitId}
+                commit={commit}
+                commitsById={commitsById}
+                repoId={repoId}
+                lanes={lanes}
+                files={filesFor(commit)}
+                isExpanded={isExpanded(commit)}
+                isSelected={selected === commit.commitId}
+                hasRemotes={graph.hasRemotes}
+                hasForge={graph.forge !== null}
+                settings={state.settings}
+                now={now}
+                onToggle={toggle}
+                onSelect={selectCommit}
+                onDescribe={startDescribe}
+              />
+            ))}
+            {graph.commits.length === 0 && (
+              <div className="muted padded">No changes match this filter.</div>
+            )}
+          </div>
+        ) : (
+          <EmptyState
+            status={state.status}
+            repos={state.repos}
+            activeRepoId={state.activeRepoId}
+            error={state.error}
+          />
+        )}
+        {describing && (
+          <DescribeDialog
+            key={describing.commitId}
+            heading={`Describe ${title(describing.description) || describing.commitId.slice(0, 8)}`}
+            initial={describing.description}
+            canStartNew={describing.isWorkingCopy}
+            onCancel={() => setDescribing(null)}
+            onSave={(message, startNew) => {
+              postMessage({ type: 'describe', commitId: describing.commitId, message, startNew })
+              setDescribing(null)
+            }}
+          />
+        )}
+      </div>
+    </FileIconThemeContext.Provider>
   )
 }

@@ -1,3 +1,4 @@
+import type { FileIconTheme } from './fileIconTheme'
 import type { GraphRow } from './graphLayout'
 import type { ChangedFile, Commit, GraphFilter, HistoryDepth, Workspace } from './model'
 
@@ -77,6 +78,7 @@ export type HostMessage =
   | { type: 'state'; state: ViewState }
   | { type: 'reveal'; commitId: string }
   | { type: 'files'; repoId: string; commitId: string; files: ChangedFile[] }
+  | { type: 'fileIcons'; theme: FileIconTheme | null }
   | { type: 'describe'; commitId: string; description: string }
 
 export type WebviewMessage =

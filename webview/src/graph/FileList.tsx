@@ -4,6 +4,7 @@ import type { ChangedFilesView, CommitView } from '../../../shared/protocol'
 import { splitPath } from '../shared/format'
 import { postMessage, vscodeContext } from '../shared/vscodeApi'
 import { buildFileTree, type FileTreeNode } from '../../../shared/fileTree'
+import { FileTypeIcon } from './FileIcon'
 
 export const FILE_MIME = 'application/x-ukemi-file'
 
@@ -81,32 +82,35 @@ function FileRow({
         canSplit,
       })}
     >
-      <span className="file-status">{file.isConflicted ? '!' : STATUS_LETTER[file.status]}</span>
+      <FileTypeIcon path={file.path} />
       <span className="file-name">{showFullPaths ? file.path : name}</span>
       {showDirectory && dir && <span className="file-dir">{dir}</span>}
-      {!commit.isImmutable && (
-        <span className="actions">
-          <button
-            type="button"
-            className="icon-button"
-            title="Discard changes"
-            onClick={(event) => {
-              event.stopPropagation()
-              if (event.detail > 1) {
-                return
-              }
-              postMessage({
-                type: 'command',
-                command: 'ukemi.file.discard',
-                context: { repoId, commitId: commit.commitId, path: file.path },
-              })
-            }}
-            onDoubleClick={(event) => event.stopPropagation()}
-          >
-            <i className="codicon codicon-discard" />
-          </button>
-        </span>
-      )}
+      <span className="file-trailing">
+        {!commit.isImmutable && (
+          <span className="actions">
+            <button
+              type="button"
+              className="icon-button"
+              title="Discard changes"
+              onClick={(event) => {
+                event.stopPropagation()
+                if (event.detail > 1) {
+                  return
+                }
+                postMessage({
+                  type: 'command',
+                  command: 'ukemi.file.discard',
+                  context: { repoId, commitId: commit.commitId, path: file.path },
+                })
+              }}
+              onDoubleClick={(event) => event.stopPropagation()}
+            >
+              <i className="codicon codicon-discard" />
+            </button>
+          </span>
+        )}
+        <span className="file-status">{file.isConflicted ? '!' : STATUS_LETTER[file.status]}</span>
+      </span>
     </li>
   )
 }
