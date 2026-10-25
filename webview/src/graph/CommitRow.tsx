@@ -9,6 +9,7 @@ import { canSquashIntoParent } from './canSquashIntoParent'
 import { dropCommitAction } from './dropCommit'
 import { dragModifiers, installDragModifiers } from './dragModifiers'
 import { FileList, FILE_LOCKED_MIME, FILE_MIME } from './FileList'
+import { LineStats, lineTotals } from './LineStats'
 import { GraphCell } from './GraphCell'
 
 export const COMMIT_MIME = 'application/x-ukemi-commit'
@@ -63,6 +64,8 @@ export function CommitRow(props: CommitRowProps) {
   const change = splitId(commit.changeId, commit.changePrefix, settings.changeIdLength)
   const summary = title(commit.description)
   const fileCount = commit.isWorkingCopy ? (props.files?.length ?? 0) : null
+  const totals =
+    commit.isWorkingCopy && settings.showLineStats ? lineTotals(props.files ?? []) : null
   const canExpand = !commit.isWorkingCopy || (props.files?.length ?? 0) > 0
   const placeholder = commit.isEmpty ? (commit.isWorkingCopy ? '' : '(empty)') : '(no description)'
 
@@ -196,6 +199,7 @@ export function CommitRow(props: CommitRowProps) {
             {summary || placeholder}
           </span>
           {fileCount !== null && fileCount > 0 && <span className="file-count">{fileCount}</span>}
+          {totals && <LineStats added={totals.added} removed={totals.removed} />}
           <span className="time" title={`${commit.author.name} · ${commit.committer.timestamp}`}>
             {relativeTime(commit.committer.timestamp, props.now)}
           </span>
@@ -260,6 +264,7 @@ export function CommitRow(props: CommitRowProps) {
             files={props.files}
             repoId={repoId}
             showFullPaths={settings.showFullPaths}
+            showLineStats={settings.showLineStats}
             changedFilesView={settings.changedFilesView}
           />
         )}

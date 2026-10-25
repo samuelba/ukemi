@@ -6,6 +6,7 @@ import { splitPath } from '../shared/format'
 import { postMessage, vscodeContext } from '../shared/vscodeApi'
 import { buildFileTree, type FileTreeNode } from '../../../shared/fileTree'
 import { FileTypeIcon } from './FileIcon'
+import { LineStats } from './LineStats'
 
 export const FILE_MIME = 'application/x-ukemi-file'
 export const FILE_LOCKED_MIME = 'application/x-ukemi-file-locked'
@@ -26,6 +27,7 @@ interface FileListProps {
   files: ChangedFile[] | undefined
   repoId: string
   showFullPaths: boolean
+  showLineStats: boolean
   changedFilesView: ChangedFilesView
 }
 
@@ -35,6 +37,7 @@ interface FileRowProps {
   repoId: string
   canSplit: boolean
   showFullPaths: boolean
+  showLineStats: boolean
   showDirectory: boolean
   depth: number
 }
@@ -49,6 +52,7 @@ function FileRow({
   repoId,
   canSplit,
   showFullPaths,
+  showLineStats,
   showDirectory,
   depth,
 }: FileRowProps) {
@@ -122,6 +126,9 @@ function FileRow({
             </button>
           </span>
         )}
+        {showLineStats && (
+          <LineStats added={file.linesAdded ?? 0} removed={file.linesRemoved ?? 0} />
+        )}
         <span className="file-status">{file.isConflicted ? '!' : STATUS_LETTER[file.status]}</span>
       </span>
     </li>
@@ -132,13 +139,23 @@ interface TreeProps {
   commit: CommitView
   repoId: string
   canSplit: boolean
+  showLineStats: boolean
   nodes: readonly FileTreeNode[]
   depth: number
   collapsed: ReadonlySet<string>
   onToggle: (path: string) => void
 }
 
-function FileTreeItems({ commit, repoId, canSplit, nodes, depth, collapsed, onToggle }: TreeProps) {
+function FileTreeItems({
+  commit,
+  repoId,
+  canSplit,
+  showLineStats,
+  nodes,
+  depth,
+  collapsed,
+  onToggle,
+}: TreeProps) {
   return nodes.map((node) => {
     if (node.kind === 'file') {
       return (
@@ -149,6 +166,7 @@ function FileTreeItems({ commit, repoId, canSplit, nodes, depth, collapsed, onTo
           repoId={repoId}
           canSplit={canSplit}
           showFullPaths={false}
+          showLineStats={showLineStats}
           showDirectory={false}
           depth={depth}
         />
@@ -178,6 +196,7 @@ function FileTreeItems({ commit, repoId, canSplit, nodes, depth, collapsed, onTo
               commit={commit}
               repoId={repoId}
               canSplit={canSplit}
+              showLineStats={showLineStats}
               nodes={node.children}
               depth={depth + 1}
               collapsed={collapsed}
@@ -194,10 +213,12 @@ function FileTree({
   commit,
   files,
   repoId,
+  showLineStats,
 }: {
   commit: CommitView
   files: ChangedFile[]
   repoId: string
+  showLineStats: boolean
 }) {
   const nodes = useMemo(() => buildFileTree(files), [files])
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set())
@@ -214,6 +235,7 @@ function FileTree({
         commit={commit}
         repoId={repoId}
         canSplit={files.length > 1 && !commit.isImmutable}
+        showLineStats={showLineStats}
         nodes={nodes}
         depth={0}
         collapsed={collapsed}
@@ -228,6 +250,7 @@ export function FileList({
   files,
   repoId,
   showFullPaths,
+  showLineStats,
   changedFilesView,
 }: FileListProps) {
   if (!files) {
@@ -237,7 +260,7 @@ export function FileList({
     return <div className="files muted">No changed files</div>
   }
   if (changedFilesView === 'tree') {
-    return <FileTree commit={commit} files={files} repoId={repoId} />
+    return <FileTree commit={commit} files={files} repoId={repoId} showLineStats={showLineStats} />
   }
   const canSplit = files.length > 1 && !commit.isImmutable
   return (
@@ -250,6 +273,7 @@ export function FileList({
           repoId={repoId}
           canSplit={canSplit}
           showFullPaths={showFullPaths}
+          showLineStats={showLineStats}
           showDirectory
           depth={0}
         />

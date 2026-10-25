@@ -181,6 +181,30 @@ describe('RepoModel', () => {
     expect(working.graph?.commits.map((c) => c.description.trim())).toEqual(['work', 'base'])
   })
 
+  test('reports working-copy line counts only when enabled', async () => {
+    writeFile(root, 'b.txt', 'b\n')
+    jj(root, 'describe', '-m', 'base')
+    jj(root, 'new')
+    writeFile(root, 'b.txt', 'b\nextra\n')
+    await model.refresh()
+    const id = model.graph?.commits.find((commit) => commit.isWorkingCopy)?.commitId ?? ''
+    const before = model.graph?.workingCopyFiles.find((file) => file.path === 'b.txt')
+
+    expect(before?.linesAdded).toBeUndefined()
+    expect(before?.linesRemoved).toBeUndefined()
+
+    await model.setShowLineStats(true)
+
+    expect(model.graph?.workingCopyFiles.find((file) => file.path === 'b.txt')).toMatchObject({
+      linesAdded: 1,
+      linesRemoved: 0,
+    })
+    expect((await model.filesFor(id)).find((file) => file.path === 'b.txt')).toMatchObject({
+      linesAdded: 1,
+      linesRemoved: 0,
+    })
+  })
+
   test('caches file lists by commit id', async () => {
     writeFile(root, 'a.txt', 'a\n')
     await model.refresh()

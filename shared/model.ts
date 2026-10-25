@@ -47,6 +47,8 @@ export interface ChangedFile {
   sourcePath: string
   status: FileStatus
   isConflicted: boolean
+  linesAdded?: number
+  linesRemoved?: number
 }
 
 export interface Workspace {

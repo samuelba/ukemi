@@ -126,6 +126,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
         await registry.discover()
       } else if (e.affectsConfiguration('ukemi.workspaces.snapshotOnRefresh')) {
         registry.applyWorkspaceSettings()
+      } else if (e.affectsConfiguration('ukemi.showLineStats')) {
+        await registry.applyLineStats()
       }
     }),
   )

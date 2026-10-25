@@ -44,9 +44,16 @@ const logEntrySchema = z.object({
 
 const fileStatusSchema = z.enum(['added', 'modified', 'removed', 'renamed', 'copied'])
 
+const fileStatSchema = z.object({
+  path: z.string(),
+  added: z.number(),
+  removed: z.number(),
+})
+
 const filesEntrySchema = z.object({
   files: z.array(z.object({ path: z.string(), status: fileStatusSchema, source: z.string() })),
   conflicted: z.array(z.string()),
+  stats: z.array(fileStatSchema).optional(),
 })
 
 const workspaceSchema = z.object({
@@ -124,17 +131,28 @@ export function parseLog(output: string): Commit[] {
   }))
 }
 
+function lineCounts(
+  stat: { added: number; removed: number } | undefined,
+): Pick<ChangedFile, 'linesAdded' | 'linesRemoved'> {
+  if (!stat || (stat.added === 0 && stat.removed === 0)) {
+    return {}
+  }
+  return { linesAdded: stat.added, linesRemoved: stat.removed }
+}
+
 export function parseFiles(output: string): ChangedFile[] {
   const [entry] = parseLines(output, filesEntrySchema, 'file list')
   if (!entry) {
     return []
   }
   const conflicted = new Set(entry.conflicted)
+  const stats = new Map((entry.stats ?? []).map((stat) => [stat.path, stat]))
   const changed = entry.files.map((file) => ({
     path: file.path,
     sourcePath: file.source,
     status: file.status,
     isConflicted: conflicted.has(file.path),
+    ...lineCounts(stats.get(file.path)),
   }))
   const changedPaths = new Set(changed.map((file) => file.path))
   const conflictOnly = entry.conflicted

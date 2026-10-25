@@ -68,6 +68,7 @@ export type ChangedFilesView = 'list' | 'tree'
 export interface ViewSettings {
   changeIdLength: number
   showFullPaths: boolean
+  showLineStats: boolean
   changedFilesView: ChangedFilesView
   ciOnlyMine: boolean
 }

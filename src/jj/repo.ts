@@ -25,6 +25,7 @@ import {
   COMMIT_ID_TEMPLATE,
   DIFF_FILES_TEMPLATE,
   EVOLOG_TEMPLATE,
+  FILES_STATS_TEMPLATE,
   FILES_TEMPLATE,
   LOG_TEMPLATE,
   OP_LOG_TEMPLATE,
@@ -101,8 +102,9 @@ export class JjRepo {
     return parseCommitIds(stdout)
   }
 
-  async files(commitId: string): Promise<ChangedFile[]> {
-    const { stdout } = await this.read(['log', '--no-graph', '-r', commitId, '-T', FILES_TEMPLATE])
+  async files(commitId: string, withStats = false): Promise<ChangedFile[]> {
+    const template = withStats ? FILES_STATS_TEMPLATE : FILES_TEMPLATE
+    const { stdout } = await this.read(['log', '--no-graph', '-r', commitId, '-T', template])
     return parseFiles(stdout)
   }
 

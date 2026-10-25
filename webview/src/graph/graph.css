@@ -247,6 +247,22 @@
   text-align: center;
 }
 
+.line-stats {
+  display: inline-flex;
+  flex: none;
+  gap: 4px;
+  font-size: 0.85em;
+  font-variant-numeric: tabular-nums;
+}
+
+.line-added {
+  color: var(--vscode-gitDecoration-addedResourceForeground);
+}
+
+.line-removed {
+  color: var(--vscode-gitDecoration-deletedResourceForeground);
+}
+
 .time {
   flex: none;
   color: var(--vscode-descriptionForeground);

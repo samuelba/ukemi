@@ -247,6 +247,7 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable 
       settings: {
         changeIdLength: config.changeIdLength,
         showFullPaths: config.showFullPaths,
+        showLineStats: config.showLineStats,
         changedFilesView: config.changedFilesView,
         ciOnlyMine: config.ciOnlyMine,
       },

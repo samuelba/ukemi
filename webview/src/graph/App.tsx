@@ -103,6 +103,13 @@ export function App() {
     [expanded, isWorkingCopyCollapsed],
   )
 
+  const showLineStats = state?.settings.showLineStats ?? false
+
+  useEffect(() => {
+    requested.current = new Set()
+    setFiles(new Map())
+  }, [showLineStats])
+
   useEffect(() => {
     for (const commit of graph?.commits ?? []) {
       const key = fileKey(repoId, commit.commitId)
@@ -111,7 +118,7 @@ export function App() {
         postMessage({ type: 'loadFiles', commitId: commit.commitId })
       }
     }
-  }, [graph, expanded, repoId])
+  }, [graph, expanded, repoId, showLineStats])
 
   const toggle = useCallback((commit: CommitView) => {
     if (commit.isWorkingCopy) {

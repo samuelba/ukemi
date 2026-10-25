@@ -151,6 +151,13 @@ export class RepoRegistry implements vscode.Disposable {
     }
   }
 
+  applyLineStats(): Promise<void> {
+    const enabled = readConfig().showLineStats
+    return Promise.all(this.models.map((model) => model.setShowLineStats(enabled))).then(
+      () => undefined,
+    )
+  }
+
   async addRepo(root: string): Promise<void> {
     const existing = this.entries.get(root)
     if (existing) {
@@ -184,6 +191,7 @@ export class RepoRegistry implements vscode.Disposable {
       depth: config.historyDepth,
       filter: config.defaultFilter,
       snapshotOtherWorkspaces: config.snapshotOnRefresh,
+      showLineStats: config.showLineStats,
     })
     entry.model = model
     entry.disposables.push(

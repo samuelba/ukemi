@@ -1438,6 +1438,11 @@
           "default": false,
           "description": "Show full file paths in the change graph."
         },
+        "ukemi.showLineStats": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show added and removed line counts on the working copy and on changed files. This reads those file contents on each refresh."
+        },
         "ukemi.workspaces.snapshotOnRefresh": {
           "type": "boolean",
           "default": false,

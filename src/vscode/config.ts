@@ -22,6 +22,7 @@ export interface UkemiConfig {
   defaultFilter: GraphFilter
   changeIdLength: number
   showFullPaths: boolean
+  showLineStats: boolean
   changedFilesView: ChangedFilesView
   snapshotOnRefresh: boolean
   addJjToTerminalPath: boolean
@@ -65,6 +66,7 @@ export function readConfig(): UkemiConfig {
     defaultFilter: oneOf(c.get<string>('defaultFilter', 'recent'), GRAPH_FILTERS, 'recent'),
     changeIdLength: c.get<number>('changeIdLength', 4),
     showFullPaths: c.get<boolean>('showFullPaths', false),
+    showLineStats: c.get<boolean>('showLineStats', false),
     changedFilesView: oneOf(c.get<string>('changedFilesView', 'list'), CHANGED_FILES_VIEWS, 'list'),
     snapshotOnRefresh: c.get<boolean>('workspaces.snapshotOnRefresh', false),
     addJjToTerminalPath: c.get<boolean>('addJjToTerminalPath', true),

@@ -30,7 +30,13 @@ async function main(root: string, output: string): Promise<void> {
     graph: model.graph,
     busy: null,
     error: null,
-    settings: { changeIdLength: 4, showFullPaths: false, changedFilesView: 'list', ciOnlyMine: true },
+    settings: {
+      changeIdLength: 4,
+      showFullPaths: false,
+      showLineStats: false,
+      changedFilesView: 'list',
+      ciOnlyMine: true,
+    },
     autoFetch: { enabled: false, interval: '10m' },
   }
   const target = model.graph?.commits.find(

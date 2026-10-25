@@ -27,17 +27,24 @@ export class RepoModel {
   private requests: RequestBadge[] = []
   private forge: ForgeState | null = null
   private snapshotOtherWorkspaces = false
+  private showLineStats = false
   private readonly fileCache = new Map<string, ChangedFile[]>()
   private readonly listeners = new Set<ChangeListener>()
 
   constructor(
     readonly repo: JjRepo,
     private readonly logger: Logger,
-    options: { depth?: HistoryDepth; filter?: GraphFilter; snapshotOtherWorkspaces?: boolean } = {},
+    options: {
+      depth?: HistoryDepth
+      filter?: GraphFilter
+      snapshotOtherWorkspaces?: boolean
+      showLineStats?: boolean
+    } = {},
   ) {
     this.depth = options.depth ?? this.depth
     this.filter = options.filter ?? this.filter
     this.snapshotOtherWorkspaces = options.snapshotOtherWorkspaces ?? false
+    this.showLineStats = options.showLineStats ?? false
   }
 
   get root(): string {
@@ -69,6 +76,15 @@ export class RepoModel {
 
   setSnapshotOtherWorkspaces(enabled: boolean): void {
     this.snapshotOtherWorkspaces = enabled
+  }
+
+  setShowLineStats(enabled: boolean): Promise<void> {
+    if (this.showLineStats === enabled) {
+      return Promise.resolve()
+    }
+    this.showLineStats = enabled
+    this.fileCache.clear()
+    return this.refresh()
   }
 
   setView(filter: GraphFilter, depth: HistoryDepth): Promise<void> {
@@ -166,7 +182,9 @@ export class RepoModel {
     const rows = layoutGraph(nodes)
     const trunkId = trunkIds[0]
     const workingCopy = commits.find((c) => c.isWorkingCopy)
-    const workingCopyFiles = workingCopy ? await this.repo.files(workingCopy.commitId) : []
+    const workingCopyFiles = workingCopy
+      ? await this.repo.files(workingCopy.commitId, this.showLineStats)
+      : []
     const head = operations[0]
     this.lastOperationId = head?.id ?? null
 
@@ -221,18 +239,23 @@ export class RepoModel {
   }
 
   async filesFor(commitId: string): Promise<ChangedFile[]> {
-    const cached = this.fileCache.get(commitId)
+    const key = `${this.showLineStats ? '1' : '0'}\n${commitId}`
+    const cached = this.fileCache.get(key)
     if (cached) {
       return cached
     }
-    const files = await this.repo.files(commitId)
+    const withStats = this.showLineStats
+    const files = await this.repo.files(commitId, withStats)
+    if (withStats !== this.showLineStats) {
+      return files
+    }
     if (this.fileCache.size >= FILE_CACHE_LIMIT) {
       const oldest = this.fileCache.keys().next().value
       if (oldest !== undefined) {
         this.fileCache.delete(oldest)
       }
     }
-    this.fileCache.set(commitId, files)
+    this.fileCache.set(key, files)
     return files
   }
 }

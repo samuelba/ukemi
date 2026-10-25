@@ -55,14 +55,25 @@ export const LOG_TEMPLATE =
     is_pushed: 'json(self.contained_in("::remote_bookmarks()"))',
   }) + LINE_END
 
-export const FILES_TEMPLATE =
+const FILE_LIST_FIELDS = {
+  files: jsonArray(
+    'diff.files()',
+    'f',
+    'json({"path" => f.path(), "status" => f.status(), "source" => f.source().path()})',
+  ),
+  conflicted: 'json(self.conflicted_files().map(|f| f.path()))',
+}
+
+export const FILES_TEMPLATE = jsonObject(FILE_LIST_FIELDS) + LINE_END
+
+export const FILES_STATS_TEMPLATE =
   jsonObject({
-    files: jsonArray(
-      'diff.files()',
-      'f',
-      'json({"path" => f.path(), "status" => f.status(), "source" => f.source().path()})',
+    ...FILE_LIST_FIELDS,
+    stats: jsonArray(
+      'diff.stat().files()',
+      's',
+      'json({"path" => s.path(), "added" => s.lines_added(), "removed" => s.lines_removed()})',
     ),
-    conflicted: 'json(self.conflicted_files().map(|f| f.path()))',
   }) + LINE_END
 
 export const EVOLOG_TEMPLATE =
