@@ -59,6 +59,10 @@ body {
   padding: 8px 12px;
 }
 
+a.icon-button {
+  text-decoration: none;
+}
+
 .button {
   display: inline-flex;
   align-items: center;
@@ -134,6 +138,7 @@ select:disabled {
 }
 
 button:focus-visible,
+a.icon-button:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   outline: 1px solid var(--vscode-focusBorder);

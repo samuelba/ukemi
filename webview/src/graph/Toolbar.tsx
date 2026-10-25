@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { DEPTHLESS_FILTERS, type GraphFilter, type HistoryDepth } from '../../../shared/model'
 import type { AutoFetchState, GraphState, RepoSummary } from '../../../shared/protocol'
+import { settingsCommandHref } from '../../../shared/settingsLink'
 import { postMessage } from '../shared/vscodeApi'
 
 const FILTERS: ReadonlyArray<{ id: GraphFilter; label: string; hint: string }> = [
@@ -51,6 +52,22 @@ function autoFetchLabel(autoFetch: AutoFetchState): string {
 
 function command(name: string, context: Record<string, unknown> = {}) {
   postMessage({ type: 'command', command: name, context })
+}
+
+function SettingsGear() {
+  if (document.body.dataset.cursor !== '1') {
+    return null
+  }
+  return (
+    <a
+      className="icon-button"
+      href={settingsCommandHref('@ext:ukemi.ukemi')}
+      title="Open Settings"
+      aria-label="Open Settings"
+    >
+      <i className="codicon codicon-gear" />
+    </a>
+  )
 }
 
 function ToolButton({
@@ -233,6 +250,7 @@ export function Toolbar({
           label="Refresh"
           onClick={() => command('ukemi.refresh')}
         />
+        <SettingsGear />
       </div>
       {graph && (
         <div className="toolbar-row filters">

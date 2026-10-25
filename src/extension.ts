@@ -35,6 +35,11 @@ export interface UkemiApi {
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<UkemiApi> {
+  void vscode.commands.executeCommand(
+    'setContext',
+    'ukemi.inCursor',
+    vscode.env.appName === 'Cursor',
+  )
   const channel = vscode.window.createOutputChannel('Ukemi', { log: true })
   const logger = createOutputLogger(channel)
   const storageDir = context.globalStorageUri.fsPath
