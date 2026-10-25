@@ -25,7 +25,8 @@ function main(prompt: string): void {
   const socket = createConnection(socketPath)
   const timer = setTimeout(() => socket.destroy(), TIMEOUT_MS)
   socket.setEncoding('utf8')
-  socket.on('connect', () => socket.write(`${JSON.stringify({ nonce, prompt })}\n`))
+  const interactive = process.env.UKEMI_ASKPASS_INTERACTIVE !== '0'
+  socket.on('connect', () => socket.write(`${JSON.stringify({ nonce, prompt, interactive })}\n`))
   socket.on('data', (chunk: string) => {
     data += chunk
   })

@@ -7,7 +7,7 @@ import { collectBookmarks } from '../../repo/workspaceItems'
 import { errorMessage } from '../../util/logger'
 import { openCommitDiff } from '../diff'
 import { GRAPH_VIEW_ID } from '../graphView'
-import { readConfig } from '../config'
+import { readConfig, updateUkemiSetting } from '../config'
 import { type CommandEnv, type Handler } from './context'
 
 function activeOrWarn(env: CommandEnv): RepoModel | null {
@@ -145,16 +145,8 @@ async function goTo(env: CommandEnv, model: RepoModel): Promise<void> {
   }
 }
 
-async function setChangedFilesView(view: ChangedFilesView): Promise<void> {
-  const config = vscode.workspace.getConfiguration('ukemi')
-  const inspected = config.inspect<ChangedFilesView>('changedFilesView')
-  const target =
-    inspected?.workspaceFolderValue !== undefined
-      ? vscode.ConfigurationTarget.WorkspaceFolder
-      : inspected?.workspaceValue !== undefined
-        ? vscode.ConfigurationTarget.Workspace
-        : vscode.ConfigurationTarget.Global
-  await config.update('changedFilesView', view, target)
+function setChangedFilesView(view: ChangedFilesView): Promise<void> {
+  return updateUkemiSetting('changedFilesView', view)
 }
 
 export function globalCommands(env: CommandEnv): Record<string, Handler> {
@@ -177,9 +169,14 @@ export function globalCommands(env: CommandEnv): Record<string, Handler> {
     'ukemi.selectRepository': () => selectRepository(env),
     'ukemi.initRepo': (arg?: unknown) => initRepo(env, typeof arg === 'string' ? arg : undefined),
     'ukemi.fetch': withModel(env, async (model) => {
-      await env.operations.run('Fetch', model, () => model.repo.fetch())
+      const result = await env.operations.run('Fetch', model, () => model.repo.fetch())
+      if (result) {
+        env.autoFetch.recordFetch(model.root)
+      }
       await env.forge.refreshRequests(model, { force: true })
     }),
+    'ukemi.toggleAutoFetch': () =>
+      updateUkemiSetting('autoFetch.enabled', !readConfig().autoFetchEnabled),
     'ukemi.push': withModel(env, (model) =>
       env.operations.run('Push', model, () => model.repo.push()),
     ),

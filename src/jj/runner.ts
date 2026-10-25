@@ -14,6 +14,7 @@ export interface RunOptions {
   stdin?: string
   timeoutMs?: number
   ignoreWorkingCopy?: boolean
+  env?: Readonly<Record<string, string>>
 }
 
 export interface RunResult {
@@ -123,7 +124,13 @@ export class JjRunner {
     return new Promise((resolve, reject) => {
       const child = spawn(this.binaryPath, args, {
         cwd: options.cwd,
-        env: { ...process.env, ...this.extraEnv, JJ_EDITOR: 'false', GIT_TERMINAL_PROMPT: '0' },
+        env: {
+          ...process.env,
+          ...this.extraEnv,
+          ...options.env,
+          JJ_EDITOR: 'false',
+          GIT_TERMINAL_PROMPT: '0',
+        },
         stdio: ['pipe', 'pipe', 'pipe'],
       })
       const stdout: Buffer[] = []

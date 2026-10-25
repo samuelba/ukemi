@@ -61,6 +61,11 @@ export interface ViewSettings {
   changedFilesView: ChangedFilesView
 }
 
+export interface AutoFetchState {
+  enabled: boolean
+  interval: string
+}
+
 export interface ViewState {
   status: ViewStatus
   repos: RepoSummary[]
@@ -69,6 +74,7 @@ export interface ViewState {
   busy: string | null
   error: string | null
   settings: ViewSettings
+  autoFetch: AutoFetchState
 }
 
 export type DropMode = 'source' | 'revision'

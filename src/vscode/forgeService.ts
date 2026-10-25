@@ -22,10 +22,7 @@ function secretKey(host: string): string {
   return `ukemi.gitlab.token.${host}`
 }
 
-async function githubSession(
-  host: string,
-  interactive: boolean,
-): Promise<GithubCredential | null> {
+async function githubSession(host: string, interactive: boolean): Promise<GithubCredential | null> {
   const provider = host === 'github.com' ? 'github' : 'github-enterprise'
   const session = await vscode.authentication.getSession(provider, GITHUB_SCOPES, {
     createIfNone: interactive,
@@ -65,7 +62,10 @@ export class ForgeService implements vscode.Disposable {
 
   private async token(target: ForgeHost, interactive: boolean): Promise<string | null> {
     if (target.kind === 'github') {
-      const credential = await this.github.get(target.host, interactive ? 'ask-if-missing' : 'silent')
+      const credential = await this.github.get(
+        target.host,
+        interactive ? 'ask-if-missing' : 'silent',
+      )
       return credential?.token ?? null
     }
     const stored = await this.secrets.get(secretKey(target.host))
@@ -112,14 +112,15 @@ export class ForgeService implements vscode.Disposable {
   async gitCredential(request: CredentialRequest): Promise<string | null> {
     const kind = forgeKindForHost(request.host, readConfig())
     if (kind === 'github') {
-      const credential = await this.github.get(request.host, 'ask-if-missing')
+      const mode = request.interactive ? 'ask-if-missing' : 'silent'
+      const credential = await this.github.get(request.host, mode)
       if (!credential) {
         return null
       }
       return request.field === 'username' ? credential.username : credential.token
     }
     if (kind === 'gitlab') {
-      const token = await this.token({ kind, host: request.host }, true)
+      const token = await this.token({ kind, host: request.host }, request.interactive)
       if (!token) {
         return null
       }

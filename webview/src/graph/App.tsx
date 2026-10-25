@@ -156,6 +156,7 @@ export function App() {
           activeRepoId={state.activeRepoId}
           graph={graph}
           isBusy={state.busy !== null}
+          autoFetch={state.autoFetch}
         />
         {state.busy && (
           <div className="busy" role="status">

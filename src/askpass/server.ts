@@ -11,14 +11,18 @@ export type CredentialResolver = (request: CredentialRequest) => Promise<string 
 
 const MAX_REQUEST_BYTES = 4096
 
-function readRequest(line: string): { nonce: string; prompt: string } | null {
+function readRequest(line: string): { nonce: string; prompt: string; interactive: boolean } | null {
   try {
     const value: unknown = JSON.parse(line)
     if (typeof value !== 'object' || value === null) {
       return null
     }
-    const { nonce, prompt } = value as Record<string, unknown>
-    return typeof nonce === 'string' && typeof prompt === 'string' ? { nonce, prompt } : null
+    const record = value as Record<string, unknown>
+    const { nonce, prompt } = record
+    if (typeof nonce !== 'string' || typeof prompt !== 'string') {
+      return null
+    }
+    return { nonce, prompt, interactive: record.interactive !== false }
   } catch {
     return null
   }
@@ -85,7 +89,7 @@ export class AskpassServer {
       return null
     }
     const credential = parsePrompt(request.prompt)
-    return credential ? this.resolve(credential) : null
+    return credential ? this.resolve({ ...credential, interactive: request.interactive }) : null
   }
 
   private isValidNonce(nonce: string): boolean {

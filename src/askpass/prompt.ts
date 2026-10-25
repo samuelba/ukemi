@@ -1,11 +1,15 @@
-export interface CredentialRequest {
+export interface CredentialPrompt {
   field: 'username' | 'password'
   host: string
 }
 
+export interface CredentialRequest extends CredentialPrompt {
+  interactive: boolean
+}
+
 const PROMPT = /^(Username|Password) for 'https:\/\/(?:[^@'/]*@)?([^':/]+)(?::\d+)?[^']*'/
 
-export function parsePrompt(prompt: string): CredentialRequest | null {
+export function parsePrompt(prompt: string): CredentialPrompt | null {
   const match = PROMPT.exec(prompt)
   if (!match?.[1] || !match[2]) {
     return null

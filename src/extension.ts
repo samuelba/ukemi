@@ -20,6 +20,7 @@ import { EvolutionView } from './vscode/evolutionView'
 import { ForgeService } from './vscode/forgeService'
 import { GRAPH_VIEW_ID, GraphView } from './vscode/graphView'
 import { installJj, locateJj, offerInstall, updateTerminalPath } from './vscode/jjSetup'
+import { AutoFetcher } from './vscode/autoFetch'
 import { Operations } from './vscode/operations'
 import { createOutputLogger } from './vscode/outputLogger'
 import { RepoRegistry } from './vscode/registry'
@@ -61,6 +62,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
   } catch (error) {
     logger.warn(`git sign-in over HTTPS is not available: ${errorMessage(error)}`)
   }
+  const autoFetch = new AutoFetcher(registry, forge, operations, logger)
   const env: CommandEnv = {
     registry,
     operations,
@@ -71,6 +73,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
     extensionUri: context.extensionUri,
     storageUri: context.globalStorageUri,
     selection,
+    autoFetch,
   }
   graphView.setHandler(createMessageHandler(env))
 
@@ -88,6 +91,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
   context.subscriptions.push(
     channel,
     askpass,
+    autoFetch,
     registry,
     operations,
     graphView,

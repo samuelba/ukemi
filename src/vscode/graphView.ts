@@ -249,6 +249,10 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable 
         showFullPaths: config.showFullPaths,
         changedFilesView: config.changedFilesView,
       },
+      autoFetch: {
+        enabled: config.autoFetchEnabled,
+        interval: config.autoFetchInterval,
+      },
     }
   }
 

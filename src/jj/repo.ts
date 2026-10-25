@@ -65,7 +65,10 @@ export class JjRepo {
     return this.runner.run({ cwd: this.root, args, ignoreWorkingCopy: true })
   }
 
-  private mutate(args: readonly string[], options: { stdin?: string; timeoutMs?: number } = {}) {
+  private mutate(
+    args: readonly string[],
+    options: { stdin?: string; timeoutMs?: number; env?: Readonly<Record<string, string>> } = {},
+  ) {
     return this.mutations.run(() => this.runner.run({ cwd: this.root, args, ...options }))
   }
 
@@ -320,8 +323,9 @@ export class JjRepo {
     return this.mutate(['bookmark', 'track', `${name}@${remote}`])
   }
 
-  fetch() {
-    return this.mutate(['git', 'fetch', '--all-remotes'], { timeoutMs: NETWORK_TIMEOUT_MS })
+  fetch(options: { interactive?: boolean } = {}) {
+    const env = options.interactive === false ? { UKEMI_ASKPASS_INTERACTIVE: '0' } : undefined
+    return this.mutate(['git', 'fetch', '--all-remotes'], { timeoutMs: NETWORK_TIMEOUT_MS, env })
   }
 
   push(bookmarks?: string | readonly string[]) {

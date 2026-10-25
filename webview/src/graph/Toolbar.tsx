@@ -1,12 +1,16 @@
 import type { ReactNode } from 'react'
 import { DEPTHLESS_FILTERS, type GraphFilter, type HistoryDepth } from '../../../shared/model'
-import type { GraphState, RepoSummary } from '../../../shared/protocol'
+import type { AutoFetchState, GraphState, RepoSummary } from '../../../shared/protocol'
 import { postMessage } from '../shared/vscodeApi'
 
 const FILTERS: ReadonlyArray<{ id: GraphFilter; label: string; hint: string }> = [
   { id: 'recent', label: 'Recent', hint: 'Mutable changes, bookmarks and tags' },
   { id: 'mine', label: 'Mine', hint: 'All your open changes' },
-  { id: 'myHistory', label: 'My history', hint: 'Your open changes, and your history in the time range' },
+  {
+    id: 'myHistory',
+    label: 'My history',
+    hint: 'Your open changes, and your history in the time range',
+  },
   { id: 'stack', label: 'Stack', hint: 'Changes connected to the working copy' },
   { id: 'working', label: 'Working copy', hint: 'The working copy and its last 5 parents' },
 ]
@@ -24,6 +28,24 @@ interface ToolbarProps {
   activeRepoId: string | null
   graph: GraphState | null
   isBusy: boolean
+  autoFetch: AutoFetchState
+}
+
+function everyLabel(interval: string): string {
+  const text = interval.trim()
+  return /^every\s+/i.test(text) ? text : `every ${text}`
+}
+
+function fetchLabel(autoFetch: AutoFetchState): string {
+  return autoFetch.enabled
+    ? `Fetch (auto fetch on, ${everyLabel(autoFetch.interval)})`
+    : 'Fetch (auto fetch off)'
+}
+
+function autoFetchLabel(autoFetch: AutoFetchState): string {
+  return autoFetch.enabled
+    ? `Auto fetch on, ${everyLabel(autoFetch.interval)} (click to turn off)`
+    : 'Auto fetch off (click to turn on)'
 }
 
 function command(name: string, context: Record<string, unknown> = {}) {
@@ -78,12 +100,7 @@ function hasUnsyncedCurrent(graph: GraphState): boolean {
   return graph.commits.some((c) => c.localBookmarks.some((b) => current.has(b.name) && !b.synced))
 }
 
-export function Toolbar({
-  repos,
-  activeRepoId,
-  graph,
-  isBusy,
-}: ToolbarProps) {
+export function Toolbar({ repos, activeRepoId, graph, isBusy, autoFetch }: ToolbarProps) {
   const repoId = graph?.repoId
   const ignoresDepth = graph !== null && DEPTHLESS_FILTERS.includes(graph.filter)
   const singleLabel = repos.length === 1 ? (repos[0]?.label ?? '') : ''
@@ -140,8 +157,14 @@ export function Toolbar({
               <>
                 <ToolButton
                   icon="cloud-download"
-                  label="Fetch"
+                  label={fetchLabel(autoFetch)}
                   onClick={() => command('ukemi.fetch', { repoId })}
+                />
+                <ToolButton
+                  icon="sync"
+                  label={autoFetchLabel(autoFetch)}
+                  isAccent={autoFetch.enabled}
+                  onClick={() => command('ukemi.toggleAutoFetch')}
                 />
                 <ToolButton
                   icon="cloud-upload"

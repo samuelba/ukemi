@@ -4,6 +4,7 @@ import type { CommitView } from '../../../shared/protocol'
 import type { JjRunner } from '../../jj/runner'
 import type { RepoModel } from '../../repo/repoModel'
 import type { Logger } from '../../util/logger'
+import type { AutoFetcher } from '../autoFetch'
 import type { ChangeSelection } from '../changeSelection'
 import type { ForgeService } from '../forgeService'
 import type { GraphView } from '../graphView'
@@ -20,6 +21,7 @@ export interface CommandEnv {
   extensionUri: vscode.Uri
   storageUri: vscode.Uri
   selection: ChangeSelection
+  autoFetch: AutoFetcher
 }
 
 const contextSchema = z

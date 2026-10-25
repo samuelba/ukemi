@@ -26,6 +26,20 @@ export interface UkemiConfig {
   addJjToTerminalPath: boolean
   gitlabHosts: string[]
   githubHosts: string[]
+  autoFetchEnabled: boolean
+  autoFetchInterval: string
+}
+
+export async function updateUkemiSetting<T>(key: string, value: T): Promise<void> {
+  const config = vscode.workspace.getConfiguration('ukemi')
+  const inspected = config.inspect<T>(key)
+  const target =
+    inspected?.workspaceFolderValue !== undefined
+      ? vscode.ConfigurationTarget.WorkspaceFolder
+      : inspected?.workspaceValue !== undefined
+        ? vscode.ConfigurationTarget.Workspace
+        : vscode.ConfigurationTarget.Global
+  await config.update(key, value, target)
 }
 
 const CHANGED_FILES_VIEWS = ['list', 'tree'] as const satisfies readonly ChangedFilesView[]
@@ -52,5 +66,7 @@ export function readConfig(): UkemiConfig {
     addJjToTerminalPath: c.get<boolean>('addJjToTerminalPath', true),
     gitlabHosts: c.get<string[]>('gitlab.hosts', []),
     githubHosts: c.get<string[]>('github.hosts', []),
+    autoFetchEnabled: c.get<boolean>('autoFetch.enabled', false),
+    autoFetchInterval: c.get<string>('autoFetch.interval', '10m'),
   }
 }

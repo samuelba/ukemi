@@ -52,6 +52,24 @@ describe('AskpassServer', () => {
     expect(await ask("Username for 'https://example.com': ")).toEqual({ status: 1, stdout: '' })
   })
 
+  test('tells the resolver when the fetch must not ask for credentials', async () => {
+    const env = { ...server.env, UKEMI_ASKPASS_INTERACTIVE: '0' }
+
+    expect(await ask("Password for 'https://github.com': ", env)).toEqual({
+      status: 0,
+      stdout: 'secret-token\n',
+    })
+    expect(requests.at(-1)?.interactive).toBe(false)
+  })
+
+  test('asks for credentials when the fetch is interactive', async () => {
+    expect(await ask("Username for 'https://github.com': ")).toEqual({
+      status: 0,
+      stdout: 'x-access-token\n',
+    })
+    expect(requests.at(-1)?.interactive).toBe(true)
+  })
+
   test('fails for prompts it cannot read, without asking for credentials', async () => {
     expect(await ask('Enter passphrase: ')).toEqual({ status: 1, stdout: '' })
     expect(requests).toEqual([])
