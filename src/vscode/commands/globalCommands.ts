@@ -203,6 +203,9 @@ export function globalCommands(env: CommandEnv): Record<string, Handler> {
       }
       await env.operations.run('Redo', model, () => model.repo.redo())
     }),
+    'ukemi.newFromTrunk': withModel(env, (model) =>
+      env.operations.run('New change from trunk', model, () => model.repo.newChange(['trunk()'])),
+    ),
     'ukemi.goTo': withModel(env, (model) => goTo(env, model)),
     'ukemi.openCommitDiff': withModel(env, async (model) => {
       const commit = model.graph?.commits.find((c) => c.isWorkingCopy)

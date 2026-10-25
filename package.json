@@ -184,6 +184,12 @@
         "icon": "$(redo)"
       },
       {
+        "command": "ukemi.newFromTrunk",
+        "title": "New Change from Trunk",
+        "category": "Ukemi",
+        "icon": "$(git-branch)"
+      },
+      {
         "command": "ukemi.goTo",
         "title": "Go to Bookmark, Request or Revision…",
         "category": "Ukemi",

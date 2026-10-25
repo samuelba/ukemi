@@ -321,6 +321,27 @@ describe('mutations', () => {
     expect(await repo.remotes()).toEqual([{ name: 'origin', url: remote }])
   })
 
+  test('newChange on trunk() parents the working copy on the trunk commit', async () => {
+    const remote = join(fixture.dir, 'remote.git')
+    execFileSync('git', ['init', '--bare', '-q', remote])
+    jj(root, 'git', 'remote', 'add', 'origin', remote)
+    writeFile(root, 'a.txt', 'a\n')
+    jj(root, 'describe', '-m', 'shared')
+    const trunk = await current()
+    await repo.setBookmark('main', trunk.commitId)
+    await repo.push('main')
+    await repo.fetch()
+    jj(root, 'new', '-m', 'side')
+    writeFile(root, 'b.txt', 'b\n')
+
+    await repo.newChange(['trunk()'])
+
+    const workingCopy = await current()
+    expect(workingCopy.commitId).not.toBe(trunk.commitId)
+    expect(workingCopy.parents).toEqual([trunk.commitId])
+    expect(workingCopy.isEmpty).toBe(true)
+  })
+
   test('push with names pushes only those bookmarks', async () => {
     const remote = join(fixture.dir, 'remote.git')
     execFileSync('git', ['init', '--bare', '-q', remote])

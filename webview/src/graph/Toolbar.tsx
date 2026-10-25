@@ -123,6 +123,15 @@ export function Toolbar({
         {graph && (
           <>
             <ToolButton
+              icon="git-branch"
+              label={
+                graph.trunkName
+                  ? `New change from trunk (${graph.trunkName})`
+                  : 'New change from trunk'
+              }
+              onClick={() => command('ukemi.newFromTrunk', { repoId })}
+            />
+            <ToolButton
               icon="search"
               label="Go to bookmark, request or revision"
               onClick={() => command('ukemi.goTo', { repoId })}
