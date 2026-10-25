@@ -26,6 +26,7 @@
     "diff": "^8.0.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "yaml": "^2.9.1",
     "zod": "^3.25.76"
   },
   "devDependencies": {
@@ -1482,6 +1483,26 @@
           },
           "default": [],
           "description": "Additional self-hosted GitLab hosts, for example git.example.com."
+        },
+        "ukemi.gitlab.oauthApplications": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "markdownDescription": "GitLab OAuth application client IDs, keyed by host. The client ID is not a secret. Example: `{ \"git.example.com\": \"abc123\" }`. Create a non-confidential application with the `api` scope and redirect URIs `vscode://ukemi.ukemi/gitlab-auth` and `cursor://ukemi.ukemi/gitlab-auth`."
+        },
+        "ukemi.forge.ciOnlyMine": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show CI status only on open merge and pull requests that you authored."
+        },
+        "ukemi.forge.requestLimit": {
+          "type": "integer",
+          "default": 50,
+          "minimum": 1,
+          "maximum": 500,
+          "description": "How many of the most recently updated merge and pull requests to load. Each request returns at most 100, so a higher value loads more pages."
         }
       }
     },

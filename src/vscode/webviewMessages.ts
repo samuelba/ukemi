@@ -1,5 +1,6 @@
 import * as vscode from 'vscode'
 import type { WebviewMessage } from '../../shared/protocol'
+import { isAllowedForgeUrl } from '../forge/hostName'
 import type { CommandEnv } from './commands/context'
 import { editOrNew } from './commands/commitCommands'
 import { initRepo } from './commands/globalCommands'
@@ -137,6 +138,13 @@ export function createMessageHandler(env: CommandEnv) {
         const commit = model.findCommit(message.commitId)
         if (commit) {
           await editOrNew(env, model, commit)
+        }
+        return
+      }
+      case 'openUrl': {
+        const host = model.graph?.forge?.host
+        if (host && isAllowedForgeUrl(message.url, host)) {
+          await vscode.env.openExternal(vscode.Uri.parse(message.url))
         }
         return
       }

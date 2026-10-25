@@ -10,8 +10,8 @@ Ukemi is a visual interface for [Jujutsu (jj)](https://jj-vcs.github.io/jj/) in 
 - **Split by hunks.** Select hunks in a split editor. The selected hunks go into a new change before the original.
 - **Evolution.** The Evolution panel shows how the selected change evolved: each amend, describe, snapshot and rebase. Select a change in the graph. Click a version to see what it changed, compare it with the current version, or restore its files.
 - **Diffs.** Click a file to see its diff. The Source Control view shows the working copy for repositories that the Git extension does not show.
-- **Sync.** Fetch, push tracked bookmarks, undo and redo from the toolbar. SSH remotes use your SSH agent. For HTTPS remotes, Ukemi uses your git credential helper first, then your GitHub sign-in in the editor or your GitLab token. For GitHub, you can also choose a user name and a personal access token with the `repo` scope. Use **Sign In to GitHub or GitLab** to change the choice, and **Sign Out of GitHub or GitLab** to remove a stored token.
-- **Pull and merge requests.** Create GitHub pull requests and GitLab merge requests from a change. See their status and CI result in the graph. Merge them and clean up after the merge.
+- **Sync.** Fetch, push tracked bookmarks, undo and redo from the toolbar. SSH remotes use your SSH agent. For HTTPS remotes, Ukemi uses your git credential helper first, then your GitHub sign-in in the editor or your GitLab sign-in. For GitHub, you can also choose a user name and a personal access token with the `repo` scope. Use **Sign In to GitHub or GitLab** to change the choice, and **Sign Out of GitHub or GitLab** to remove a stored token.
+- **Pull and merge requests.** Create GitHub pull requests and GitLab merge requests from a change. See their status and CI result in the graph. Hover a request you opened to see the jobs, and use the open icon to open it in the browser. Merge them and clean up after the merge.
 - **Many repositories.** Ukemi finds repositories in subfolders, for example `tools/firmware/repo`. When it finds more than one, select it in the dropdown. Ukemi follows the active editor.
 - **No setup.** When jj is missing, Ukemi offers to download the official static release and checks its SHA-256 digest.
 
@@ -31,11 +31,26 @@ Select the gear in the title bar of the Ukemi view to open the Ukemi settings.
 | `ukemi.repoScanDepth` | Folder levels to search for repositories. |
 | `ukemi.showSourceControl` | When to show the working copy in Source Control. |
 | `ukemi.gitlab.hosts`, `ukemi.github.hosts` | Self-hosted GitLab and GitHub Enterprise hosts. |
+| `ukemi.gitlab.oauthApplications` | GitLab OAuth client IDs by host. The client ID is not a secret. |
+| `ukemi.forge.ciOnlyMine` | Show CI status only on open requests that you authored. Default: on. |
+| `ukemi.forge.requestLimit` | How many recently updated merge and pull requests to load. Default: 50. Maximum: 500. |
 
 ## Sign in
 
-- **GitHub** uses the VS Code GitHub account.
-- **GitLab** uses a personal access token with the `api` scope. Ukemi keeps it in the VS Code secret storage.
+- **GitHub** uses the GitHub account of the editor, or a personal access token with the `repo` scope.
+- **GitLab** tries, in order: an OAuth session, a personal access token, then the `glab` CLI. For `glab`, Ukemi runs `glab api --hostname <host>` and does not read the token. `glab` sends its own `Bearer` header and refreshes a web login.
+- OAuth and personal access tokens are stored in VS Code secret storage. On Linux that is the OS keyring (libsecret), not a clear-text file. **Sign Out** removes both and stops using `glab` until the next sign-in. The `glab` login itself stays in `glab`.
+
+### GitLab OAuth application
+
+OAuth needs a non-confidential application on that GitLab host, with the `api` scope and these redirect URIs:
+
+- `vscode://ukemi.ukemi/gitlab-auth`
+- `cursor://ukemi.ukemi/gitlab-auth`
+
+Put the client ID in `ukemi.gitlab.oauthApplications`, for example `{ "git.example.com": "abc123" }`. If the host has no client ID, Ukemi asks for a personal access token with the `api` scope instead.
+
+CI status refreshes about every 15 seconds while one of your pipelines is running, and about every 60 seconds otherwise. It pauses while the window is not focused.
 
 ## Development
 

@@ -6,6 +6,7 @@ import {
   type HistoryDepth,
 } from '../../shared/model'
 import type { ChangedFilesView } from '../../shared/protocol'
+import { clampRequestLimit } from '../forge/requestLimit'
 import { DEFAULT_EXCLUDES } from '../repo/discovery'
 
 export type SourceControlMode = 'auto' | 'always' | 'never'
@@ -26,6 +27,9 @@ export interface UkemiConfig {
   addJjToTerminalPath: boolean
   gitlabHosts: string[]
   githubHosts: string[]
+  gitlabOAuthApplications: Record<string, string>
+  ciOnlyMine: boolean
+  requestLimit: number
   autoFetchEnabled: boolean
   autoFetchInterval: string
 }
@@ -66,6 +70,9 @@ export function readConfig(): UkemiConfig {
     addJjToTerminalPath: c.get<boolean>('addJjToTerminalPath', true),
     gitlabHosts: c.get<string[]>('gitlab.hosts', []),
     githubHosts: c.get<string[]>('github.hosts', []),
+    gitlabOAuthApplications: c.get<Record<string, string>>('gitlab.oauthApplications', {}),
+    ciOnlyMine: c.get<boolean>('forge.ciOnlyMine', true),
+    requestLimit: clampRequestLimit(c.get<number>('forge.requestLimit', 50)),
     autoFetchEnabled: c.get<boolean>('autoFetch.enabled', false),
     autoFetchInterval: c.get<string>('autoFetch.interval', '10m'),
   }

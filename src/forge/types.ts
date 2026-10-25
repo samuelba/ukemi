@@ -13,7 +13,7 @@ export interface CreateRequestInput {
 export interface ForgeClient {
   readonly kind: ForgeKind
   readonly host: string
-  listRequests(branches: readonly string[]): Promise<RequestBadge[]>
+  listRequests(branches: readonly string[], limit?: number): Promise<RequestBadge[]>
   createRequest(input: CreateRequestInput): Promise<RequestBadge>
   mergeRequest(number: number, method: MergeMethod): Promise<void>
 }

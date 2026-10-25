@@ -4,7 +4,7 @@ import type { ChangedFile } from '../../../shared/model'
 import type { CommitView, ViewSettings } from '../../../shared/protocol'
 import { relativeTime, splitId, title } from '../shared/format'
 import { postMessage, vscodeContext } from '../shared/vscodeApi'
-import { BOOKMARK_MIME, Badges } from './Badges'
+import { BOOKMARK_MIME, Badges, RequestRow } from './Badges'
 import { canSquashIntoParent } from './canSquashIntoParent'
 import { dropCommitAction } from './dropCommit'
 import { dragModifiers, installDragModifiers } from './dragModifiers'
@@ -183,7 +183,12 @@ export function CommitRow(props: CommitRowProps) {
               <span className="id-offset">/{commit.changeOffset}</span>
             )}
           </span>
-          <Badges commit={commit} repoId={repoId} hasForge={props.hasForge} />
+          <Badges
+            commit={commit}
+            repoId={repoId}
+            hasForge={props.hasForge}
+            ciOnlyMine={settings.ciOnlyMine}
+          />
           <span
             className={`summary${summary ? '' : ' muted'}`}
             title={commit.description || undefined}
@@ -243,6 +248,12 @@ export function CommitRow(props: CommitRowProps) {
             </button>
           </span>
         </div>
+        <RequestRow
+          commit={commit}
+          repoId={repoId}
+          hasForge={props.hasForge}
+          ciOnlyMine={settings.ciOnlyMine}
+        />
         {isExpanded && canExpand && (
           <FileList
             commit={commit}

@@ -3,8 +3,15 @@ import type { GraphRow } from './graphLayout'
 import type { ChangedFile, Commit, GraphFilter, HistoryDepth, Workspace } from './model'
 
 export type RequestState = 'draft' | 'open' | 'reviewed' | 'approved' | 'merged' | 'closed'
-export type CiState = 'pending' | 'success' | 'failure' | 'none'
+export type CiState = 'pending' | 'success' | 'failure' | 'manual' | 'skipped' | 'none'
 export type ForgeKind = 'github' | 'gitlab'
+
+export interface CiCheck {
+  name: string
+  stage?: string
+  state: CiState
+  url: string
+}
 
 export interface RequestBadge {
   number: number
@@ -12,6 +19,9 @@ export interface RequestBadge {
   url: string
   state: RequestState
   ci: CiState
+  isMine: boolean
+  pipelineUrl?: string
+  checks: CiCheck[]
   headBranch: string
   baseBranch: string
 }
@@ -59,6 +69,7 @@ export interface ViewSettings {
   changeIdLength: number
   showFullPaths: boolean
   changedFilesView: ChangedFilesView
+  ciOnlyMine: boolean
 }
 
 export interface AutoFetchState {
@@ -111,3 +122,4 @@ export type WebviewMessage =
   | { type: 'initRepo'; root: string }
   | { type: 'installJj' }
   | { type: 'openFolder' }
+  | { type: 'openUrl'; url: string }

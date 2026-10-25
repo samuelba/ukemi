@@ -1,7 +1,10 @@
 import { describe, expect, test } from 'vitest'
 import { detectForge, forgeKindForHost } from '../../src/forge/detect'
-import { GithubClient, githubCi, githubState } from '../../src/forge/github'
+import { GithubClient, githubCheckState, githubCi, githubState } from '../../src/forge/github'
 import { GitlabClient, gitlabCi, gitlabState } from '../../src/forge/gitlab'
+import { isAllowedForgeUrl } from '../../src/forge/hostName'
+import { clampRequestLimit } from '../../src/forge/requestLimit'
+import { FORGE_REFRESH_PENDING_MS, forgeRefreshInterval } from '../../src/forge/refreshInterval'
 import { parseRemoteUrl } from '../../src/forge/remoteUrl'
 import { ForgeError, type HttpFetch } from '../../src/forge/types'
 
@@ -62,6 +65,10 @@ describe('request state mapping', () => {
     expect(githubState({ ...base, state: 'MERGED' })).toBe('merged')
     expect(githubCi('FAILURE')).toBe('failure')
     expect(githubCi(undefined)).toBe('none')
+    expect(githubCheckState('COMPLETED', 'SUCCESS')).toBe('success')
+    expect(githubCheckState('COMPLETED', 'FAILURE')).toBe('failure')
+    expect(githubCheckState('COMPLETED', 'SKIPPED')).toBe('skipped')
+    expect(githubCheckState('IN_PROGRESS', null)).toBe('pending')
   })
 
   test('maps GitLab merge request states', () => {
@@ -72,6 +79,8 @@ describe('request state mapping', () => {
     expect(gitlabState({ state: 'merged' }, null)).toBe('merged')
     expect(gitlabCi('running')).toBe('pending')
     expect(gitlabCi('success')).toBe('success')
+    expect(gitlabCi('manual')).toBe('manual')
+    expect(gitlabCi('skipped')).toBe('skipped')
   })
 })
 
@@ -88,7 +97,7 @@ function fakeFetch(responses: Record<string, unknown>, calls: string[] = []): Ht
 
 describe('GithubClient', () => {
   test('lists pull requests for local branches only', async () => {
-    const node = (number: number, head: string) => ({
+    const node = (number: number, head: string, login: string) => ({
       number,
       title: `PR ${number}`,
       url: `https://github.com/o/r/pull/${number}`,
@@ -96,9 +105,39 @@ describe('GithubClient', () => {
       isDraft: false,
       headRefName: head,
       baseRefName: 'main',
+      author: { login },
       reviewDecision: null,
       latestReviews: { totalCount: 0 },
-      commits: { nodes: [{ commit: { statusCheckRollup: { state: 'SUCCESS' } } }] },
+      commits: {
+        nodes: [
+          {
+            commit: {
+              statusCheckRollup: {
+                state: 'SUCCESS',
+                contexts: {
+                  nodes: [
+                    {
+                      __typename: 'CheckRun',
+                      name: 'ci',
+                      status: 'COMPLETED',
+                      conclusion: 'SUCCESS',
+                      detailsUrl: 'https://github.com/o/r/actions/runs/1',
+                    },
+                    {
+                      __typename: 'StatusContext',
+                      context: 'review',
+                      state: 'PENDING',
+                      targetUrl: 'https://github.com/o/r/status',
+                    },
+                    { __typename: 'UnknownContext' },
+                    null,
+                  ],
+                },
+              },
+            },
+          },
+        ],
+      },
     })
     const client = new GithubClient(
       'github.com',
@@ -106,7 +145,12 @@ describe('GithubClient', () => {
       'token',
       fakeFetch({
         graphql: {
-          data: { repository: { pullRequests: { nodes: [node(1, 'mine'), node(2, 'other')] } } },
+          data: {
+            viewer: { login: 'Sam' },
+            repository: {
+              pullRequests: { nodes: [node(1, 'mine', 'sam'), node(2, 'other', 'ada')] },
+            },
+          },
         },
       }),
     )
@@ -120,6 +164,12 @@ describe('GithubClient', () => {
         url: 'https://github.com/o/r/pull/1',
         state: 'open',
         ci: 'success',
+        isMine: true,
+        pipelineUrl: 'https://github.com/o/r/pull/1/checks',
+        checks: [
+          { name: 'ci', state: 'success', url: 'https://github.com/o/r/actions/runs/1' },
+          { name: 'review', state: 'pending', url: 'https://github.com/o/r/status' },
+        ],
         headBranch: 'mine',
         baseBranch: 'main',
       },
@@ -161,7 +211,7 @@ describe('GithubClient', () => {
 })
 
 describe('GitlabClient', () => {
-  test('lists merge requests with pipeline and approval details', async () => {
+  test('lists merge requests with jobs for the current author', async () => {
     const calls: string[] = []
     const client = new GitlabClient(
       'git.anybotics.com',
@@ -169,17 +219,45 @@ describe('GitlabClient', () => {
       't',
       fakeFetch(
         {
+          '/pipelines/42/jobs': [
+            {
+              name: 'test',
+              stage: 'test',
+              status: 'failed',
+              web_url: 'https://git.anybotics.com/team/sub/repo/-/jobs/1',
+            },
+          ],
           '/merge_requests/7/approvals': { approved: true, approved_by: [{}] },
-          '/merge_requests/7': { head_pipeline: { status: 'failed' } },
+          '/merge_requests/8/approvals': { approved: false, approved_by: [] },
+          '/merge_requests/7': { head_pipeline: { id: 42, status: 'failed' } },
+          '/merge_requests/8': { head_pipeline: null },
+          '/api/v4/user': { id: 5 },
           '/merge_requests?': [
             {
               iid: 7,
               title: 'MR',
-              web_url: 'w',
+              web_url: 'https://git.anybotics.com/team/sub/repo/-/merge_requests/7',
               state: 'opened',
               draft: false,
               source_branch: 'feat',
               target_branch: 'main',
+              author: { id: 5 },
+              head_pipeline: {
+                id: 42,
+                status: 'failed',
+                web_url: 'https://git.anybotics.com/team/sub/repo/-/pipelines/42',
+              },
+            },
+            {
+              iid: 8,
+              title: 'Other',
+              web_url: 'https://git.anybotics.com/team/sub/repo/-/merge_requests/8',
+              state: 'opened',
+              draft: false,
+              source_branch: 'other',
+              target_branch: 'main',
+              author: { id: 9 },
+              head_pipeline: { id: 43, status: 'running' },
             },
           ],
         },
@@ -187,10 +265,138 @@ describe('GitlabClient', () => {
       ),
     )
 
-    const [mr] = await client.listRequests(['feat'])
+    const requests = await client.listRequests(['feat', 'other'])
 
-    expect(calls[0]).toContain('/api/v4/projects/team%2Fsub%2Frepo/merge_requests?state=all')
-    expect(mr).toMatchObject({ number: 7, state: 'approved', ci: 'failure' })
+    expect(requests[0]).toMatchObject({
+      number: 7,
+      state: 'approved',
+      ci: 'failure',
+      isMine: true,
+      pipelineUrl: 'https://git.anybotics.com/team/sub/repo/-/pipelines/42',
+      checks: [
+        {
+          name: 'test',
+          stage: 'test',
+          state: 'failure',
+          url: 'https://git.anybotics.com/team/sub/repo/-/jobs/1',
+        },
+      ],
+    })
+    expect(requests[1]).toMatchObject({ number: 8, isMine: false, checks: [] })
+    expect(calls.some((call) => call.includes('/pipelines/43/jobs'))).toBe(false)
+  })
+
+  test('appends downstream trigger jobs and keeps stage creation order', async () => {
+    const calls: string[] = []
+    const job = (id: number, name: string, stage: string, status: string) => ({
+      id,
+      name,
+      stage,
+      status,
+      web_url: `https://git.anybotics.com/team/sub/repo/-/jobs/${id}`,
+    })
+    const client = new GitlabClient(
+      'git.anybotics.com',
+      'team/sub/repo',
+      't',
+      fakeFetch(
+        {
+          '/pipelines/42/jobs': [job(3, 'prep', 'merge-prep', 'success'), job(1, 'version-job', 'version', 'success')],
+          '/pipelines/42/bridges': [
+            {
+              ...job(2, 'pipeline_all', 'triggers', 'success'),
+              downstream_pipeline: { id: 99, project_id: 21 },
+            },
+          ],
+          '/pipelines/99/jobs': [job(11, 'build-image', 'build', 'failed'), job(10, 'child-version', 'version', 'success')],
+          '/pipelines/99/bridges': [job(12, 'install-desktop', 'hardware-in-the-loop', 'skipped')],
+          '/merge_requests/7/approvals': { approved: false, approved_by: [] },
+          '/merge_requests/7': { head_pipeline: { id: 42, status: 'success' } },
+          '/api/v4/user': { id: 5 },
+          '/merge_requests?': [
+            {
+              iid: 7,
+              title: 'MR',
+              web_url: 'https://git.anybotics.com/team/sub/repo/-/merge_requests/7',
+              state: 'opened',
+              source_branch: 'feat',
+              target_branch: 'main',
+              author: { id: 5 },
+              head_pipeline: { id: 42, status: 'success' },
+            },
+          ],
+        },
+        calls,
+      ),
+    )
+
+    const requests = await client.listRequests(['feat'])
+
+    expect(requests[0]?.checks.map((check) => [check.stage, check.name])).toEqual([
+      ['version', 'version-job'],
+      ['triggers', 'pipeline_all'],
+      ['merge-prep', 'prep'],
+      ['version', 'child-version'],
+      ['build', 'build-image'],
+      ['hardware-in-the-loop', 'install-desktop'],
+    ])
+    expect(calls.some((call) => call.includes('/projects/21/pipelines/99/jobs'))).toBe(true)
+  })
+
+  test('loads a later page when the request limit is above 100', async () => {
+    const pages: string[] = []
+    const mergeRequest = (iid: number) => ({
+      iid,
+      title: `MR ${iid}`,
+      web_url: `https://gitlab.com/a/b/-/merge_requests/${iid}`,
+      state: 'opened',
+      source_branch: iid === 101 ? 'wanted' : 'other',
+      target_branch: 'main',
+      author: { id: 1 },
+    })
+    const client = new GitlabClient('gitlab.com', 'a/b', 't', async (url) => {
+      if (url.includes('/api/v4/user')) {
+        return new Response(JSON.stringify({ id: 1 }), { status: 200 })
+      }
+      if (url.includes('/approvals')) {
+        return new Response(JSON.stringify({ approved: false, approved_by: [] }), { status: 200 })
+      }
+      if (!url.includes('/merge_requests?')) {
+        return new Response(JSON.stringify({ head_pipeline: null }), { status: 200 })
+      }
+      const page = new URL(url).searchParams.get('page') ?? ''
+      pages.push(page)
+      const start = page === '2' ? 100 : 0
+      const count = page === '2' ? 20 : 100
+      return new Response(
+        JSON.stringify(Array.from({ length: count }, (_, index) => mergeRequest(start + index))),
+        { status: 200 },
+      )
+    })
+
+    const requests = await client.listRequests(['wanted'], 120)
+
+    expect(pages).toEqual(['1', '2'])
+    expect(requests.map((request) => request.number)).toEqual([101])
+  })
+
+  test('sends a bearer token for an OAuth session', async () => {
+    const headers: string[] = []
+    const client = new GitlabClient(
+      'gitlab.com',
+      'a/b',
+      'oauth-token',
+      async (_url, init) => {
+        headers.push(new Headers(init.headers).get('authorization') ?? '')
+        return new Response(JSON.stringify({ message: 'no' }), { status: 401 })
+      },
+      'oauth',
+    )
+
+    await client.listRequests([]).catch(() => undefined)
+
+    expect(headers.length).toBeGreaterThan(0)
+    expect(headers.every((value) => value === 'Bearer oauth-token')).toBe(true)
   })
 
   test('surfaces API errors with the status code', async () => {
@@ -206,5 +412,31 @@ describe('GitlabClient', () => {
     expect(error).toBeInstanceOf(ForgeError)
     expect((error as ForgeError).isAuthError).toBe(true)
     expect((error as ForgeError).message).toBe('HTTP 401: 401 Unauthorized')
+  })
+})
+
+describe('forge helpers', () => {
+  test('clamps the request list size', () => {
+    expect(clampRequestLimit(50)).toBe(50)
+    expect(clampRequestLimit(0)).toBe(1)
+    expect(clampRequestLimit(900)).toBe(500)
+    expect(clampRequestLimit(Number.NaN)).toBe(50)
+  })
+
+  test('polls faster while one of my requests is pending', () => {
+    expect(forgeRefreshInterval([{ isMine: true, ci: 'pending', state: 'open' }])).toBe(
+      FORGE_REFRESH_PENDING_MS,
+    )
+    expect(forgeRefreshInterval([{ isMine: false, ci: 'pending', state: 'open' }])).toBe(60_000)
+    expect(forgeRefreshInterval([{ isMine: true, ci: 'pending', state: 'merged' }])).toBe(60_000)
+  })
+
+  test('allows https links on the forge host only', () => {
+    expect(isAllowedForgeUrl('https://git.anybotics.com/group/repo/-/jobs/1', 'git.anybotics.com')).toBe(
+      true,
+    )
+    expect(isAllowedForgeUrl('https://github.com/o/r/pull/1', 'git.anybotics.com')).toBe(false)
+    expect(isAllowedForgeUrl('http://git.anybotics.com/group/repo', 'git.anybotics.com')).toBe(false)
+    expect(isAllowedForgeUrl('not a url', 'git.anybotics.com')).toBe(false)
   })
 })

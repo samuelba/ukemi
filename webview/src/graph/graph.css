@@ -295,9 +295,14 @@
 }
 
 .badge.here {
+  padding: 0 3px;
   color: var(--ukemi-here-fg);
   background: var(--ukemi-here-bg);
-  font-weight: 600;
+}
+
+.badge .svg-icon {
+  width: 12px;
+  height: 12px;
 }
 
 .badge.is-empty {
@@ -345,7 +350,20 @@
 }
 
 .badge.request {
+  max-width: 240px;
   border-color: var(--vscode-widget-border, var(--ukemi-edge));
+}
+
+.badge.request > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.badge.request > .codicon,
+.badge.request > .svg-icon,
+.request-open {
+  flex: none;
 }
 
 .request-state {
@@ -380,6 +398,97 @@
 
 .ci-pending {
   color: var(--kincha);
+}
+
+.ci-manual {
+  color: var(--vscode-textLink-foreground, var(--ukemi-accent));
+}
+
+.ci-skipped {
+  color: var(--vscode-descriptionForeground);
+}
+
+.request-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 0 2px;
+}
+
+.request-hover {
+  display: inline-flex;
+  max-width: 100%;
+}
+
+.request-open {
+  display: inline-flex;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.request-popover {
+  position: fixed;
+  z-index: 20;
+  box-sizing: border-box;
+  width: 280px;
+  max-height: 280px;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-widget-border));
+  background: var(--vscode-editorHoverWidget-background, var(--vscode-editor-background));
+  color: var(--vscode-editorHoverWidget-foreground, inherit);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.36);
+}
+
+.request-popover-title,
+.request-check {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  margin: 0;
+  padding: 2px 4px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.request-popover-title {
+  font-weight: 600;
+}
+
+.request-check .codicon,
+.request-check .svg-icon {
+  flex: none;
+}
+
+.request-check:disabled {
+  cursor: default;
+  opacity: 0.8;
+}
+
+.request-popover-title:hover,
+.request-check:not(:disabled):hover {
+  background: var(--vscode-list-hoverBackground, transparent);
+}
+
+.request-popover-meta,
+.request-stage-name,
+.request-popover-empty {
+  padding: 2px 4px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.85em;
+}
+
+.request-stage-name {
+  margin-top: 4px;
 }
 
 .files {
