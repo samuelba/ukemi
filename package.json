@@ -163,7 +163,7 @@
         "command": "ukemi.toggleAutoFetch",
         "title": "Auto Fetch",
         "category": "Ukemi",
-        "icon": "$(sync)"
+        "icon": "$(sync-ignored)"
       },
       {
         "command": "ukemi.push",
@@ -889,7 +889,10 @@
           "command": "ukemi.toggleAutoFetch",
           "group": "4_fetch@1",
           "when": "view == ukemi.graph",
-          "toggled": "config.ukemi.autoFetch.enabled"
+          "toggled": {
+            "condition": "config.ukemi.autoFetch.enabled",
+            "icon": "$(sync)"
+          }
         },
         {
           "command": "ukemi.showLog",

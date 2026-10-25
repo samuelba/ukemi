@@ -161,7 +161,7 @@ export function Toolbar({ repos, activeRepoId, graph, isBusy, autoFetch }: Toolb
                   onClick={() => command('ukemi.fetch', { repoId })}
                 />
                 <ToolButton
-                  icon="sync"
+                  icon={autoFetch.enabled ? 'sync' : 'sync-ignored'}
                   label={autoFetchLabel(autoFetch)}
                   isAccent={autoFetch.enabled}
                   onClick={() => command('ukemi.toggleAutoFetch')}
