@@ -431,6 +431,11 @@
         "category": "Ukemi"
       },
       {
+        "command": "ukemi.file.addToChat",
+        "title": "Add to Chat",
+        "category": "Ukemi"
+      },
+      {
         "command": "ukemi.scm.openDiff",
         "title": "Open Changes",
         "category": "Ukemi",
@@ -808,6 +813,11 @@
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'file'"
         },
         {
+          "command": "ukemi.file.addToChat",
+          "group": "1_open@3",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'file' && !isRemoved"
+        },
+        {
           "command": "ukemi.file.splitBelow",
           "group": "2_split@1",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'file' && canSplit"
@@ -1038,6 +1048,11 @@
           "when": "scmProvider == ukemi"
         },
         {
+          "command": "ukemi.file.addToChat",
+          "group": "1_open@2",
+          "when": "scmProvider == ukemi && scmResourceState != removed"
+        },
+        {
           "command": "ukemi.scm.discard",
           "group": "2_discard@1",
           "when": "scmProvider == ukemi"
@@ -1193,6 +1208,10 @@
         },
         {
           "command": "ukemi.file.copyPath",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.file.addToChat",
           "when": "false"
         },
         {

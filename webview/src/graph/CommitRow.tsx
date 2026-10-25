@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore, type DragEvent } from 'react'
+import { parseFileDrag } from '../../../shared/fileUri'
 import type { ChangedFile } from '../../../shared/model'
 import type { CommitView, ViewSettings } from '../../../shared/protocol'
 import { relativeTime, splitId, title } from '../shared/format'
@@ -7,7 +8,7 @@ import { BOOKMARK_MIME, Badges } from './Badges'
 import { canSquashIntoParent } from './canSquashIntoParent'
 import { dropCommitAction } from './dropCommit'
 import { dragModifiers, installDragModifiers } from './dragModifiers'
-import { FileList, FILE_MIME } from './FileList'
+import { FileList, FILE_LOCKED_MIME, FILE_MIME } from './FileList'
 import { GraphCell } from './GraphCell'
 
 export const COMMIT_MIME = 'application/x-ukemi-commit'
@@ -46,7 +47,7 @@ function dropKind(event: DragEvent): DropKind | null {
     return 'commit'
   }
   if (types.includes(FILE_MIME)) {
-    return 'file'
+    return types.includes(FILE_LOCKED_MIME) ? null : 'file'
   }
   return types.includes(BOOKMARK_MIME) ? 'bookmark' : null
 }
@@ -99,9 +100,9 @@ export function CommitRow(props: CommitRowProps) {
         mode,
       })
     } else if (kind === 'file') {
-      const data = JSON.parse(event.dataTransfer.getData(FILE_MIME)) as {
-        commitId: string
-        path: string
+      const data = parseFileDrag(event.dataTransfer.getData(FILE_MIME))
+      if (!data || data.isImmutable) {
+        return
       }
       postMessage({
         type: 'dropFile',

@@ -1,4 +1,4 @@
-import { relative, sep } from 'node:path'
+import { isAbsolute, join, relative, sep } from 'node:path'
 import * as vscode from 'vscode'
 import type { ChangedFile } from '../../../shared/model'
 import type { RepoModel } from '../../repo/repoModel'
@@ -55,6 +55,87 @@ async function discard(env: CommandEnv, { model, commit, file }: FileTarget): Pr
   }
 }
 
+const CHAT_ATTACH_COMMANDS = [
+  'composer.addfilestocomposer',
+  'workbench.action.chat.attachFile',
+] as const
+
+interface ChatResource {
+  resourceUri: vscode.Uri
+  contextValue?: string
+  root?: string
+}
+
+function isScmResource(arg: unknown): arg is ChatResource {
+  return (
+    typeof arg === 'object' &&
+    arg !== null &&
+    'resourceUri' in arg &&
+    (arg as { resourceUri?: unknown }).resourceUri instanceof vscode.Uri
+  )
+}
+
+function pathInside(root: string, full: string): string | null {
+  const rel = relative(root, full)
+  if (rel === '' || rel.startsWith(`..${sep}`) || rel === '..' || isAbsolute(rel)) {
+    return null
+  }
+  return full
+}
+
+async function attachFilesToChat(uris: readonly vscode.Uri[]): Promise<void> {
+  const available = new Set(await vscode.commands.getCommands(false))
+  const command = CHAT_ATTACH_COMMANDS.find((id) => available.has(id))
+  if (!command) {
+    void vscode.window.showWarningMessage('Ukemi: this editor has no command to add a file to chat.')
+    return
+  }
+  for (const uri of uris) {
+    await vscode.commands.executeCommand(command, uri)
+  }
+}
+
+async function addToChat(env: CommandEnv, ...args: unknown[]): Promise<void> {
+  const uris: vscode.Uri[] = []
+  let removed = false
+  for (const arg of args) {
+    const resolved = await chatFile(env, arg)
+    if (resolved === 'removed') {
+      removed = true
+    } else if (resolved) {
+      uris.push(resolved)
+    }
+  }
+  if (uris.length === 0) {
+    if (removed) {
+      void vscode.window.showWarningMessage('Ukemi: a deleted file is not on disk.')
+    }
+    return
+  }
+  await attachFilesToChat(uris)
+}
+
+async function chatFile(env: CommandEnv, arg: unknown): Promise<vscode.Uri | 'removed' | null> {
+  if (isScmResource(arg)) {
+    if (arg.contextValue === 'removed') {
+      return 'removed'
+    }
+    if (arg.resourceUri.scheme !== 'file' || !arg.root) {
+      return null
+    }
+    return pathInside(arg.root, arg.resourceUri.fsPath) ? arg.resourceUri : null
+  }
+  const target = await fileTarget(env, arg)
+  if (!target) {
+    return null
+  }
+  if (target.file.status === 'removed') {
+    return 'removed'
+  }
+  const full = pathInside(target.model.root, join(target.model.root, target.file.path))
+  return full ? vscode.Uri.file(full) : null
+}
+
 function editorTarget(
   env: CommandEnv,
   uri?: vscode.Uri,
@@ -109,6 +190,7 @@ export function fileCommands(env: CommandEnv): Record<string, Handler> {
     'ukemi.file.copyPath': withFile(env, async ({ file }) =>
       vscode.env.clipboard.writeText(file.path),
     ),
+    'ukemi.file.addToChat': (...args: unknown[]) => addToChat(env, ...args),
     'ukemi.scm.openDiff': async (arg?: unknown) => {
       const ctx = scmContext(env, arg)
       if (ctx) {

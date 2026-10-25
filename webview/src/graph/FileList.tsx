@@ -1,12 +1,17 @@
 import { useMemo, useState, type CSSProperties, type DragEvent } from 'react'
 import type { ChangedFile } from '../../../shared/model'
 import type { ChangedFilesView, CommitView } from '../../../shared/protocol'
+import { fileDragTransfer } from '../../../shared/fileUri'
 import { splitPath } from '../shared/format'
 import { postMessage, vscodeContext } from '../shared/vscodeApi'
 import { buildFileTree, type FileTreeNode } from '../../../shared/fileTree'
 import { FileTypeIcon } from './FileIcon'
 
 export const FILE_MIME = 'application/x-ukemi-file'
+export const FILE_LOCKED_MIME = 'application/x-ukemi-file-locked'
+const URI_LIST_MIME = 'text/uri-list'
+// Workbench drag type that chat (Cursor and VS Code) turns into a file attachment.
+const RESOURCE_URLS_MIME = 'ResourceURLs'
 
 const STATUS_LETTER: Record<ChangedFile['status'], string> = {
   added: 'A',
@@ -52,17 +57,24 @@ function FileRow({
     postMessage({ type: 'openFile', commitId: commit.commitId, path: file.path, mode })
   const onDragStart = (event: DragEvent) => {
     event.stopPropagation()
-    event.dataTransfer.setData(
-      FILE_MIME,
-      JSON.stringify({ commitId: commit.commitId, path: file.path }),
-    )
-    event.dataTransfer.effectAllowed = 'move'
+    const drag = fileDragTransfer(repoId, commit, file)
+    event.dataTransfer.setData(FILE_MIME, drag.payload)
+    if (drag.locked) {
+      event.dataTransfer.setData(FILE_LOCKED_MIME, '1')
+    }
+    if (drag.uriList) {
+      event.dataTransfer.setData(URI_LIST_MIME, drag.uriList)
+    }
+    if (drag.resourceUrls) {
+      event.dataTransfer.setData(RESOURCE_URLS_MIME, drag.resourceUrls)
+    }
+    event.dataTransfer.effectAllowed = 'copyMove'
   }
   return (
     <li
       className={`file status-${file.status}${file.isConflicted ? ' conflicted' : ''}`}
       title={file.sourcePath !== file.path ? `${file.sourcePath} → ${file.path}` : file.path}
-      draggable={!commit.isImmutable}
+      draggable
       style={depthStyle(depth)}
       onDragStart={onDragStart}
       onClick={(event) => {
@@ -79,6 +91,7 @@ function FileRow({
         commitId: commit.commitId,
         path: file.path,
         isImmutable: commit.isImmutable,
+        isRemoved: file.status === 'removed',
         canSplit,
       })}
     >

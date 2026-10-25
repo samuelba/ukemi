@@ -113,7 +113,14 @@ export function createMessageHandler(env: CommandEnv) {
       }
       case 'dropFile': {
         const target = model.findCommit(message.targetId)
-        if (!target || target.isImmutable || message.fromCommitId === message.targetId) {
+        const source = model.findCommit(message.fromCommitId)
+        if (
+          !target ||
+          !source ||
+          target.isImmutable ||
+          source.isImmutable ||
+          message.fromCommitId === message.targetId
+        ) {
           return
         }
         await env.operations.run('Move file', model, () =>
