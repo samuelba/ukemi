@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { detectForge, forgeKindForHost } from '../../src/forge/detect'
 import { GithubClient, githubCheckState, githubCi, githubState } from '../../src/forge/github'
-import { GitlabClient, gitlabCi, gitlabState } from '../../src/forge/gitlab'
+import { GitlabClient, gitlabCi, gitlabPipelineCi, gitlabState } from '../../src/forge/gitlab'
 import { isAllowedForgeUrl } from '../../src/forge/hostName'
 import { clampRequestLimit } from '../../src/forge/requestLimit'
 import { FORGE_REFRESH_PENDING_MS, forgeRefreshInterval } from '../../src/forge/refreshInterval'
@@ -81,6 +81,24 @@ describe('request state mapping', () => {
     expect(gitlabCi('success')).toBe('success')
     expect(gitlabCi('manual')).toBe('manual')
     expect(gitlabCi('skipped')).toBe('skipped')
+  })
+
+  test('counts unrun manual jobs as optional once a job has succeeded', () => {
+    const check = (state: 'success' | 'manual' | 'skipped' | 'failure' | 'pending') => ({
+      name: state,
+      state,
+      url: 'https://git.example/job',
+    })
+    expect(gitlabPipelineCi('manual', [check('success'), check('manual')])).toBe('success')
+    expect(gitlabPipelineCi('manual', [check('success'), check('skipped'), check('manual')])).toBe(
+      'success',
+    )
+    expect(gitlabPipelineCi('manual', [check('manual')])).toBe('manual')
+    expect(gitlabPipelineCi('manual', [check('success'), check('failure')])).toBe('manual')
+    expect(gitlabPipelineCi('manual', [check('success'), check('pending')])).toBe('manual')
+    expect(gitlabPipelineCi('manual', [])).toBe('manual')
+    expect(gitlabPipelineCi('failed', [check('success'), check('manual')])).toBe('failure')
+    expect(gitlabPipelineCi('success', [check('success'), check('manual')])).toBe('success')
   })
 })
 
@@ -284,6 +302,48 @@ describe('GitlabClient', () => {
     })
     expect(requests[1]).toMatchObject({ number: 8, isMine: false, checks: [] })
     expect(calls.some((call) => call.includes('/pipelines/43/jobs'))).toBe(false)
+  })
+
+  test('reports success when the remaining jobs are unrun manual jobs', async () => {
+    const job = (id: number, name: string, stage: string, status: string) => ({
+      id,
+      name,
+      stage,
+      status,
+      web_url: `https://git.anybotics.com/team/sub/repo/-/jobs/${id}`,
+    })
+    const client = new GitlabClient(
+      'git.anybotics.com',
+      'team/sub/repo',
+      't',
+      fakeFetch({
+        '/pipelines/42/jobs': [
+          job(1, 'test_scripts', 'test', 'success'),
+          job(2, 'update_repositories', 'update', 'manual'),
+        ],
+        '/pipelines/42/bridges': [],
+        '/merge_requests/42/approvals': { approved: false, approved_by: [] },
+        '/merge_requests/42': { head_pipeline: { id: 42, status: 'manual' } },
+        '/api/v4/user': { id: 5 },
+        '/merge_requests?': [
+          {
+            iid: 42,
+            title: 'MR',
+            web_url: 'https://git.anybotics.com/team/sub/repo/-/merge_requests/42',
+            state: 'opened',
+            source_branch: 'feat',
+            target_branch: 'main',
+            author: { id: 5 },
+            head_pipeline: { id: 42, status: 'manual' },
+          },
+        ],
+      }),
+    )
+
+    const requests = await client.listRequests(['feat'])
+
+    expect(requests[0]?.ci).toBe('success')
+    expect(requests[0]?.checks.map((check) => check.state)).toEqual(['success', 'manual'])
   })
 
   test('appends downstream trigger jobs and keeps stage creation order', async () => {

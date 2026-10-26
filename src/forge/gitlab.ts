@@ -123,6 +123,27 @@ export function gitlabCi(status: string | undefined): CiState {
   }
 }
 
+function manualIsOptional(checks: readonly CiCheck[]): boolean {
+  return (
+    checks.some((check) => check.state === 'success') &&
+    checks.every(
+      (check) =>
+        check.state === 'success' ||
+        check.state === 'manual' ||
+        check.state === 'skipped' ||
+        check.state === 'none',
+    )
+  )
+}
+
+export function gitlabPipelineCi(status: string | undefined, checks: readonly CiCheck[]): CiState {
+  const pipeline = gitlabCi(status)
+  if (pipeline === 'manual' && manualIsOptional(checks)) {
+    return 'success'
+  }
+  return pipeline
+}
+
 export class GitlabClient implements ForgeClient {
   readonly kind = 'gitlab' as const
   private readonly projectId: string
@@ -226,7 +247,7 @@ export class GitlabClient implements ForgeClient {
       title: mr.title,
       url: mr.web_url,
       state: gitlabState(mr, extra?.approvals ?? null),
-      ci: gitlabCi(pipeline?.status),
+      ci: gitlabPipelineCi(pipeline?.status, checks),
       isMine: userId !== null && mr.author?.id === userId,
       ...(pipeline?.web_url ? { pipelineUrl: pipeline.web_url } : {}),
       checks,

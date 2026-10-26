@@ -183,7 +183,7 @@ function RequestBadge({
       {details && <CiStatusIcon state={request.ci} />}
       <button
         type="button"
-        className="request-open"
+        className="request-link"
         title="Open in browser"
         onClick={(event) => {
           event.stopPropagation()

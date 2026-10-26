@@ -367,7 +367,7 @@
 
 .badge.request {
   max-width: 240px;
-  border-color: var(--vscode-widget-border, var(--ukemi-edge));
+  border: 1px solid var(--vscode-widget-border, var(--ukemi-edge));
 }
 
 .badge.request > span {
@@ -378,7 +378,7 @@
 
 .badge.request > .codicon,
 .badge.request > .svg-icon,
-.request-open {
+.request-link {
   flex: none;
 }
 
@@ -386,16 +386,7 @@
   opacity: 0.8;
 }
 
-.request-approved {
-  border-color: var(--ukemi-node);
-}
-
-.request-reviewed {
-  border-color: var(--kincha);
-}
-
 .request-merged {
-  border-color: var(--fuji);
   color: var(--fuji);
 }
 
@@ -436,7 +427,7 @@
   max-width: 100%;
 }
 
-.request-open {
+.request-link {
   display: inline-flex;
   margin: 0;
   padding: 0;
