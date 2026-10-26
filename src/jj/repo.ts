@@ -245,6 +245,59 @@ export class JjRepo {
     ])
   }
 
+  async copyFiles(fromCommitId: string, intoCommitId: string, paths: readonly string[]) {
+    const [target] = await this.log(intoCommitId)
+    if (!target) {
+      throw new Error(`Target change ${intoCommitId} not found`)
+    }
+    await this.restoreInto(fromCommitId, target.commitId, paths)
+    const [after] = await this.log(target.changeId)
+    if (!after) {
+      throw new Error(`Target change ${target.changeId} not found`)
+    }
+    if (await this.diffHasAnyPath(after.commitId, paths)) {
+      return
+    }
+    // An empty descendant already has the source content, so restore is a no-op.
+    // Move it beside the source, then the same restore becomes a real change.
+    if (after.isEmpty && (await this.isProperDescendant(after.commitId, fromCommitId))) {
+      await this.rebase(after.commitId, `parents(${fromCommitId})`, 'revision')
+      const [moved] = await this.log(target.changeId)
+      if (!moved) {
+        throw new Error(`Target change ${target.changeId} not found after rebase`)
+      }
+      await this.restoreInto(fromCommitId, moved.commitId, paths)
+      return
+    }
+    throw new Error('Target already contains this file content')
+  }
+
+  private restoreInto(fromCommitId: string, intoCommitId: string, paths: readonly string[]) {
+    return this.mutate([
+      'restore',
+      '--from',
+      fromCommitId,
+      '--into',
+      intoCommitId,
+      ...paths.map(rootFileset),
+    ])
+  }
+
+  private async diffHasAnyPath(commitId: string, paths: readonly string[]) {
+    const files = await this.files(commitId)
+    return paths.some((path) =>
+      files.some((file) => file.path === path || file.sourcePath === path),
+    )
+  }
+
+  private async isProperDescendant(commitId: string, ancestorId: string) {
+    const found = await this.log(
+      `(${commitId} & descendants(${ancestorId})) ~ ${ancestorId}`,
+      1,
+    )
+    return found.length > 0
+  }
+
   splitFiles(commitId: string, paths: readonly string[], direction: SplitDirection) {
     return this.mutate([
       'split',

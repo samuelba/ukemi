@@ -2,6 +2,7 @@
   "name": "ukemi",
   "displayName": "Ukemi: Jujutsu (jj) GUI",
   "version": "0.1.0",
+  "repository": "https://github.com/samuelba/ukemi",
   "private": true,
   "engines": {
     "vscode": "^1.90.0"

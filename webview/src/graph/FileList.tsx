@@ -4,6 +4,7 @@ import type { ChangedFilesView, CommitView } from '../../../shared/protocol'
 import { fileDragTransfer } from '../../../shared/fileUri'
 import { splitPath } from '../shared/format'
 import { postMessage, vscodeContext } from '../shared/vscodeApi'
+import { dragModifiers } from './dragModifiers'
 import { buildFileTree, type FileTreeNode } from '../../../shared/fileTree'
 import { FileTypeIcon } from './FileIcon'
 import { LineStats } from './LineStats'
@@ -61,6 +62,7 @@ function FileRow({
     postMessage({ type: 'openFile', commitId: commit.commitId, path: file.path, mode })
   const onDragStart = (event: DragEvent) => {
     event.stopPropagation()
+    dragModifiers.onDragStart(event, false)
     const drag = fileDragTransfer(repoId, commit, file)
     event.dataTransfer.setData(FILE_MIME, drag.payload)
     if (drag.locked) {
@@ -81,6 +83,7 @@ function FileRow({
       draggable
       style={depthStyle(depth)}
       onDragStart={onDragStart}
+      onDragEnd={() => dragModifiers.onDragEnd()}
       onClick={(event) => {
         event.stopPropagation()
         open(file.isConflicted ? 'file' : 'diff')

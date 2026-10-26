@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 import type { WebviewMessage } from '../../shared/protocol'
 import { isAllowedForgeUrl } from '../forge/hostName'
+import type { RepoModel } from '../repo/repoModel'
 import type { CommandEnv } from './commands/context'
 import { editOrNew } from './commands/commitCommands'
 import { initRepo } from './commands/globalCommands'
@@ -113,15 +114,27 @@ export function createMessageHandler(env: CommandEnv) {
         return
       }
       case 'dropFile': {
+        if (!model) {
+          return
+        }
         const target = model.findCommit(message.targetId)
         const source = model.findCommit(message.fromCommitId)
         if (
           !target ||
           !source ||
           target.isImmutable ||
-          source.isImmutable ||
           message.fromCommitId === message.targetId
         ) {
+          return
+        }
+        if (message.action === 'copy') {
+          await env.operations.run('Copy file', model, async () => {
+            const paths = await copyPaths(model, message.fromCommitId, message.path)
+            await model.repo.copyFiles(message.fromCommitId, message.targetId, paths)
+          })
+          return
+        }
+        if (source.isImmutable) {
           return
         }
         await env.operations.run('Move file', model, () =>
@@ -150,4 +163,12 @@ export function createMessageHandler(env: CommandEnv) {
       }
     }
   }
+}
+
+async function copyPaths(model: RepoModel, commitId: string, path: string): Promise<string[]> {
+  const file = (await model.filesFor(commitId)).find((item) => item.path === path)
+  if (file && file.sourcePath !== path) {
+    return [file.sourcePath, path]
+  }
+  return [path]
 }

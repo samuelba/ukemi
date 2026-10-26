@@ -91,6 +91,7 @@ export interface ViewState {
 
 export type DropMode = 'source' | 'revision'
 export type DropAction = 'rebase' | 'duplicate'
+export type FileDropAction = 'copy' | 'move'
 
 export type HostMessage =
   | { type: 'state'; state: ViewState }
@@ -116,7 +117,13 @@ export type WebviewMessage =
       mode: DropMode
       action: DropAction
     }
-  | { type: 'dropFile'; fromCommitId: string; path: string; targetId: string }
+  | {
+      type: 'dropFile'
+      fromCommitId: string
+      path: string
+      targetId: string
+      action: FileDropAction
+    }
   | { type: 'dropBookmark'; name: string; targetId: string }
   | { type: 'doubleClickCommit'; commitId: string }
   | { type: 'dismissError' }

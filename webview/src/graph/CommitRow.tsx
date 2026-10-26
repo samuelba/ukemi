@@ -6,7 +6,7 @@ import { relativeTime, splitId, title } from '../shared/format'
 import { postMessage, vscodeContext } from '../shared/vscodeApi'
 import { BOOKMARK_MIME, Badges, RequestRow } from './Badges'
 import { canSquashIntoParent } from './canSquashIntoParent'
-import { dropCommitAction } from './dropCommit'
+import { dropCommitAction, fileDropAction } from './dropCommit'
 import { dragModifiers, installDragModifiers } from './dragModifiers'
 import { FileList, FILE_LOCKED_MIME, FILE_MIME } from './FileList'
 import { LineStats, lineTotals } from './LineStats'
@@ -42,13 +42,16 @@ function useCopyModifier() {
   )
 }
 
-function dropKind(event: DragEvent): DropKind | null {
+function dropKind(event: DragEvent, copy: boolean): DropKind | null {
   const types = event.dataTransfer.types
   if (types.includes(COMMIT_MIME)) {
     return 'commit'
   }
   if (types.includes(FILE_MIME)) {
-    return types.includes(FILE_LOCKED_MIME) ? null : 'file'
+    if (types.includes(FILE_LOCKED_MIME) && !copy) {
+      return null
+    }
+    return 'file'
   }
   return types.includes(BOOKMARK_MIME) ? 'bookmark' : null
 }
@@ -77,23 +80,24 @@ export function CommitRow(props: CommitRowProps) {
   }
 
   const onDragOver = (event: DragEvent) => {
-    const kind = dropKind(event)
+    dragModifiers.onDragOver(event)
+    const copy = dragModifiers.snapshot().copy
+    const kind = dropKind(event, copy)
     if (kind && accepts(kind)) {
       event.preventDefault()
-      dragModifiers.onDragOver(event)
-      const copy = kind === 'commit' && dragModifiers.snapshot().copy
-      event.dataTransfer.dropEffect = copy ? 'copy' : 'move'
-      setDropTarget(copy ? 'duplicate' : kind)
+      const copyDrop = (kind === 'commit' || kind === 'file') && copy
+      event.dataTransfer.dropEffect = copyDrop ? 'copy' : 'move'
+      setDropTarget(copyDrop ? 'duplicate' : kind)
     }
   }
 
   const onDrop = (event: DragEvent) => {
     event.preventDefault()
     setDropTarget(null)
-    const kind = dropKind(event)
+    dragModifiers.onDragOver(event)
+    const modifiers = dragModifiers.snapshot()
+    const kind = dropKind(event, modifiers.copy)
     if (kind === 'commit') {
-      dragModifiers.onDragOver(event)
-      const modifiers = dragModifiers.snapshot()
       const { action, mode } = dropCommitAction(modifiers.copy, modifiers.alt)
       postMessage({
         type: 'dropCommit',
@@ -104,7 +108,11 @@ export function CommitRow(props: CommitRowProps) {
       })
     } else if (kind === 'file') {
       const data = parseFileDrag(event.dataTransfer.getData(FILE_MIME))
-      if (!data || data.isImmutable) {
+      if (!data) {
+        return
+      }
+      const action = fileDropAction(modifiers.copy, data.isImmutable)
+      if (!action) {
         return
       }
       postMessage({
@@ -112,6 +120,7 @@ export function CommitRow(props: CommitRowProps) {
         fromCommitId: data.commitId,
         path: data.path,
         targetId: commit.commitId,
+        action,
       })
     } else if (kind === 'bookmark') {
       postMessage({

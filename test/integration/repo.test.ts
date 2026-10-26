@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { GRAPH_FILTERS } from '../../shared/model'
@@ -148,6 +148,87 @@ describe('mutations', () => {
 
     const [after] = await repo.log('@-')
     expect((await repo.files(after?.commitId ?? '')).map((f) => f.path)).toEqual(['a.txt', 'b.txt'])
+  })
+
+  test('copyFiles leaves the source file and writes it into the target', async () => {
+    writeFile(root, 'a.txt', 'a\n')
+    jj(root, 'describe', '-m', 'base')
+    const base = await current()
+    jj(root, 'new', '-m', 'target')
+    const target = await current()
+    jj(root, 'new', base.commitId, '-m', 'source')
+    writeFile(root, 'b.txt', 'b\n')
+    writeFile(root, 'c.txt', 'c\n')
+    const source = await current()
+
+    await repo.copyFiles(source.commitId, target.commitId, ['b.txt'])
+
+    const [sourceAfter] = await repo.log(source.changeId)
+    const [targetAfter] = await repo.log(target.changeId)
+    expect((await repo.files(sourceAfter?.commitId ?? '')).map((f) => f.path).sort()).toEqual([
+      'b.txt',
+      'c.txt',
+    ])
+    expect((await repo.files(targetAfter?.commitId ?? '')).map((f) => f.path).sort()).toEqual([
+      'b.txt',
+    ])
+    expect(await repo.fileContent(sourceAfter?.commitId ?? '', 'b.txt')).toEqual(Buffer.from('b\n'))
+    expect(await repo.fileContent(targetAfter?.commitId ?? '', 'b.txt')).toEqual(Buffer.from('b\n'))
+  })
+
+  test('copyFiles copies a file into an empty child beside the source', async () => {
+    writeFile(root, 'a.txt', 'a\n')
+    writeFile(root, 'c.txt', 'c\n')
+    jj(root, 'describe', '-m', 'source')
+    const source = await current()
+    jj(root, 'new')
+    const target = await current()
+    expect(target.isEmpty).toBe(true)
+
+    await repo.copyFiles(source.commitId, target.commitId, ['a.txt'])
+
+    const [sourceAfter] = await repo.log(source.changeId)
+    const [targetAfter] = await repo.log(target.changeId)
+    expect((await repo.files(sourceAfter?.commitId ?? '')).map((file) => file.path).sort()).toEqual([
+      'a.txt',
+      'c.txt',
+    ])
+    expect((await repo.files(targetAfter?.commitId ?? '')).map((file) => file.path)).toEqual([
+      'a.txt',
+    ])
+    expect(targetAfter?.parents).toEqual(sourceAfter?.parents)
+    expect(await repo.fileContent(targetAfter?.commitId ?? '', 'a.txt')).toEqual(Buffer.from('a\n'))
+    expect(await repo.fileContent(sourceAfter?.commitId ?? '', 'a.txt')).toEqual(Buffer.from('a\n'))
+  })
+
+  test('copyFiles restores both names of a rename', async () => {
+    writeFile(root, 'a.txt', 'old\n')
+    jj(root, 'describe', '-m', 'base')
+    const base = await current()
+    jj(root, 'new', '-m', 'target')
+    const target = await current()
+    jj(root, 'new', base.commitId, '-m', 'source')
+    renameSync(join(root, 'a.txt'), join(root, 'b.txt'))
+    const source = await current()
+    const renamed = (await repo.files(source.commitId)).find((file) => file.path === 'b.txt')
+    expect(renamed?.sourcePath).toBe('a.txt')
+
+    await repo.copyFiles(source.commitId, target.commitId, ['a.txt', 'b.txt'])
+
+    const [sourceAfter] = await repo.log(source.changeId)
+    const [targetAfter] = await repo.log(target.changeId)
+    expect((await repo.files(sourceAfter?.commitId ?? '')).map((file) => file.path)).toEqual([
+      'b.txt',
+    ])
+    expect((await repo.files(targetAfter?.commitId ?? '')).map((file) => file.path)).toEqual([
+      'b.txt',
+    ])
+    expect(await repo.fileContent(targetAfter?.commitId ?? '', 'b.txt')).toEqual(
+      Buffer.from('old\n'),
+    )
+    expect(await repo.fileContent(sourceAfter?.commitId ?? '', 'b.txt')).toEqual(
+      Buffer.from('old\n'),
+    )
   })
 
   test('duplicate without a destination copies onto the same parents', async () => {
