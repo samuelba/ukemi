@@ -29,6 +29,7 @@ interface ToolbarProps {
   graph: GraphState | null
   isBusy: boolean
   autoFetch: AutoFetchState
+  showGitTags: boolean
 }
 
 function everyLabel(interval: string): string {
@@ -57,19 +58,24 @@ function ToolButton({
   label,
   onClick,
   isAccent,
+  isOn,
   isDisabled,
+  isPressed,
 }: {
   icon: string | ReactNode
   label: string
   onClick: () => void
   isAccent?: boolean
+  isOn?: boolean
   isDisabled?: boolean
+  isPressed?: boolean
 }) {
   return (
     <button
-      className={`icon-button${isAccent ? ' accent' : ''}`}
+      className={`icon-button${isAccent ? ' accent' : ''}${isOn ? ' on' : ''}`}
       title={label}
       aria-label={label}
+      aria-pressed={isPressed}
       disabled={isDisabled}
       onClick={onClick}
     >
@@ -100,7 +106,14 @@ function hasUnsyncedCurrent(graph: GraphState): boolean {
   return graph.commits.some((c) => c.localBookmarks.some((b) => current.has(b.name) && !b.synced))
 }
 
-export function Toolbar({ repos, activeRepoId, graph, isBusy, autoFetch }: ToolbarProps) {
+export function Toolbar({
+  repos,
+  activeRepoId,
+  graph,
+  isBusy,
+  autoFetch,
+  showGitTags,
+}: ToolbarProps) {
   const repoId = graph?.repoId
   const ignoresDepth = graph !== null && DEPTHLESS_FILTERS.includes(graph.filter)
   const singleLabel = repos.length === 1 ? (repos[0]?.label ?? '') : ''
@@ -163,7 +176,7 @@ export function Toolbar({ repos, activeRepoId, graph, isBusy, autoFetch }: Toolb
                 <ToolButton
                   icon={autoFetch.enabled ? 'sync' : 'sync-ignored'}
                   label={autoFetchLabel(autoFetch)}
-                  isAccent={autoFetch.enabled}
+                  isOn={autoFetch.enabled}
                   onClick={() => command('ukemi.toggleAutoFetch')}
                 />
                 <ToolButton
@@ -238,6 +251,13 @@ export function Toolbar({ repos, activeRepoId, graph, isBusy, autoFetch }: Toolb
               </option>
             ))}
           </select>
+          <ToolButton
+            icon="tag"
+            label={showGitTags ? 'Hide git tags' : 'Show git tags'}
+            isOn={showGitTags}
+            isPressed={showGitTags}
+            onClick={() => command('ukemi.toggleGitTags')}
+          />
         </div>
       )}
     </div>

@@ -34,6 +34,7 @@ async function main(root: string, output: string): Promise<void> {
       changeIdLength: 4,
       showFullPaths: false,
       showLineStats: false,
+      showGitTags: true,
       changedFilesView: 'list',
       ciOnlyMine: true,
     },

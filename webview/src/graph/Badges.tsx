@@ -31,6 +31,7 @@ interface BadgesProps {
   repoId: string
   hasForge: boolean
   ciOnlyMine: boolean
+  showGitTags: boolean
 }
 
 function onBookmarkDrag(name: string) {
@@ -41,7 +42,7 @@ function onBookmarkDrag(name: string) {
   }
 }
 
-export function Badges({ commit, repoId, hasForge }: BadgesProps) {
+export function Badges({ commit, repoId, hasForge, showGitTags }: BadgesProps) {
   const localNames = new Set(commit.localBookmarks.map((b) => b.name))
   const remoteOnly = commit.remoteBookmarks.filter((b) => !localNames.has(b.name))
   const showWorkspaces =
@@ -100,12 +101,13 @@ export function Badges({ commit, repoId, hasForge }: BadgesProps) {
           {b.name}@{b.remote}
         </span>
       ))}
-      {commit.tags.map((tag) => (
-        <span key={`t-${tag}`} className="badge tag" title={`tag ${tag}`}>
-          <i className="codicon codicon-tag" />
-          {tag}
-        </span>
-      ))}
+      {showGitTags &&
+        commit.tags.map((tag) => (
+          <span key={`t-${tag}`} className="badge tag" title={`tag ${tag}`}>
+            <i className="codicon codicon-tag" />
+            {tag}
+          </span>
+        ))}
       {showWorkspaces &&
         commit.workingCopies.map((name) => (
           <span

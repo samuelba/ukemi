@@ -177,6 +177,7 @@ export function globalCommands(env: CommandEnv): Record<string, Handler> {
     }),
     'ukemi.toggleAutoFetch': () =>
       updateUkemiSetting('autoFetch.enabled', !readConfig().autoFetchEnabled),
+    'ukemi.toggleGitTags': () => updateUkemiSetting('showGitTags', !readConfig().showGitTags),
     'ukemi.push': withModel(env, (model) =>
       env.operations.run('Push', model, () => model.repo.push()),
     ),

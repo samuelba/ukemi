@@ -168,6 +168,12 @@
         "icon": "$(sync-ignored)"
       },
       {
+        "command": "ukemi.toggleGitTags",
+        "title": "Show Git Tags",
+        "category": "Ukemi",
+        "icon": "$(tag)"
+      },
+      {
         "command": "ukemi.push",
         "title": "Push All Tracked Bookmarks",
         "category": "Ukemi",
@@ -1443,6 +1449,11 @@
           "type": "boolean",
           "default": false,
           "description": "Show added and removed line counts on the working copy and on changed files. This reads those file contents on each refresh."
+        },
+        "ukemi.showGitTags": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show git tags on changes in the graph."
         },
         "ukemi.workspaces.snapshotOnRefresh": {
           "type": "boolean",

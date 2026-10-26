@@ -23,6 +23,7 @@ export interface UkemiConfig {
   changeIdLength: number
   showFullPaths: boolean
   showLineStats: boolean
+  showGitTags: boolean
   changedFilesView: ChangedFilesView
   snapshotOnRefresh: boolean
   addJjToTerminalPath: boolean
@@ -67,6 +68,7 @@ export function readConfig(): UkemiConfig {
     changeIdLength: c.get<number>('changeIdLength', 4),
     showFullPaths: c.get<boolean>('showFullPaths', false),
     showLineStats: c.get<boolean>('showLineStats', false),
+    showGitTags: c.get<boolean>('showGitTags', true),
     changedFilesView: oneOf(c.get<string>('changedFilesView', 'list'), CHANGED_FILES_VIEWS, 'list'),
     snapshotOnRefresh: c.get<boolean>('workspaces.snapshotOnRefresh', false),
     addJjToTerminalPath: c.get<boolean>('addJjToTerminalPath', true),

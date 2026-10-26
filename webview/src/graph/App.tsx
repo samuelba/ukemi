@@ -164,6 +164,7 @@ export function App() {
           graph={graph}
           isBusy={state.busy !== null}
           autoFetch={state.autoFetch}
+          showGitTags={state.settings.showGitTags}
         />
         {state.busy && (
           <div className="busy" role="status">

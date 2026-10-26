@@ -69,6 +69,7 @@ export interface ViewSettings {
   changeIdLength: number
   showFullPaths: boolean
   showLineStats: boolean
+  showGitTags: boolean
   changedFilesView: ChangedFilesView
   ciOnlyMine: boolean
 }

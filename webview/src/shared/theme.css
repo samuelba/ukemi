@@ -113,6 +113,10 @@ body {
   color: var(--ukemi-accent);
 }
 
+.icon-button.on {
+  color: var(--ukemi-node);
+}
+
 .svg-icon {
   width: 16px;
   height: 16px;

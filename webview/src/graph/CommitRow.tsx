@@ -200,6 +200,7 @@ export function CommitRow(props: CommitRowProps) {
             repoId={repoId}
             hasForge={props.hasForge}
             ciOnlyMine={settings.ciOnlyMine}
+            showGitTags={settings.showGitTags}
           />
           <span
             className={`summary${summary ? '' : ' muted'}`}
@@ -266,6 +267,7 @@ export function CommitRow(props: CommitRowProps) {
           repoId={repoId}
           hasForge={props.hasForge}
           ciOnlyMine={settings.ciOnlyMine}
+          showGitTags={settings.showGitTags}
         />
         {isExpanded && canExpand && (
           <FileList
