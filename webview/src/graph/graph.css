@@ -523,16 +523,27 @@
   padding-left: calc(4px + var(--file-depth, 0) * 12px);
 }
 
-button.file-dir-row {
+.file-dir-row {
   width: 100%;
+}
+
+.file-dir-toggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
   border: none;
   background: transparent;
   color: inherit;
   font: inherit;
   text-align: left;
+  cursor: pointer;
 }
 
-.file-dir-row .codicon {
+.file-dir-toggle .codicon {
   flex: none;
   width: 12px;
   font-size: 12px;

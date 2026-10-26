@@ -434,6 +434,12 @@
         "icon": "$(discard)"
       },
       {
+        "command": "ukemi.file.discardDirectory",
+        "title": "Discard Changes",
+        "category": "Ukemi",
+        "icon": "$(discard)"
+      },
+      {
         "command": "ukemi.file.copyPath",
         "title": "Copy Path",
         "category": "Ukemi"
@@ -841,6 +847,11 @@
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'file' && !isImmutable"
         },
         {
+          "command": "ukemi.file.discardDirectory",
+          "group": "3_discard@1",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'directory' && !isImmutable"
+        },
+        {
           "command": "ukemi.file.copyPath",
           "group": "9_copy@1",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'file'"
@@ -1212,6 +1223,10 @@
         },
         {
           "command": "ukemi.file.discard",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.file.discardDirectory",
           "when": "false"
         },
         {

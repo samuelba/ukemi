@@ -1,5 +1,6 @@
 import { isAbsolute, join, relative, sep } from 'node:path'
 import * as vscode from 'vscode'
+import { changedPathsInDirectory } from '../../../shared/fileTree'
 import type { ChangedFile } from '../../../shared/model'
 import type { RepoModel } from '../../repo/repoModel'
 import { openFileAtRevision, openFileDiff } from '../diff'
@@ -17,15 +18,20 @@ interface FileTarget extends Target {
   file: ChangedFile
 }
 
+async function changedFiles(target: Target): Promise<ChangedFile[]> {
+  if (target.commit.isWorkingCopy) {
+    return target.model.graph?.workingCopyFiles ?? []
+  }
+  return target.model.filesFor(target.commit.commitId)
+}
+
 async function fileTarget(env: CommandEnv, arg: unknown): Promise<FileTarget | null> {
   const ctx = parseContext(arg)
   const target = contextCommit(env, arg)
   if (!target || !ctx.path) {
     return null
   }
-  const files = target.commit.isWorkingCopy
-    ? (target.model.graph?.workingCopyFiles ?? [])
-    : await target.model.filesFor(target.commit.commitId)
+  const files = await changedFiles(target)
   const file = files.find((f) => f.path === ctx.path) ?? {
     path: ctx.path,
     sourcePath: ctx.path,
@@ -51,6 +57,25 @@ async function discard(env: CommandEnv, { model, commit, file }: FileTarget): Pr
   if (await confirm(`Discard changes to ${file.path} in ${shortId(commit)}?`, 'Discard')) {
     await env.operations.run('Discard', model, () =>
       model.repo.restoreFiles(commit.commitId, [file.path]),
+    )
+  }
+}
+
+async function discardDirectory(env: CommandEnv, arg: unknown): Promise<void> {
+  const ctx = parseContext(arg)
+  const target = contextCommit(env, arg)
+  if (!target || !ctx.path || target.commit.isImmutable) {
+    return
+  }
+  const paths = changedPathsInDirectory(await changedFiles(target), ctx.path)
+  if (paths.length === 0) {
+    void vscode.window.showWarningMessage('Ukemi: no changes in that folder.')
+    return
+  }
+  const count = paths.length === 1 ? '1 file' : `${paths.length} files`
+  if (await confirm(`Discard changes in ${ctx.path} (${count})?`, 'Discard')) {
+    await env.operations.run('Discard', target.model, () =>
+      target.model.repo.restoreFiles(target.commit.commitId, paths),
     )
   }
 }
@@ -187,6 +212,7 @@ export function fileCommands(env: CommandEnv): Record<string, Handler> {
       ),
     ),
     'ukemi.file.discard': withFile(env, (target) => discard(env, target)),
+    'ukemi.file.discardDirectory': (arg) => discardDirectory(env, arg),
     'ukemi.file.copyPath': withFile(env, async ({ file }) =>
       vscode.env.clipboard.writeText(file.path),
     ),

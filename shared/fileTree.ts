@@ -77,3 +77,14 @@ export function buildFileTree(files: readonly ChangedFile[]): FileTreeNode[] {
   }
   return childNodes([...root.dirs.values()].map(finish), root.files)
 }
+
+export function changedPathsInDirectory(
+  files: readonly { path: string }[],
+  directory: string,
+): string[] {
+  if (directory.length === 0) {
+    return []
+  }
+  const prefix = `${directory}/`
+  return files.filter((file) => file.path.startsWith(prefix)).map((file) => file.path)
+}

@@ -176,23 +176,64 @@ function FileTreeItems({
       )
     }
     const isCollapsed = collapsed.has(node.path)
+    const directoryContext = vscodeContext({
+      webviewSection: 'directory',
+      repoId,
+      commitId: commit.commitId,
+      path: node.path,
+      isImmutable: commit.isImmutable,
+    })
     return (
       <li key={node.path} className="file-folder">
-        <button
-          type="button"
+        <div
           className="file file-dir-row"
           style={depthStyle(depth)}
-          aria-expanded={!isCollapsed}
-          data-vscode-context={vscodeContext({ webviewSection: 'directory' })}
+          data-vscode-context={directoryContext}
           onClick={(event) => {
             event.stopPropagation()
             onToggle(node.path)
           }}
           onDoubleClick={(event) => event.stopPropagation()}
         >
-          <i className={`codicon codicon-chevron-${isCollapsed ? 'right' : 'down'}`} />
-          <span className="file-name">{node.name}</span>
-        </button>
+          <button
+            type="button"
+            className="file-dir-toggle"
+            aria-expanded={!isCollapsed}
+            onClick={(event) => {
+              event.stopPropagation()
+              onToggle(node.path)
+            }}
+            onDoubleClick={(event) => event.stopPropagation()}
+          >
+            <i className={`codicon codicon-chevron-${isCollapsed ? 'right' : 'down'}`} />
+            <span className="file-name">{node.name}</span>
+          </button>
+          {!commit.isImmutable && (
+            <span className="file-trailing">
+              <span className="actions">
+                <button
+                  type="button"
+                  className="icon-button"
+                  title="Discard changes in this folder"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    if (event.detail > 1) {
+                      return
+                    }
+                    postMessage({
+                      type: 'command',
+                      command: 'ukemi.file.discardDirectory',
+                      context: { repoId, commitId: commit.commitId, path: node.path },
+                    })
+                  }}
+                  onDoubleClick={(event) => event.stopPropagation()}
+                >
+                  <i className="codicon codicon-discard" />
+                </button>
+              </span>
+            </span>
+          )}
+        </div>
         {!isCollapsed && (
           <ul className="file-children">
             <FileTreeItems

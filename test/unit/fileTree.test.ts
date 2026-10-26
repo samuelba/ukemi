@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { ChangedFile } from '../../shared/model'
-import { buildFileTree } from '../../shared/fileTree'
+import { buildFileTree, changedPathsInDirectory } from '../../shared/fileTree'
 
 function file(path: string, sourcePath = path): ChangedFile {
   return { path, sourcePath, status: 'modified', isConflicted: false }
@@ -71,5 +71,37 @@ describe('buildFileTree', () => {
         children: [{ kind: 'file', name: 'name.ts', file: renamed }],
       },
     ])
+  })
+})
+
+describe('changedPathsInDirectory', () => {
+  const files = [
+    file('src/a.ts'),
+    file('src/sub/b.ts'),
+    file('src2/a.ts'),
+    file('README.md'),
+    file('src/vscode/graphView.ts'),
+  ]
+
+  test('keeps files under the directory and skips a sibling prefix', () => {
+    expect(changedPathsInDirectory(files, 'src')).toEqual([
+      'src/a.ts',
+      'src/sub/b.ts',
+      'src/vscode/graphView.ts',
+    ])
+  })
+
+  test('matches a compacted folder path', () => {
+    expect(changedPathsInDirectory(files, 'src/vscode')).toEqual(['src/vscode/graphView.ts'])
+  })
+
+  test('uses the destination of a rename', () => {
+    const renamed = { ...file('new/name.ts'), sourcePath: 'old/name.ts' }
+    expect(changedPathsInDirectory([renamed], 'new')).toEqual(['new/name.ts'])
+    expect(changedPathsInDirectory([renamed], 'old')).toEqual([])
+  })
+
+  test('matches nothing for an empty directory', () => {
+    expect(changedPathsInDirectory(files, '')).toEqual([])
   })
 })
