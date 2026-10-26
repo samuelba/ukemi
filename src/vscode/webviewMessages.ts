@@ -3,7 +3,6 @@ import type { WebviewMessage } from '../../shared/protocol'
 import { isAllowedForgeUrl } from '../forge/hostName'
 import type { RepoModel } from '../repo/repoModel'
 import type { CommandEnv } from './commands/context'
-import { editOrNew } from './commands/commitCommands'
 import { initRepo } from './commands/globalCommands'
 import { openFileAtRevision, openFileDiff } from './diff'
 
@@ -147,13 +146,6 @@ export function createMessageHandler(env: CommandEnv) {
           model.repo.setBookmark(message.name, message.targetId),
         )
         return
-      case 'doubleClickCommit': {
-        const commit = model.findCommit(message.commitId)
-        if (commit) {
-          await editOrNew(env, model, commit)
-        }
-        return
-      }
       case 'openUrl': {
         const host = model.graph?.forge?.host
         if (host && isAllowedForgeUrl(message.url, host)) {

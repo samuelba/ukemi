@@ -126,7 +126,6 @@ export type WebviewMessage =
       action: FileDropAction
     }
   | { type: 'dropBookmark'; name: string; targetId: string }
-  | { type: 'doubleClickCommit'; commitId: string }
   | { type: 'dismissError' }
   | { type: 'initRepo'; root: string }
   | { type: 'installJj' }

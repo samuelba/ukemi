@@ -6,7 +6,7 @@ Ukemi is a visual interface for [Jujutsu (jj)](https://jj-vcs.github.io/jj/) in 
 
 - **Change graph.** See your changes, bookmarks, tags, workspaces and conflicts. The working copy has a red seal. Filter by *Recent*, *Mine*, *My history*, *Stack* or *Working copy* (the working copy and its last 5 parents) and choose the history depth.
 - **Drag and drop.** Drag a change onto another change to rebase it with its descendants. Hold Alt to move only that change. Drag a file to another change to move its changes. Drag a bookmark to move it.
-- **Edit history.** Use the context menu to describe, create, edit, squash, split, abandon, duplicate and revert changes. Double-click a change to edit it.
+- **Edit history.** Use the context menu or the hover action to describe, create, edit, squash, split, abandon, duplicate and revert changes. Click a change to show or hide its files.
 - **Split by hunks.** Select hunks in a split editor. The selected hunks go into a new change before the original.
 - **Evolution.** The Evolution panel shows how the selected change evolved: each amend, describe, snapshot and rebase. Select a change in the graph. Click a version to see what it changed, compare it with the current version, or restore its files.
 - **Diffs.** Click a file to see its diff. The Source Control view shows the working copy for repositories that the Git extension does not show.

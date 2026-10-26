@@ -168,7 +168,6 @@ export function CommitRow(props: CommitRowProps) {
           props.onToggle(commit)
         }
       }}
-      onDoubleClick={() => postMessage({ type: 'doubleClickCommit', commitId: commit.commitId })}
       data-vscode-context={vscodeContext({
         webviewSection: 'commit',
         repoId,
