@@ -1,0 +1,139 @@
+body {
+  background: var(--vscode-editor-background);
+}
+
+.cleanup {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 12px 16px 32px;
+}
+
+.cleanup h1,
+.cleanup h2 {
+  margin: 0;
+  font-size: 1.2em;
+  font-weight: 600;
+}
+
+.cleanup h2 {
+  margin-bottom: 8px;
+  font-size: 1em;
+}
+
+.cleanup-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--vscode-widget-border, transparent);
+  background: var(--vscode-editor-background);
+}
+
+.cleanup-header p {
+  margin: 0;
+}
+
+.cleanup-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.cleanup-section {
+  margin-top: 20px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.cleanup-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.cleanup-table .col-check {
+  width: 2rem;
+}
+
+.cleanup-table .col-id {
+  width: 5.5rem;
+}
+
+.cleanup-table .col-note {
+  width: 8.5rem;
+}
+
+.cleanup-table.bookmarks .col-name {
+  width: 28%;
+}
+
+.cleanup-table.bookmarks .col-reason {
+  width: 15rem;
+}
+
+.cleanup-table.workspaces .col-name {
+  width: 28%;
+}
+
+.cleanup-table th,
+.cleanup-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--vscode-widget-border, transparent);
+  vertical-align: top;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.cleanup-table thead th {
+  position: sticky;
+  top: var(--cleanup-header-height, 0);
+  z-index: 1;
+  padding-bottom: 4px;
+  color: var(--vscode-descriptionForeground);
+  background: var(--vscode-editor-background);
+  font-size: 0.85em;
+  font-weight: 600;
+}
+
+.cleanup-table tbody tr:hover td {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.cleanup-table .group-row th {
+  padding-top: 14px;
+  padding-bottom: 2px;
+  border-bottom: none;
+  background: var(--vscode-editor-background);
+  font-family: var(--vscode-editor-font-family);
+  font-weight: 600;
+}
+
+.cleanup-table .name {
+  font-family: var(--vscode-editor-font-family);
+  font-weight: 600;
+}
+
+.cleanup-table label {
+  display: block;
+  cursor: pointer;
+}
+
+.cleanup-table tr.is-disabled label {
+  cursor: default;
+}
+
+.cleanup-table input {
+  margin: 2px 0 0;
+}

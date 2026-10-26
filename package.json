@@ -210,6 +210,12 @@
         "icon": "$(search)"
       },
       {
+        "command": "ukemi.cleanup",
+        "title": "Clean Up…",
+        "category": "Ukemi",
+        "icon": "$(clear-all)"
+      },
+      {
         "command": "ukemi.addWorkspace",
         "title": "Add Workspace…",
         "category": "Ukemi",
@@ -897,6 +903,11 @@
         {
           "command": "ukemi.initRepo",
           "group": "1_repo@3",
+          "when": "view == ukemi.graph"
+        },
+        {
+          "command": "ukemi.cleanup",
+          "group": "1_repo@4",
           "when": "view == ukemi.graph"
         },
         {

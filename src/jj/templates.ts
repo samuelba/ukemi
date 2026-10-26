@@ -98,5 +98,17 @@ export const WORKSPACE_TEMPLATE =
 
 export const PUSHED_BOOKMARK_TEMPLATE = 'if(remote && remote != "git", name ++ "\\n")'
 
+export const BOOKMARK_LIST_TEMPLATE =
+  jsonObject({
+    name: 'json(name)',
+    remote: 'json(remote)',
+    present: 'json(present)',
+    conflict: 'json(conflict)',
+    tracked: 'json(tracked)',
+    commit_id: 'if(normal_target, json(normal_target.commit_id()), "null")',
+    description: 'if(normal_target, json(normal_target.description().first_line()), json(""))',
+    in_trunk: 'if(normal_target, json(normal_target.contained_in("::trunk()")), "false")',
+  }) + LINE_END
+
 export const OP_LOG_TEMPLATE =
   'json({"id" => id, "description" => description, "time" => time.end()}) ++ "\\n"'

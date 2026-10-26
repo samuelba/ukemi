@@ -38,7 +38,11 @@ const builds = [
   },
   {
     ...common,
-    entryPoints: { graph: 'webview/src/graph/main.tsx', split: 'webview/src/split/main.tsx' },
+    entryPoints: {
+      graph: 'webview/src/graph/main.tsx',
+      split: 'webview/src/split/main.tsx',
+      cleanup: 'webview/src/cleanup/main.tsx',
+    },
     outdir: 'dist/webview',
     platform: 'browser',
     format: 'iife',

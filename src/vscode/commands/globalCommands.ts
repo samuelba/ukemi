@@ -8,7 +8,8 @@ import { errorMessage } from '../../util/logger'
 import { openCommitDiff } from '../diff'
 import { GRAPH_VIEW_ID } from '../graphView'
 import { readConfig, updateUkemiSetting } from '../config'
-import { type CommandEnv, type Handler } from './context'
+import { openCleanupPanel } from '../cleanupPanel'
+import { contextModel, parseContext, type CommandEnv, type Handler } from './context'
 
 function activeOrWarn(env: CommandEnv): RepoModel | null {
   const model = env.registry.activeModel
@@ -205,6 +206,14 @@ export function globalCommands(env: CommandEnv): Record<string, Handler> {
       env.operations.run('New change from trunk', model, () => model.repo.newChange(['trunk()'])),
     ),
     'ukemi.goTo': withModel(env, (model) => goTo(env, model)),
+    'ukemi.cleanup': async (arg?: unknown) => {
+      const model = contextModel(env, parseContext(arg))
+      if (!model) {
+        void vscode.window.showWarningMessage('Ukemi: no jj repository is active.')
+        return
+      }
+      openCleanupPanel(env, model)
+    },
     'ukemi.openCommitDiff': withModel(env, async (model) => {
       const commit = model.graph?.commits.find((c) => c.isWorkingCopy)
       if (commit) {

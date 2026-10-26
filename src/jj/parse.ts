@@ -84,6 +84,28 @@ const operationSchema = z.object({
   time: z.string(),
 })
 
+const bookmarkSchema = z.object({
+  name: z.string(),
+  remote: z.string().nullable(),
+  present: z.boolean(),
+  conflict: z.boolean(),
+  tracked: z.boolean(),
+  commit_id: z.string().nullable(),
+  description: z.string(),
+  in_trunk: z.boolean(),
+})
+
+export interface ParsedBookmark {
+  name: string
+  remote: string | null
+  present: boolean
+  conflict: boolean
+  tracked: boolean
+  commitId: string | null
+  description: string
+  inTrunk: boolean
+}
+
 function parseLines<T>(output: string, schema: z.ZodType<T>, what: string): T[] {
   return output
     .split('\n')
@@ -196,6 +218,19 @@ export function parseDiffFiles(output: string): ChangedFile[] {
 
 export function parseOperations(output: string): Operation[] {
   return parseLines(output, operationSchema, 'operation')
+}
+
+export function parseBookmarks(output: string): ParsedBookmark[] {
+  return parseLines(output, bookmarkSchema, 'bookmark').map((entry) => ({
+    name: entry.name,
+    remote: entry.remote,
+    present: entry.present,
+    conflict: entry.conflict,
+    tracked: entry.tracked,
+    commitId: entry.commit_id,
+    description: entry.description,
+    inTrunk: entry.in_trunk,
+  }))
 }
 
 export function parseRemotes(output: string): Remote[] {

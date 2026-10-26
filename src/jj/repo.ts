@@ -10,6 +10,7 @@ import type {
 } from '../../shared/model'
 import { SerialQueue } from '../util/serialQueue'
 import {
+  parseBookmarks,
   parseCommitIds,
   parseDiffFiles,
   parseEvolution,
@@ -22,6 +23,7 @@ import {
 import { rootFileset } from './revsets'
 import { JjRunner, NETWORK_TIMEOUT_MS, type RunResult } from './runner'
 import {
+  BOOKMARK_LIST_TEMPLATE,
   COMMIT_ID_TEMPLATE,
   DIFF_FILES_TEMPLATE,
   EVOLOG_TEMPLATE,
@@ -168,6 +170,17 @@ export class JjRepo {
     return stdout.split('\n').filter((line) => line.length > 0)
   }
 
+  async bookmarkList() {
+    const { stdout } = await this.read([
+      'bookmark',
+      'list',
+      '--all-remotes',
+      '-T',
+      BOOKMARK_LIST_TEMPLATE,
+    ])
+    return parseBookmarks(stdout)
+  }
+
   async pushedBookmarkNames(): Promise<Set<string>> {
     const { stdout } = await this.read([
       'bookmark',
@@ -291,10 +304,7 @@ export class JjRepo {
   }
 
   private async isProperDescendant(commitId: string, ancestorId: string) {
-    const found = await this.log(
-      `(${commitId} & descendants(${ancestorId})) ~ ${ancestorId}`,
-      1,
-    )
+    const found = await this.log(`(${commitId} & descendants(${ancestorId})) ~ ${ancestorId}`, 1)
     return found.length > 0
   }
 
