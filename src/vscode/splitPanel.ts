@@ -36,7 +36,10 @@ export async function openSplitPanel(env: CommandEnv, { model, commit }: Target)
       localResourceRoots: [vscode.Uri.joinPath(env.extensionUri, 'dist', 'webview')],
     },
   )
-  panel.iconPath = vscode.Uri.joinPath(env.extensionUri, 'resources', 'activity.svg')
+  panel.iconPath = {
+    light: vscode.Uri.joinPath(env.extensionUri, 'resources', 'activity-light.svg'),
+    dark: vscode.Uri.joinPath(env.extensionUri, 'resources', 'activity-dark.svg'),
+  }
   panel.webview.html = webviewHtml(panel.webview, env.extensionUri, 'split')
   panel.webview.onDidReceiveMessage(async (message: SplitWebviewMessage) => {
     switch (message.type) {

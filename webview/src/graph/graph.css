@@ -413,7 +413,7 @@
 }
 
 .ci-pending {
-  color: var(--kincha);
+  color: var(--vscode-charts-blue, #3794ff);
 }
 
 .ci-manual {

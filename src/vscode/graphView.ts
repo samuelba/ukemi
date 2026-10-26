@@ -137,7 +137,10 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable 
         localResourceRoots: iconThemeResourceRoots(this.extensionUri),
       },
     )
-    panel.iconPath = vscode.Uri.joinPath(this.extensionUri, 'resources', 'activity.svg')
+    panel.iconPath = {
+      light: vscode.Uri.joinPath(this.extensionUri, 'resources', 'activity-light.svg'),
+      dark: vscode.Uri.joinPath(this.extensionUri, 'resources', 'activity-dark.svg'),
+    }
     this.panel = panel
     this.attach(panel.webview)
     panel.onDidDispose(() => {

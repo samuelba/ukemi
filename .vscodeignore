@@ -7,6 +7,8 @@
 !dist/webview/*.ttf
 !resources/icon.png
 !resources/activity.svg
+!resources/activity-light.svg
+!resources/activity-dark.svg
 !package.json
 !README.md
 !CHANGELOG.md
