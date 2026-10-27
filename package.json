@@ -513,6 +513,12 @@
         "icon": "$(pin)"
       },
       {
+        "command": "ukemi.bookmark.trackOrigin",
+        "title": "Track origin",
+        "category": "Ukemi",
+        "icon": "$(pin)"
+      },
+      {
         "command": "ukemi.bookmark.untrack",
         "title": "Untrack Remote Bookmark",
         "category": "Ukemi",
@@ -1076,18 +1082,23 @@
           "when": "view == ukemi.bookmarks && viewItem =~ /^bookmark\\+local(?!.*\\+trunk\\b)/ && viewItem =~ /present/"
         },
         {
-          "command": "ukemi.bookmark.push",
+          "command": "ukemi.bookmark.trackOrigin",
           "group": "inline@5",
+          "when": "view == ukemi.bookmarks && viewItem =~ /^bookmark\\+local/ && viewItem =~ /track-origin/"
+        },
+        {
+          "command": "ukemi.bookmark.push",
+          "group": "inline@6",
           "when": "view == ukemi.bookmarks && viewItem =~ /^bookmark\\+local/ && viewItem =~ /unsynced/"
         },
         {
           "command": "ukemi.bookmark.pushDeleted",
-          "group": "inline@5",
+          "group": "inline@6",
           "when": "view == ukemi.bookmarks && viewItem =~ /^bookmark\\+local/ && viewItem =~ /deleted/"
         },
         {
           "command": "ukemi.bookmark.forget",
-          "group": "inline@6",
+          "group": "inline@7",
           "when": "view == ukemi.bookmarks && viewItem =~ /^bookmark\\+local(?!.*\\+trunk\\b)/"
         },
         {
@@ -1388,6 +1399,10 @@
         },
         {
           "command": "ukemi.bookmark.track",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.bookmark.trackOrigin",
           "when": "false"
         },
         {
