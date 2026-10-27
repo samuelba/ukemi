@@ -4,6 +4,7 @@ import { quoteRevsetString } from '../../jj/revsets'
 import type { MergeMethod } from '../../forge/types'
 import type { RepoModel } from '../../repo/repoModel'
 import { bodyAfterTitle, bookmarkSlug, firstLine, validateBookmarkName } from '../../util/text'
+import { showForgeMissing } from '../forgeMissing'
 import {
   confirm,
   contextCommit,
@@ -70,11 +71,13 @@ async function createRequest(env: CommandEnv, arg: unknown, askName: boolean): P
     void vscode.window.showWarningMessage('Ukemi: describe the change before creating a request.')
     return
   }
+  if (!(await env.forge.target(model))) {
+    await showForgeMissing(model, env)
+    return
+  }
   const client = await env.forge.client(model, true)
   if (!client) {
-    void vscode.window.showWarningMessage(
-      'Ukemi: no GitHub or GitLab remote found, or sign-in was cancelled. Add self-hosted GitLab hosts to "ukemi.gitlab.hosts".',
-    )
+    void vscode.window.showWarningMessage('Ukemi: sign-in was cancelled.')
     return
   }
   const trunk = model.graph?.trunkName ?? 'main'
