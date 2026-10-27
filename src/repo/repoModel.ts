@@ -22,7 +22,7 @@ export class RepoModel {
   private lastError: string | null = null
   private isDirty = true
   private lastOperationId: string | null = null
-  private running: Promise<void> | null = null
+  private tail: Promise<void> | null = null
   private isRefreshQueued = false
   private requests: RequestBadge[] = []
   private forge: ForgeState | null = null
@@ -130,18 +130,25 @@ export class RepoModel {
   }
 
   refresh(): Promise<void> {
-    if (this.running) {
+    if (this.tail) {
       this.isRefreshQueued = true
-      return this.running
+      return this.tail
     }
-    this.running = this.load().finally(() => {
-      this.running = null
-      if (this.isRefreshQueued) {
-        this.isRefreshQueued = false
-        void this.refresh()
+    this.tail = this.startRefresh()
+    return this.tail
+  }
+
+  // A refresh requested during load stays on this promise, so the next jj command waits until the repo is idle.
+  private startRefresh(): Promise<void> {
+    const run = this.load().finally(() => {
+      if (!this.isRefreshQueued) {
+        this.tail = null
+        return
       }
+      this.isRefreshQueued = false
+      this.tail = this.startRefresh()
     })
-    return this.running
+    return run.then(() => this.tail ?? undefined)
   }
 
   private async load(): Promise<void> {

@@ -90,6 +90,9 @@ export async function run(): Promise<void> {
 
   await step('duplicates a change', async () => {
     const parent = commitOf('@-')
+    const base = commitOf('@--')
+    // The command looks the change up in the graph and does nothing until that refresh has landed.
+    await waitFor('the split change in the graph', () => model.findCommit(parent))
     await vscode.commands.executeCommand('ukemi.commit.duplicate', {
       repoId: root,
       commitId: parent,
@@ -99,10 +102,12 @@ export async function run(): Promise<void> {
       'log',
       '--no-graph',
       '-r',
-      `children(${commitOf('@--')})`,
+      `children(${base})`,
       '-T',
       'commit_id ++ "\\n"',
     )
-    assert.equal(copies.split('\n').length, 2)
+      .split('\n')
+      .filter((id) => id.length > 0)
+    assert.equal(copies.length, 2)
   })
 }

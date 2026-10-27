@@ -60,6 +60,29 @@ describe('RepoModel', () => {
     expect(calls).toBeLessThanOrEqual(3)
   })
 
+  test('waits for a refresh queued during the load', async () => {
+    await model.refresh()
+    let nested = false
+    model.onDidChange(() => {
+      if (nested) {
+        return
+      }
+      nested = true
+      writeFile(root, 'during.txt', 'z\n')
+      model.markDirty()
+      void model.refresh()
+    })
+    writeFile(root, 'before.txt', 'y\n')
+    model.markDirty()
+
+    await model.refresh()
+
+    expect(model.graph?.workingCopyFiles.map((file) => file.path).sort()).toEqual([
+      'before.txt',
+      'during.txt',
+    ])
+  })
+
   test('reports errors instead of throwing', async () => {
     fixture.cleanup()
 

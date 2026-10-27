@@ -5,4 +5,5 @@ coverage
 .vscode-test
 *.vsix
 package-lock.json
+CHANGELOG.md
 scripts/preview/state.generated.js
