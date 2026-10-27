@@ -220,8 +220,8 @@ export function Toolbar({
                   icon={<PushAllIcon />}
                   label={
                     graph.hasUnpushed
-                      ? 'Push all tracked bookmarks (unpushed changes)'
-                      : 'Push all tracked bookmarks'
+                      ? 'Push all bookmarks (unpushed changes)'
+                      : 'Push all bookmarks'
                   }
                   isAccent={graph.hasUnpushed}
                   onClick={() => command('ukemi.push', { repoId })}

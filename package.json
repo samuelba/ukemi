@@ -190,7 +190,7 @@
       },
       {
         "command": "ukemi.push",
-        "title": "Push All Tracked Bookmarks",
+        "title": "Push All Bookmarks",
         "category": "Ukemi",
         "icon": "$(repo-push)"
       },
