@@ -9,6 +9,7 @@ import { openCommitDiff } from '../diff'
 import { GRAPH_VIEW_ID } from '../graphView'
 import { readConfig, updateUkemiSetting } from '../config'
 import { openCleanupPanel } from '../cleanupPanel'
+import { openSettings } from '../openSettings'
 import { contextModel, parseContext, type CommandEnv, type Handler } from './context'
 
 function activeOrWarn(env: CommandEnv): RepoModel | null {
@@ -231,8 +232,9 @@ export function globalCommands(env: CommandEnv): Record<string, Handler> {
       await env.forge.refreshRequests(model, { force: true })
     }),
     'ukemi.forge.signOut': withModel(env, (model) => env.forge.signOut(model)),
-    'ukemi.openSettings': () =>
-      vscode.commands.executeCommand('workbench.action.openSettings', `@ext:${env.extensionId}`),
+    'ukemi.openSettings': () => {
+      openSettings(`@ext:${env.extensionId}`)
+    },
     'ukemi.view.asList': () => setChangedFilesView('list'),
     'ukemi.view.asTree': () => setChangedFilesView('tree'),
   }

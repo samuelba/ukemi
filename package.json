@@ -946,7 +946,7 @@
         {
           "command": "ukemi.openSettings",
           "group": "navigation@3",
-          "when": "view == ukemi.graph"
+          "when": "view == ukemi.graph && !ukemi.inCursor"
         }
       ],
       "view/item/context": [

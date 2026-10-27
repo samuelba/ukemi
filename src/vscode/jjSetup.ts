@@ -9,6 +9,7 @@ import {
 } from '../jj/binary'
 import { errorMessage, type Logger } from '../util/logger'
 import { readConfig } from './config'
+import { openSettings } from './openSettings'
 
 const versionText = (v: { major: number; minor: number; patch: number }) =>
   `${v.major}.${v.minor}.${v.patch}`
@@ -42,7 +43,7 @@ export async function offerInstall(storageDir: string, logger: Logger): Promise<
     'Install Guide',
   )
   if (choice === 'Set Path') {
-    await vscode.commands.executeCommand('workbench.action.openSettings', 'ukemi.jjPath')
+    openSettings('ukemi.jjPath')
     return false
   }
   if (choice === 'Install Guide') {

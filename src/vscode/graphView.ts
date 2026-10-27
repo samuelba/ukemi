@@ -10,6 +10,10 @@ import type { RepoRegistry } from './registry'
 
 export const GRAPH_VIEW_ID = 'ukemi.graph'
 const PANEL_VIEW_TYPE = 'ukemi.graphPanel'
+const SETTINGS_COMMAND_URIS = [
+  'workbench.action.openSettings',
+  '/workbench.action.openSettings',
+] as const
 
 export type MessageHandler = (message: WebviewMessage) => Promise<void>
 
@@ -21,6 +25,7 @@ export function webviewHtml(
   webview: vscode.Webview,
   extensionUri: vscode.Uri,
   entry: string,
+  bodyAttributes = '',
 ): string {
   const base = vscode.Uri.joinPath(extensionUri, 'dist', 'webview')
   const script = webview.asWebviewUri(vscode.Uri.joinPath(base, `${entry}.js`))
@@ -41,7 +46,7 @@ export function webviewHtml(
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="${style}">
 </head>
-<body>
+<body${bodyAttributes}>
   <div id="root"></div>
   <script nonce="${nonce}" src="${script}"></script>
 </body>
@@ -133,6 +138,7 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable 
       vscode.ViewColumn.Active,
       {
         enableScripts: true,
+        enableCommandUris: [...SETTINGS_COMMAND_URIS],
         retainContextWhenHidden: true,
         localResourceRoots: iconThemeResourceRoots(this.extensionUri),
       },
@@ -152,9 +158,15 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable 
   private attach(webview: vscode.Webview): void {
     webview.options = {
       enableScripts: true,
+      enableCommandUris: [...SETTINGS_COMMAND_URIS],
       localResourceRoots: iconThemeResourceRoots(this.extensionUri),
     }
-    webview.html = webviewHtml(webview, this.extensionUri, 'graph')
+    webview.html = webviewHtml(
+      webview,
+      this.extensionUri,
+      'graph',
+      vscode.env.appName === 'Cursor' ? ' data-cursor="1"' : '',
+    )
     webview.onDidReceiveMessage(async (message: WebviewMessage) => {
       if (message.type === 'ready') {
         this.readyWebviews.add(webview)
