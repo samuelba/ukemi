@@ -60,6 +60,7 @@ Select the gear in the title bar of the Ukemi view to open the Ukemi settings.
 | `ukemi.gitlab.oauthApplications`     | GitLab OAuth client IDs by host. The client ID is not a secret.                                   |
 | `ukemi.forge.ciOnlyMine`             | Show CI status only on open requests that you authored. Default: on.                              |
 | `ukemi.forge.requestLimit`           | How many recently updated merge and pull requests to load. Default: 50. Maximum: 500.             |
+| `ukemi.forge.statusInterval`         | How often to reload CI status. Default: `60s`, or 15s while your pipeline runs.                   |
 
 ## Sign in
 
@@ -76,7 +77,7 @@ OAuth needs a non-confidential application on that GitLab host, with the `api` s
 
 Put the client ID in `ukemi.gitlab.oauthApplications`, for example `{ "git.example.com": "abc123" }`. If the host has no client ID, Ukemi asks for a personal access token with the `api` scope instead.
 
-CI status refreshes about every 15 seconds while one of your pipelines is running, and about every 60 seconds otherwise. It pauses while the window is not focused.
+`ukemi.forge.statusInterval` sets how often CI status refreshes. The default is 60 seconds, and 15 seconds while one of your pipelines is running. It pauses while the window is not focused.
 
 ## Development
 

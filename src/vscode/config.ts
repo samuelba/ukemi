@@ -32,6 +32,7 @@ export interface UkemiConfig {
   gitlabOAuthApplications: Record<string, string>
   ciOnlyMine: boolean
   requestLimit: number
+  statusInterval: string
   autoFetchEnabled: boolean
   autoFetchInterval: string
 }
@@ -77,6 +78,7 @@ export function readConfig(): UkemiConfig {
     gitlabOAuthApplications: c.get<Record<string, string>>('gitlab.oauthApplications', {}),
     ciOnlyMine: c.get<boolean>('forge.ciOnlyMine', true),
     requestLimit: clampRequestLimit(c.get<number>('forge.requestLimit', 50)),
+    statusInterval: c.get<string>('forge.statusInterval', '60s'),
     autoFetchEnabled: c.get<boolean>('autoFetch.enabled', false),
     autoFetchInterval: c.get<string>('autoFetch.interval', '10m'),
   }

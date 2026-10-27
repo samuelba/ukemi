@@ -524,6 +524,15 @@ describe('forge helpers', () => {
     expect(forgeRefreshInterval([{ isMine: true, ci: 'pending', state: 'merged' }])).toBe(60_000)
   })
 
+  test('scales the pending poll with the idle interval', () => {
+    const pending = { isMine: true, ci: 'pending' as const, state: 'open' as const }
+    const idle = { isMine: false, ci: 'pending' as const, state: 'open' as const }
+    expect(forgeRefreshInterval([pending], 300_000)).toBe(75_000)
+    expect(forgeRefreshInterval([idle], 300_000)).toBe(300_000)
+    expect(forgeRefreshInterval([pending], 20_000)).toBe(10_000)
+    expect(forgeRefreshInterval([pending], 10_000)).toBe(10_000)
+  })
+
   test('allows https links on the forge host only', () => {
     expect(
       isAllowedForgeUrl('https://git.anybotics.com/group/repo/-/jobs/1', 'git.anybotics.com'),
