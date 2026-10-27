@@ -30,24 +30,45 @@ export function forgeKindForHost(host: string, lists: HostLists): ForgeKind | nu
   return null
 }
 
-const REMOTE_PREFERENCE = ['origin', 'upstream']
+const PREFERRED_REMOTES = ['origin', 'upstream']
 
-export function pickRemote(remotes: readonly Remote[]): Remote | null {
-  for (const name of REMOTE_PREFERENCE) {
-    const match = remotes.find((r) => r.name === name)
-    if (match) {
-      return match
-    }
-  }
-  return remotes[0] ?? null
+function remoteOrder(name: string): number {
+  const index = PREFERRED_REMOTES.indexOf(name)
+  return index === -1 ? PREFERRED_REMOTES.length : index
+}
+
+function orderedRemotes(remotes: readonly Remote[]): Remote[] {
+  return remotes
+    .map((remote, index) => ({ remote, index }))
+    .sort(
+      (left, right) =>
+        remoteOrder(left.remote.name) - remoteOrder(right.remote.name) || left.index - right.index,
+    )
+    .map((entry) => entry.remote)
 }
 
 export function detectForge(remotes: readonly Remote[], lists: HostLists): ForgeTarget | null {
-  const remote = pickRemote(remotes)
-  const location = remote ? parseRemoteUrl(remote.url) : null
-  if (!remote || !location) {
-    return null
+  for (const remote of orderedRemotes(remotes)) {
+    const location = parseRemoteUrl(remote.url)
+    if (!location) {
+      continue
+    }
+    const kind = forgeKindForHost(location.host, lists)
+    if (kind) {
+      return { ...location, kind, remote: remote.name }
+    }
   }
-  const kind = forgeKindForHost(location.host, lists)
-  return kind ? { ...location, kind, remote: remote.name } : null
+  return null
+}
+
+export function unknownHosts(remotes: readonly Remote[], lists: HostLists): string[] {
+  const hosts: string[] = []
+  for (const remote of orderedRemotes(remotes)) {
+    const location = parseRemoteUrl(remote.url)
+    if (!location || forgeKindForHost(location.host, lists) || hosts.includes(location.host)) {
+      continue
+    }
+    hosts.push(location.host)
+  }
+  return hosts
 }

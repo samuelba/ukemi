@@ -9,6 +9,7 @@ import { openCommitDiff } from '../diff'
 import { GRAPH_VIEW_ID } from '../graphView'
 import { readConfig, updateUkemiSetting } from '../config'
 import { openCleanupPanel } from '../cleanupPanel'
+import { showForgeMissing } from '../forgeMissing'
 import { openSettings } from '../openSettings'
 import { contextModel, parseContext, type CommandEnv, type Handler } from './context'
 
@@ -222,11 +223,13 @@ export function globalCommands(env: CommandEnv): Record<string, Handler> {
       }
     }),
     'ukemi.forge.signIn': withModel(env, async (model) => {
+      if (!(await env.forge.target(model))) {
+        await showForgeMissing(model, env)
+        return
+      }
       const client = await env.forge.signIn(model)
       if (!client) {
-        void vscode.window.showWarningMessage(
-          'Ukemi: no GitHub or GitLab remote found for this repository.',
-        )
+        void vscode.window.showWarningMessage('Ukemi: sign-in was cancelled.')
         return
       }
       await env.forge.refreshRequests(model, { force: true })

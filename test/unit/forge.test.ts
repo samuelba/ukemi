@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { detectForge, forgeKindForHost } from '../../src/forge/detect'
+import { detectForge, forgeKindForHost, unknownHosts } from '../../src/forge/detect'
 import { GithubClient, githubCheckState, githubCi, githubState } from '../../src/forge/github'
 import { GitlabClient, gitlabCi, gitlabPipelineCi, gitlabState } from '../../src/forge/gitlab'
 import { isAllowedForgeUrl } from '../../src/forge/hostName'
@@ -47,6 +47,33 @@ describe('forge detection', () => {
       projectPath: 'team/repo',
       remote: 'origin',
     })
+  })
+
+  test('uses the next remote when origin is on an unknown host', () => {
+    const remotes = [
+      { name: 'fork', url: 'git@git.example.com:me/repo.git' },
+      { name: 'origin', url: 'https://git.example.com/me/repo.git' },
+      { name: 'upstream', url: 'https://github.com/team/repo.git' },
+    ]
+
+    expect(detectForge(remotes, lists)).toEqual({
+      kind: 'github',
+      host: 'github.com',
+      projectPath: 'team/repo',
+      remote: 'upstream',
+    })
+  })
+
+  test('lists unknown hosts once and skips known hosts', () => {
+    const remotes = [
+      { name: 'origin', url: 'https://git.example.com/me/repo.git' },
+      { name: 'fork', url: 'git@git.example.com:me/fork.git' },
+      { name: 'mirror', url: 'https://code.example.org/team/repo.git' },
+      { name: 'upstream', url: 'https://github.com/team/repo.git' },
+      { name: 'local', url: '/tmp/remote.git' },
+    ]
+
+    expect(unknownHosts(remotes, lists)).toEqual(['git.example.com', 'code.example.org'])
   })
 })
 
