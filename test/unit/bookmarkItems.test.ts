@@ -86,12 +86,12 @@ describe('bookmarkRows', () => {
 
   test('sorts local names and marks sync, conflict, deletion, and trunk', () => {
     expect(localRows.map((item) => item.label)).toEqual([
-      'alpha',
-      'drift',
+      '* alpha',
+      '* drift',
       'feature',
       '(deleted) gone',
-      'main',
-      'zeta',
+      '* main',
+      '* zeta',
     ])
     expect(localRows.find((item) => item.name === 'feature')).toMatchObject({
       description: 'fix the gate',
@@ -99,11 +99,13 @@ describe('bookmarkRows', () => {
       commitId: 'abc',
     })
     expect(localRows.find((item) => item.name === 'drift')).toMatchObject({
-      description: 'local drift *',
+      label: '* drift',
+      description: 'local drift',
       contextValue: 'bookmark+local+unsynced+present',
+      tooltipLines: ['* drift', 'local drift', 'left', 'unsynced'],
     })
     expect(localRows.find((item) => item.name === 'alpha')).toMatchObject({
-      description: 'first * ??',
+      description: 'first ??',
       contextValue: 'bookmark+local+unsynced+conflict+present',
     })
     expect(localRows.find((item) => item.name === 'gone')).toMatchObject({
@@ -113,10 +115,10 @@ describe('bookmarkRows', () => {
       tooltipLines: ['(deleted) gone', 'old', 'abc', 'deleted'],
     })
     expect(localRows.find((item) => item.name === 'main')).toMatchObject({
-      description: 'trunk line *',
+      description: 'trunk line',
       contextValue: 'bookmark+local+unsynced+trunk+present',
     })
-    expect(localRows.find((item) => item.name === 'zeta')?.description).toBe('last *')
+    expect(localRows.find((item) => item.name === 'zeta')?.description).toBe('last')
   })
 
   test('labels remote rows as name@remote and tracks trunk', () => {
@@ -148,6 +150,59 @@ describe('bookmarkRows', () => {
         contextValue: 'bookmark+remote+present',
       }),
     ])
+  })
+
+  test('marks a present local bookmark that can track an untracked origin', () => {
+    const same = row({ name: 'release', commitId: 'same', description: 'line' })
+    const sameOrigin = row({
+      name: 'release',
+      remote: 'origin',
+      tracked: false,
+      commitId: 'same',
+      description: 'line',
+    })
+    const behind = row({ name: 'older', commitId: 'local', description: 'old line' })
+    const behindOrigin = row({
+      name: 'older',
+      remote: 'origin',
+      tracked: false,
+      commitId: 'remote',
+      description: 'new line',
+    })
+    const tracked = row({ name: 'kept' })
+    const trackedOrigin = row({ name: 'kept', remote: 'origin', tracked: true, commitId: 'abc' })
+    const deleted = row({ name: 'gone', present: false, description: 'old' })
+    const deletedOrigin = row({
+      name: 'gone',
+      remote: 'origin',
+      tracked: false,
+      present: true,
+      description: 'old',
+    })
+    const listed = [
+      same,
+      sameOrigin,
+      behind,
+      behindOrigin,
+      tracked,
+      trackedOrigin,
+      deleted,
+      deletedOrigin,
+    ]
+    const group = bookmarkGroups(listed, '/repo')[0]
+    const items = group ? bookmarkRows(listed, group, null) : []
+    const origin = bookmarkGroups(listed, '/repo').find((entry) => entry.remote === 'origin')
+    const originItems = origin ? bookmarkRows(listed, origin, null) : []
+    expect(items.find((item) => item.name === 'release')).toMatchObject({
+      label: '* release',
+      contextValue: 'bookmark+local+unsynced+present+track-origin',
+    })
+    expect(items.find((item) => item.name === 'older')?.contextValue).toContain('track-origin')
+    expect(items.find((item) => item.name === 'kept')?.contextValue).toBe('bookmark+local+present')
+    expect(items.find((item) => item.name === 'gone')?.contextValue).toBe('bookmark+local+deleted')
+    expect(originItems.find((item) => item.name === 'release')?.contextValue).toBe(
+      'bookmark+remote+present',
+    )
   })
 
   test('does not list git rows under local', () => {

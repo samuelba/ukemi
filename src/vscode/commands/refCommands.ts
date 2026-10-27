@@ -305,6 +305,9 @@ export function refCommands(env: CommandEnv): Record<string, Handler> {
     'ukemi.bookmark.track': bookmarkHandler(env, ({ model, name, remote }) =>
       op('Track bookmark', model, () => model.repo.trackBookmark(name, remote ?? 'origin')),
     ),
+    'ukemi.bookmark.trackOrigin': bookmarkHandler(env, ({ model, name }) =>
+      op('Track origin', model, () => model.repo.trackBookmark(name, 'origin')),
+    ),
     'ukemi.bookmark.untrack': bookmarkHandler(env, ({ model, name, remote }) =>
       op('Untrack bookmark', model, () => model.repo.untrackBookmark(name, remote ?? 'origin')),
     ),

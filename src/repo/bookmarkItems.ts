@@ -2,6 +2,7 @@ import { firstLine } from '../util/text'
 import type { ParsedBookmark } from '../jj/parse'
 
 const GIT_REMOTE = 'git'
+const ORIGIN_REMOTE = 'origin'
 
 export interface BookmarkGroupElement {
   kind: 'group'
@@ -83,7 +84,8 @@ function rowElement(
 ): BookmarkRowElement {
   const unsynced = row.remote === null && row.present && hasRemotes && !hasTrackedRemote(row, rows)
   const isTrunk = trunkName !== null && row.name === trunkName
-  const label = rowLabel(row)
+  const trackOrigin = canTrackOrigin(row, rows)
+  const label = rowLabel(row, unsynced)
   return {
     kind: 'bookmark',
     repoId,
@@ -91,9 +93,9 @@ function rowElement(
     remote: row.remote,
     commitId: row.commitId,
     label,
-    description: rowDescription(row, unsynced),
+    description: rowDescription(row),
     tooltipLines: tooltipLines(row, rows, label, unsynced, isTrunk),
-    contextValue: contextValue(row, unsynced, isTrunk),
+    contextValue: contextValue(row, unsynced, isTrunk, trackOrigin),
     id: `${repoId}\n${row.remote ?? 'local'}\n${row.name}`,
   }
 }
@@ -110,7 +112,21 @@ function hasTrackedRemote(local: ParsedBookmark, rows: readonly ParsedBookmark[]
   )
 }
 
-function contextValue(row: ParsedBookmark, unsynced: boolean, isTrunk: boolean): string {
+function canTrackOrigin(local: ParsedBookmark, rows: readonly ParsedBookmark[]): boolean {
+  if (local.remote !== null || !local.present) {
+    return false
+  }
+  return rows.some(
+    (row) => row.name === local.name && row.remote === ORIGIN_REMOTE && row.present && !row.tracked,
+  )
+}
+
+function contextValue(
+  row: ParsedBookmark,
+  unsynced: boolean,
+  isTrunk: boolean,
+  trackOrigin: boolean,
+): string {
   const flags = ['bookmark', row.remote === null ? 'local' : 'remote']
   if (unsynced) {
     flags.push('unsynced')
@@ -126,20 +142,20 @@ function contextValue(row: ParsedBookmark, unsynced: boolean, isTrunk: boolean):
   } else {
     flags.push('deleted')
   }
+  if (trackOrigin) {
+    flags.push('track-origin')
+  }
   if (row.remote !== null && row.tracked) {
     flags.push('tracked')
   }
   return flags.join('+')
 }
 
-function rowDescription(row: ParsedBookmark, unsynced: boolean): string {
+function rowDescription(row: ParsedBookmark): string {
   const marks: string[] = []
   const line = firstLine(row.description)
   if (line.length > 0) {
     marks.push(line)
-  }
-  if (unsynced) {
-    marks.push('*')
   }
   if (row.conflict) {
     marks.push('??')
@@ -147,9 +163,10 @@ function rowDescription(row: ParsedBookmark, unsynced: boolean): string {
   return marks.join(' ')
 }
 
-function rowLabel(row: ParsedBookmark): string {
+function rowLabel(row: ParsedBookmark, unsynced: boolean): string {
   const name = row.remote === null ? row.name : `${row.name}@${row.remote}`
-  return row.present ? name : `(deleted) ${name}`
+  const shown = row.present ? name : `(deleted) ${name}`
+  return unsynced ? `* ${shown}` : shown
 }
 
 function bookmarkStatus(row: ParsedBookmark, unsynced: boolean): string {
