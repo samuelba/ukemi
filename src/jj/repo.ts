@@ -404,9 +404,19 @@ export class JjRepo {
 
   push(bookmarks?: string | readonly string[]) {
     const names = typeof bookmarks === 'string' ? [bookmarks] : (bookmarks ?? [])
-    const target =
-      names.length > 0 ? names.flatMap((name) => ['--bookmark', `exact:${name}`]) : ['--tracked']
-    return this.mutate(['git', 'push', ...target], { timeoutMs: NETWORK_TIMEOUT_MS })
+    if (names.length > 0) {
+      return this.mutate(pushArgs(names), { timeoutMs: NETWORK_TIMEOUT_MS })
+    }
+    return this.mutations.run(async () => {
+      const local = (await this.bookmarkList())
+        .filter((row) => row.remote === null && row.present)
+        .map((row) => row.name)
+      return this.runner.run({
+        cwd: this.root,
+        args: pushArgs(local),
+        timeoutMs: NETWORK_TIMEOUT_MS,
+      })
+    })
   }
 
   undo() {
@@ -452,4 +462,10 @@ export class JjRepo {
       return null
     }
   }
+}
+
+function pushArgs(names: readonly string[]): readonly string[] {
+  const targets =
+    names.length > 0 ? names.flatMap((name) => ['--bookmark', `exact:${name}`]) : ['--tracked']
+  return ['git', 'push', ...targets]
 }

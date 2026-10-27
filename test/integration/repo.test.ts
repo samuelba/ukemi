@@ -438,6 +438,51 @@ describe('mutations', () => {
     expect([...(await repo.pushedBookmarkNames())].sort()).toEqual(['one', 'two'])
   })
 
+  test('push with no names publishes new bookmarks and leaves tags local', async () => {
+    const remote = join(fixture.dir, 'remote.git')
+    execFileSync('git', ['init', '--bare', '-q', remote])
+    jj(root, 'git', 'remote', 'add', 'origin', remote)
+    writeFile(root, 'a.txt', 'a\n')
+    jj(root, 'describe', '-m', 'first')
+    jj(root, 'bookmark', 'set', 'feature/one', '-r', '@')
+    jj(root, 'new', '-m', 'second')
+    jj(root, 'bookmark', 'set', 'two', '-r', '@')
+    jj(root, 'bookmark', 'set', 'three', '-r', '@')
+    jj(root, 'tag', 'set', 'v1', '-r', '@')
+
+    await repo.push()
+
+    const refs = execFileSync('git', ['ls-remote', remote], { encoding: 'utf8' })
+    expect(refs).toContain('refs/heads/feature/one')
+    expect(refs).toContain('refs/heads/two')
+    expect(refs).toContain('refs/heads/three')
+    expect(refs).not.toContain('refs/tags/v1')
+  })
+
+  test('push with no names moves a tracked bookmark and keeps a deleted one', async () => {
+    const remote = join(fixture.dir, 'remote.git')
+    execFileSync('git', ['init', '--bare', '-q', remote])
+    jj(root, 'git', 'remote', 'add', 'origin', remote)
+    writeFile(root, 'a.txt', 'a\n')
+    jj(root, 'describe', '-m', 'first')
+    jj(root, 'bookmark', 'set', 'tracked', '-r', '@')
+    jj(root, 'bookmark', 'set', 'gone', '-r', '@')
+    await repo.push(['tracked', 'gone'])
+    await repo.deleteBookmark('gone')
+    jj(root, 'new', '-m', 'second')
+    writeFile(root, 'b.txt', 'b\n')
+    jj(root, 'bookmark', 'set', 'tracked', '-r', '@')
+    const moved = (await repo.log('tracked'))[0]?.commitId
+
+    await repo.push()
+
+    const remoteTracked = (await repo.bookmarkList()).find(
+      (row) => row.name === 'tracked' && row.remote === 'origin',
+    )
+    expect(remoteTracked?.commitId).toBe(moved)
+    expect([...(await repo.pushedBookmarkNames())].sort()).toEqual(['gone', 'tracked'])
+  })
+
   test('addWorkspace creates a sibling workspace', async () => {
     const wsPath = join(fixture.dir, 'repo-ws')
 
