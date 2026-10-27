@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.3.0](https://github.com/samuelba/ukemi/compare/v0.2.0...v0.3.0) (2026-10-27)
+
+
+### Features
+
+* add deleted bookmarks and no descriptions commits to cleanup ([5ecea55](https://github.com/samuelba/ukemi/commit/5ecea5554882614dcfa4724f383addb74cba028d))
+* bookmark panel ([513a69c](https://github.com/samuelba/ukemi/commit/513a69c6a3b3f5a358a667e6c9528d19fb03301d))
+* improve bookmark panel, allow to track origin on local bookmark action ([d90a6e0](https://github.com/samuelba/ukemi/commit/d90a6e0f96fd9e5dbd46e95075d3a02b96dada23))
+* move fetch sync toggle ([6f898be](https://github.com/samuelba/ukemi/commit/6f898bee1d50893f96a69424d5d64cf12a00bb35))
+* rename to ukemi-jj ([7b37c19](https://github.com/samuelba/ukemi/commit/7b37c19864bc4d98e08ef0b40deac99032df6d76))
+* update readme ([1199287](https://github.com/samuelba/ukemi/commit/119928709647aba15db0ec48455e7b4381f9b6bb))
+
+
+### Bug Fixes
+
+* drop merge commits from the release changelog ([ab16768](https://github.com/samuelba/ukemi/commit/ab1676817283a34d027302356890c33b08503302))
+* **forge:** explain unknown remote hosts and scan all remotes ([e0d9cd3](https://github.com/samuelba/ukemi/commit/e0d9cd326aafa727f04e65f8c849e6db22025fac))
+* go to bookmark, handle remote bookmarks better ([42216ce](https://github.com/samuelba/ukemi/commit/42216ce7a191f51c8fe3df546055cee91a8eac30))
+* move settings gear on cursor ([cf0b710](https://github.com/samuelba/ukemi/commit/cf0b71021eed4a188b16099b09d8f242ba61cf8e))
+* open Cursor settings filtered to Ukemi without freezing ([15f791b](https://github.com/samuelba/ukemi/commit/15f791bc420b675ea676713563c333986771c8f3))
+* push all bookmarks, also push untracked new bookmarks ([d837f57](https://github.com/samuelba/ukemi/commit/d837f57d84719aebfddef7f3069b8c9662414120))
+
 ## [0.2.0](https://github.com/samuelba/ukemi/compare/v0.1.0...v0.2.0) (2026-10-27)
 
 
@@ -14,7 +36,6 @@
 * changed file hover button to discard change ([80884c3](https://github.com/samuelba/ukemi/commit/80884c3d428a036bf7472c564589677b4d7545f9))
 * changed file type icons ([119c776](https://github.com/samuelba/ukemi/commit/119c776d00d4524f468b442971e70123e71dae9d))
 * changed files, as list or tree ([1421714](https://github.com/samuelba/ukemi/commit/14217149aec09e8681573698480420f47321f1c6))
-* ci/cd, rename publisher, fix warnings ([70406d6](https://github.com/samuelba/ukemi/commit/70406d604f87967994c17a2a4c69b9b203aa1fef))
 * ci/cd, rename publisher, fix warnings ([cdd899c](https://github.com/samuelba/ukemi/commit/cdd899c38d341b0bebc2e5e8217484225b1d68a3))
 * cleanup editor ([12e5149](https://github.com/samuelba/ukemi/commit/12e51490267c67f5af9bb6e56a0282998846dc9a))
 * cloud icon with two arrows for push all tracked bookmarks ([4eafb16](https://github.com/samuelba/ukemi/commit/4eafb160978b47b641ad5201a4335b22c8aed927))
@@ -25,7 +46,6 @@
 * evolution panel with version diffs and restore ([8ca5e3e](https://github.com/samuelba/ukemi/commit/8ca5e3e9cbf664e5b71eb1bd2f482bda10dd14f7))
 * filter dropdown instead of filter buttons ([450f6f4](https://github.com/samuelba/ukemi/commit/450f6f4884caba0a9a1b1b0ecf5afbbd93735430))
 * forge CI job status and GitLab OAuth/glab auth ([d6abb6e](https://github.com/samuelba/ukemi/commit/d6abb6eac68f9cfa50c4267fef98f35193b624ed))
-* https remote support ([501697b](https://github.com/samuelba/ukemi/commit/501697b2f3d8ce198f153edfad41a9701c48528a))
 * let users push to GitHub over HTTPS with a user name and token ([ab4f05f](https://github.com/samuelba/ukemi/commit/ab4f05f3d7186f68c1e40aa8054122738a6abeb4))
 * line stats ([0d943ef](https://github.com/samuelba/ukemi/commit/0d943efedc03eaef0d19cc377c02e07907802b94))
 * move repo label/dropdown to separate row ([1bbfb7e](https://github.com/samuelba/ukemi/commit/1bbfb7e98c513767e50ce77b01873c89c16c2116))
