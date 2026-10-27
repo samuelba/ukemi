@@ -12,7 +12,7 @@ describe('cursorSettingsLink', () => {
   })
 
   test('drops an extension filter', () => {
-    expect(cursorSettingsLink('cursor', '@ext:ukemi.ukemi')).toEqual({
+    expect(cursorSettingsLink('cursor', '@ext:samuelba.ukemi-jj')).toEqual({
       scheme: 'cursor',
       authority: 'settings',
       path: '/',
@@ -22,9 +22,9 @@ describe('cursorSettingsLink', () => {
 
 describe('settingsCommandHref', () => {
   test('keeps an extension filter as the command argument', () => {
-    const href = settingsCommandHref('@ext:ukemi.ukemi')
+    const href = settingsCommandHref('@ext:samuelba.ukemi-jj')
     const query = href.slice(href.indexOf('?') + 1)
     expect(href.startsWith('command:workbench.action.openSettings?')).toBe(true)
-    expect(JSON.parse(decodeURIComponent(query))).toBe('@ext:ukemi.ukemi')
+    expect(JSON.parse(decodeURIComponent(query))).toBe('@ext:samuelba.ukemi-jj')
   })
 })
