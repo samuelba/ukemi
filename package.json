@@ -1725,6 +1725,13 @@
           "minimum": 1,
           "maximum": 500,
           "description": "How many of the most recently updated merge and pull requests to load. Each request returns at most 100, so a higher value loads more pages."
+        },
+        "ukemi.forge.statusInterval": {
+          "type": "string",
+          "default": "60s",
+          "pattern": "^(every\\s+)?(\\d+(\\.\\d+)?|\\.\\d+)\\s*[smhdSMHD]$",
+          "patternErrorMessage": "Use a positive number and a unit: s, m, h or d. For example 60s or 5m. The minimum is 10 seconds.",
+          "description": "How often to reload merge and pull request status. While one of your pipelines is running, Ukemi checks four times as often, and never under 10 seconds."
         }
       }
     },

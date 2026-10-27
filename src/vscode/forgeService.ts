@@ -7,9 +7,10 @@ import { GithubCredentials, type GithubCredential } from '../forge/githubCredent
 import { glabFetch } from '../forge/glabApi'
 import { glabKnowsHost } from '../forge/glabConfig'
 import { GitlabClient, type GitlabTokenKind } from '../forge/gitlab'
-import { forgeRefreshInterval } from '../forge/refreshInterval'
+import { FORGE_REFRESH_IDLE_MS, forgeRefreshInterval } from '../forge/refreshInterval'
 import { ForgeError, type ForgeClient } from '../forge/types'
 import type { RepoModel } from '../repo/repoModel'
+import { parseDuration } from '../util/duration'
 import { errorMessage, type Logger } from '../util/logger'
 import { readConfig } from './config'
 import { githubTokenUi } from './githubTokenUi'
@@ -77,6 +78,7 @@ export class ForgeService implements vscode.Disposable {
   private timer: ReturnType<typeof setTimeout> | null = null
   private refreshing = false
   private disposed = false
+  private warnedInterval: string | null = null
 
   constructor(
     private readonly registry: RepoRegistry,
@@ -97,6 +99,15 @@ export class ForgeService implements vscode.Disposable {
         const model = this.registry.activeModel
         if (state.focused && model) {
           void this.refreshRequests(model)
+        }
+      }),
+      vscode.workspace.onDidChangeConfiguration((event) => {
+        if (!event.affectsConfiguration('ukemi.forge.statusInterval')) {
+          return
+        }
+        const model = this.registry.activeModel
+        if (model) {
+          this.schedule(model)
         }
       }),
     )
@@ -235,7 +246,7 @@ export class ForgeService implements vscode.Disposable {
     if (!options.force && !vscode.window.state.focused) {
       return
     }
-    const interval = forgeRefreshInterval(requestsOf(model))
+    const interval = this.refreshInterval(model)
     const last = this.lastRefresh.get(model.root) ?? 0
     if (!options.force && Date.now() - last < interval) {
       this.schedule(model)
@@ -276,7 +287,7 @@ export class ForgeService implements vscode.Disposable {
     if (this.disposed || !vscode.window.state.focused || this.registry.activeModel !== model) {
       return
     }
-    const interval = forgeRefreshInterval(requestsOf(model))
+    const interval = this.refreshInterval(model)
     const last = this.lastRefresh.get(model.root) ?? 0
     const delay = Math.max(0, interval - (Date.now() - last))
     this.timer = setTimeout(() => {
@@ -286,6 +297,24 @@ export class ForgeService implements vscode.Disposable {
         void this.refreshRequests(active)
       }
     }, delay)
+  }
+
+  private refreshInterval(model: RepoModel): number {
+    return forgeRefreshInterval(requestsOf(model), this.idleIntervalMs())
+  }
+
+  private idleIntervalMs(): number {
+    const text = readConfig().statusInterval
+    const parsed = parseDuration(text)
+    if (parsed !== null) {
+      this.warnedInterval = null
+      return parsed
+    }
+    if (this.warnedInterval !== text) {
+      this.warnedInterval = text
+      this.logger.warn(`status interval "${text.slice(0, 40)}" is not valid, using 60s`)
+    }
+    return FORGE_REFRESH_IDLE_MS
   }
 
   private async loadRequests(model: RepoModel): Promise<void> {
