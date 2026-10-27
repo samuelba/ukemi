@@ -22,18 +22,18 @@ describe('GitLab OAuth', () => {
       gitlabAuthorizeUrl({
         host: 'git.anybotics.com',
         clientId: 'app',
-        redirectUri: 'cursor://samuelba.ukemi/gitlab-auth',
+        redirectUri: 'cursor://samuelba.ukemi-jj/gitlab-auth',
         state: 'state 1',
         challenge: pair.challenge,
       }),
     ).toBe(
-      `https://git.anybotics.com/oauth/authorize?client_id=app&redirect_uri=cursor%3A%2F%2Fsamuelba.ukemi%2Fgitlab-auth&response_type=code&state=state+1&scope=api&code_challenge=${pair.challenge}&code_challenge_method=S256`,
+      `https://git.anybotics.com/oauth/authorize?client_id=app&redirect_uri=cursor%3A%2F%2Fsamuelba.ukemi-jj%2Fgitlab-auth&response_type=code&state=state+1&scope=api&code_challenge=${pair.challenge}&code_challenge_method=S256`,
     )
     expect(() =>
       gitlabAuthorizeUrl({
         host: 'bad host',
         clientId: 'app',
-        redirectUri: 'cursor://samuelba.ukemi/gitlab-auth',
+        redirectUri: 'cursor://samuelba.ukemi-jj/gitlab-auth',
         state: 's',
         challenge: 'c',
       }),
@@ -61,7 +61,7 @@ describe('GitLab OAuth', () => {
       host: 'gitlab.com',
       clientId: 'app',
       code: 'code',
-      redirectUri: 'vscode://samuelba.ukemi/gitlab-auth',
+      redirectUri: 'vscode://samuelba.ukemi-jj/gitlab-auth',
       verifier: 'verifier',
       now: 60_000,
     })
@@ -94,7 +94,7 @@ describe('GitLab OAuth', () => {
       host: 'gitlab.com',
       clientId: 'app',
       code: 'code',
-      redirectUri: 'vscode://samuelba.ukemi/gitlab-auth',
+      redirectUri: 'vscode://samuelba.ukemi-jj/gitlab-auth',
       verifier: 'verifier',
     }).catch((caught: unknown) => caught)
 

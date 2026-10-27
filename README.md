@@ -45,8 +45,8 @@ Select the gear in the title bar of the Ukemi view to open the Ukemi settings.
 
 OAuth needs a non-confidential application on that GitLab host, with the `api` scope and these redirect URIs:
 
-- `vscode://samuelba.ukemi/gitlab-auth`
-- `cursor://samuelba.ukemi/gitlab-auth`
+- `vscode://samuelba.ukemi-jj/gitlab-auth`
+- `cursor://samuelba.ukemi-jj/gitlab-auth`
 
 Put the client ID in `ukemi.gitlab.oauthApplications`, for example `{ "git.example.com": "abc123" }`. If the host has no client ID, Ukemi asks for a personal access token with the `api` scope instead.
 
@@ -86,22 +86,22 @@ To watch without the debugger, run `npm run watch` in a terminal.
 ```sh
 npm test            # unit and integration tests, needs jj on PATH
 npm run test:e2e    # runs the extension inside the installed VS Code
-npm run package     # builds ukemi-0.1.0.vsix
+npm run package     # builds ukemi-jj-0.2.0.vsix
 ```
 
 ### Install the VSIX
 
 ```sh
-code --install-extension ukemi-0.1.0.vsix
+code --install-extension ukemi-jj-0.2.0.vsix
 ```
 
 In Cursor, `npm run install:cursor` packages and installs in one step.
 
-Then run **Developer: Restart Extension Host** or **Developer: Reload Window**. The editor keeps the old code loaded and does not ask for a restart when the version number is the same. To remove it, run `code --uninstall-extension samuelba.ukemi`.
+Then run **Developer: Restart Extension Host** or **Developer: Reload Window**. The editor keeps the old code loaded and does not ask for a restart when the version number is the same. To remove it, run `code --uninstall-extension samuelba.ukemi-jj`.
 
 ## Release
 
-A push to `main` does not publish. [release-please](https://github.com/googleapis/release-please) opens a release pull request from conventional commits (`feat` bumps minor before 1.0, `fix` bumps patch, `feat!` bumps major after 1.0). Merging that pull request creates the `vX.Y.Z` tag, the GitHub Release, and attaches `ukemi-X.Y.Z.vsix`.
+A push to `main` does not publish. [release-please](https://github.com/googleapis/release-please) opens a release pull request from conventional commits (`feat` bumps minor before 1.0, `fix` bumps patch, `feat!` bumps major after 1.0). Merging that pull request creates the `vX.Y.Z` tag, the GitHub Release, and attaches `ukemi-jj-X.Y.Z.vsix`.
 
 Set the repository secret `RELEASE_PLEASE_TOKEN` to a fine-grained personal access token if CI should run on that pull request. Without it, the release still works.
 
@@ -111,12 +111,12 @@ Upload that `.vsix` by hand. Cursor reads extensions from Open VSX, so publish i
 
 1. Create an Azure DevOps organization and a personal access token with Marketplace (publish) scope.
 2. Create the publisher `samuelba` at [marketplace.visualstudio.com/manage](https://marketplace.visualstudio.com/manage). The publisher id must exist before the first upload.
-3. Upload `ukemi-X.Y.Z.vsix` in the web UI, or run `npx vsce publish --packagePath ukemi-X.Y.Z.vsix -p "$VSCE_PAT"`.
+3. Upload `ukemi-jj-X.Y.Z.vsix` in the web UI, or run `npx vsce publish --packagePath ukemi-jj-X.Y.Z.vsix -p "$VSCE_PAT"`.
 
 ### Open VSX (Cursor)
 
 1. Sign in at [open-vsx.org](https://open-vsx.org) with GitHub and sign the Eclipse publisher agreement.
 2. Create a token, then create the namespace once: `npx ovsx create-namespace samuelba -p "$OVSX_PAT"`.
-3. Publish: `npx ovsx publish ukemi-X.Y.Z.vsix -p "$OVSX_PAT"`.
+3. Publish: `npx ovsx publish ukemi-jj-X.Y.Z.vsix -p "$OVSX_PAT"`.
 
 After the first public release, a later change can publish from `.github/workflows/release.yml` with the secrets `VSCE_PAT` and `OVSX_PAT`.
