@@ -61,7 +61,7 @@ function SettingsGear() {
   return (
     <a
       className="icon-button"
-      href={settingsCommandHref('@ext:ukemi.ukemi')}
+      href={settingsCommandHref('@ext:samuelba.ukemi-jj')}
       title="Open Settings"
       aria-label="Open Settings"
     >
