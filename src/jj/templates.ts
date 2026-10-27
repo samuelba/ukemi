@@ -98,6 +98,15 @@ export const WORKSPACE_TEMPLATE =
 
 export const PUSHED_BOOKMARK_TEMPLATE = 'if(remote && remote != "git", name ++ "\\n")'
 
+const TRUNK_NAME = 'b.name() == "main" || b.name() == "master" || b.name() == "trunk"'
+
+export const TRUNK_BOOKMARK_TEMPLATE =
+  'separate("\\n", ' +
+  `remote_bookmarks.filter(|b| b.remote() != "git" && (${TRUNK_NAME})).map(|b| b.name()), ` +
+  `bookmarks.filter(|b| ${TRUNK_NAME}).map(|b| b.name()), ` +
+  'remote_bookmarks.filter(|b| b.remote() != "git").map(|b| b.name())' +
+  ') ++ "\\n"'
+
 export const BOOKMARK_LIST_TEMPLATE =
   jsonObject({
     name: 'json(name)',

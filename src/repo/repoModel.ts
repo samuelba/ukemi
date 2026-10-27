@@ -3,6 +3,7 @@ import { layoutGraph, type GraphRow } from '../../shared/graphLayout'
 import type { ChangedFile, Commit, GraphFilter, HistoryDepth, Workspace } from '../../shared/model'
 import type { CommitView, ForgeState, GraphState, RequestBadge } from '../../shared/protocol'
 import { buildGraphNodes } from '../graph/buildGraph'
+import type { ParsedBookmark } from '../jj/parse'
 import { JjRepo } from '../jj/repo'
 import { CURRENT_BOOKMARKS_REVSET, graphRevset } from '../jj/revsets'
 import type { Logger } from '../util/logger'
@@ -30,6 +31,7 @@ export class RepoModel {
   private showLineStats = false
   private readonly fileCache = new Map<string, ChangedFile[]>()
   private readonly listeners = new Set<ChangeListener>()
+  private listedBookmarks: ParsedBookmark[] = []
 
   constructor(
     readonly repo: JjRepo,
@@ -53,6 +55,10 @@ export class RepoModel {
 
   get graph(): GraphState | null {
     return this.current
+  }
+
+  get bookmarks(): readonly ParsedBookmark[] {
+    return this.listedBookmarks
   }
 
   get error(): string | null {
@@ -171,7 +177,7 @@ export class RepoModel {
 
   private async buildState(): Promise<GraphState> {
     const revset = graphRevset(this.filter, this.depth)
-    const [logged, trunkIds, operations, workspaces, remotes, trunkName, pushed, currentBookmarks] =
+    const [logged, trunkIds, operations, workspaces, remotes, trunkName, listed, currentBookmarks] =
       await Promise.all([
         this.repo.log(revset),
         this.repo.commitIds('present(trunk())'),
@@ -179,10 +185,12 @@ export class RepoModel {
         this.repo.workspaces(),
         this.repo.remotes(),
         this.repo.trunkBookmark(),
-        this.repo.pushedBookmarkNames(),
+        this.repo.bookmarkList(),
         this.repo.bookmarkNames(CURRENT_BOOKMARKS_REVSET),
       ])
-    const commits = remotes.length > 0 ? markNeverPushed(logged, pushed) : logged
+    const bookmarks = listed.filter((row) => row.remote !== 'git')
+    const commits =
+      remotes.length > 0 ? markNeverPushed(logged, remoteBookmarkNames(bookmarks)) : logged
     const nodes = await buildGraphNodes(commits, (parent) =>
       this.repo.commitIds(`heads(::${parent} & (${revset}))`),
     )
@@ -196,6 +204,7 @@ export class RepoModel {
     this.lastOperationId = head?.id ?? null
 
     const views = commits.map((commit, index) => toCommitView(commit, rows[index], trunkId))
+    this.listedBookmarks = bookmarks
 
     return {
       repoId: this.root,
@@ -285,6 +294,10 @@ function toCommitView(
     isTrunk: commit.commitId === trunkId,
     requests: [],
   }
+}
+
+function remoteBookmarkNames(rows: readonly ParsedBookmark[]): Set<string> {
+  return new Set(rows.filter((row) => row.remote !== null).map((row) => row.name))
 }
 
 function markNeverPushed(commits: readonly Commit[], pushed: ReadonlySet<string>): Commit[] {

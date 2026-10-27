@@ -464,3 +464,50 @@ describe('mutations', () => {
     expect(after?.description).toBe('')
   })
 })
+
+describe('bookmark rename and untrack', () => {
+  test('renameBookmark keeps the target under the new name', async () => {
+    writeFile(root, 'a.txt', 'a\n')
+    jj(root, 'describe', '-m', 'named')
+    const commit = await current()
+    await repo.setBookmark('old', commit.commitId)
+
+    await repo.renameBookmark('old', 'new')
+
+    const local = (await repo.bookmarkList()).filter((bookmark) => bookmark.remote === null)
+    expect(local.map((bookmark) => bookmark.name)).toEqual(['new'])
+    expect(local[0]?.commitId).toBe(commit.commitId)
+  })
+
+  test('untrackBookmark stops tracking a pushed remote bookmark', async () => {
+    const remote = join(fixture.dir, 'remote.git')
+    execFileSync('git', ['init', '--bare', '-q', remote])
+    jj(root, 'git', 'remote', 'add', 'origin', remote)
+    writeFile(root, 'a.txt', 'a\n')
+    jj(root, 'describe', '-m', 'shared')
+    const commit = await current()
+    await repo.setBookmark('main', commit.commitId)
+    await repo.push('main')
+
+    await repo.untrackBookmark('main', 'origin')
+
+    const tracked = (await repo.bookmarkList()).find(
+      (bookmark) => bookmark.name === 'main' && bookmark.remote === 'origin',
+    )
+    expect(tracked?.tracked).toBe(false)
+  })
+
+  test('trunkBookmark prefers main when another bookmark sits on the trunk commit', async () => {
+    const remote = join(fixture.dir, 'remote.git')
+    execFileSync('git', ['init', '--bare', '-q', remote])
+    jj(root, 'git', 'remote', 'add', 'origin', remote)
+    writeFile(root, 'a.txt', 'a\n')
+    jj(root, 'describe', '-m', 'shared')
+    const commit = await current()
+    await repo.setBookmark('feature', commit.commitId)
+    await repo.setBookmark('main', commit.commitId)
+    await repo.push('main')
+
+    expect(await repo.trunkBookmark()).toBe('main')
+  })
+})

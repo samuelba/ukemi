@@ -32,6 +32,7 @@ import {
   LOG_TEMPLATE,
   OP_LOG_TEMPLATE,
   PUSHED_BOOKMARK_TEMPLATE,
+  TRUNK_BOOKMARK_TEMPLATE,
   WORKSPACE_TEMPLATE,
 } from './templates'
 
@@ -211,7 +212,7 @@ export class JjRepo {
       '-r',
       'present(trunk())',
       '-T',
-      'remote_bookmarks.map(|b| b.name()).join("\\n") ++ "\\n"',
+      TRUNK_BOOKMARK_TEMPLATE,
     ])
     return stdout.split('\n').find((line) => line.trim().length > 0) ?? null
   }
@@ -386,6 +387,14 @@ export class JjRepo {
 
   trackBookmark(name: string, remote: string) {
     return this.mutate(['bookmark', 'track', `${name}@${remote}`])
+  }
+
+  untrackBookmark(name: string, remote: string) {
+    return this.mutate(['bookmark', 'untrack', `${name}@${remote}`])
+  }
+
+  renameBookmark(oldName: string, newName: string) {
+    return this.mutate(['bookmark', 'rename', oldName, newName])
   }
 
   fetch(options: { interactive?: boolean } = {}) {

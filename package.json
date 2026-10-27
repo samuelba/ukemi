@@ -100,6 +100,11 @@
           "contextualTitle": "Ukemi"
         },
         {
+          "id": "ukemi.bookmarks",
+          "name": "Bookmarks",
+          "icon": "$(bookmark)"
+        },
+        {
           "id": "ukemi.workspaces",
           "name": "Workspaces"
         },
@@ -110,6 +115,12 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "ukemi.bookmarks",
+        "contents": "No bookmarks. Right-click a change in the graph → Set Bookmark…"
+      }
+    ],
     "commands": [
       {
         "command": "ukemi.refresh",
@@ -478,19 +489,58 @@
         "icon": "$(cloud-upload)"
       },
       {
+        "command": "ukemi.bookmark.pushDeleted",
+        "title": "Push Deletes the Remote Bookmark",
+        "category": "Ukemi",
+        "icon": "$(cloud-upload)"
+      },
+      {
         "command": "ukemi.bookmark.delete",
         "title": "Delete Bookmark",
-        "category": "Ukemi"
+        "category": "Ukemi",
+        "icon": "$(trash)"
       },
       {
         "command": "ukemi.bookmark.forget",
         "title": "Forget Bookmark",
-        "category": "Ukemi"
+        "category": "Ukemi",
+        "icon": "$(discard)"
       },
       {
         "command": "ukemi.bookmark.track",
         "title": "Track Remote Bookmark",
-        "category": "Ukemi"
+        "category": "Ukemi",
+        "icon": "$(pin)"
+      },
+      {
+        "command": "ukemi.bookmark.untrack",
+        "title": "Untrack Remote Bookmark",
+        "category": "Ukemi",
+        "icon": "$(debug-disconnect)"
+      },
+      {
+        "command": "ukemi.bookmark.rename",
+        "title": "Rename Bookmark",
+        "category": "Ukemi",
+        "icon": "$(replace)"
+      },
+      {
+        "command": "ukemi.bookmark.newChange",
+        "title": "New Working Copy",
+        "category": "Ukemi",
+        "icon": "$(git-branch)"
+      },
+      {
+        "command": "ukemi.bookmark.edit",
+        "title": "Edit Bookmark",
+        "category": "Ukemi",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "ukemi.bookmark.copyName",
+        "title": "Copy Bookmark Name",
+        "category": "Ukemi",
+        "icon": "$(copy)"
       },
       {
         "command": "ukemi.bookmark.createRequest",
@@ -1004,6 +1054,66 @@
           "command": "ukemi.evolution.restore",
           "group": "inline@2",
           "when": "view == ukemi.evolution && viewItem =~ /restorable/"
+        },
+        {
+          "command": "ukemi.bookmark.newChange",
+          "group": "inline@1",
+          "when": "view == ukemi.bookmarks && viewItem =~ /^bookmark\\+/ && viewItem =~ /present/"
+        },
+        {
+          "command": "ukemi.bookmark.edit",
+          "group": "inline@2",
+          "when": "view == ukemi.bookmarks && viewItem =~ /^bookmark\\+local/ && viewItem =~ /present/"
+        },
+        {
+          "command": "ukemi.bookmark.rename",
+          "group": "inline@3",
+          "when": "view == ukemi.bookmarks && viewItem =~ /^bookmark\\+local(?!.*\\+trunk\\b)/ && viewItem =~ /present/"
+        },
+        {
+          "command": "ukemi.bookmark.delete",
+          "group": "inline@4",
+          "when": "view == ukemi.bookmarks && viewItem =~ /^bookmark\\+local(?!.*\\+trunk\\b)/ && viewItem =~ /present/"
+        },
+        {
+          "command": "ukemi.bookmark.push",
+          "group": "inline@5",
+          "when": "view == ukemi.bookmarks && viewItem =~ /^bookmark\\+local/ && viewItem =~ /unsynced/"
+        },
+        {
+          "command": "ukemi.bookmark.pushDeleted",
+          "group": "inline@5",
+          "when": "view == ukemi.bookmarks && viewItem =~ /^bookmark\\+local/ && viewItem =~ /deleted/"
+        },
+        {
+          "command": "ukemi.bookmark.forget",
+          "group": "inline@6",
+          "when": "view == ukemi.bookmarks && viewItem =~ /^bookmark\\+local(?!.*\\+trunk\\b)/"
+        },
+        {
+          "command": "ukemi.bookmark.track",
+          "group": "inline@2",
+          "when": "view == ukemi.bookmarks && viewItem =~ /^bookmark\\+remote(?!.*\\+tracked\\b)/ && viewItem =~ /present/"
+        },
+        {
+          "command": "ukemi.bookmark.untrack",
+          "group": "inline@3",
+          "when": "view == ukemi.bookmarks && viewItem =~ /^bookmark\\+remote/ && viewItem =~ /tracked/"
+        },
+        {
+          "command": "ukemi.bookmark.createRequest",
+          "group": "1_request@1",
+          "when": "view == ukemi.bookmarks && viewItem =~ /^bookmark\\+local(?!.*\\+trunk\\b)/ && viewItem =~ /present/"
+        },
+        {
+          "command": "ukemi.bookmark.newWorkspace",
+          "group": "1_nav@1",
+          "when": "view == ukemi.bookmarks && viewItem =~ /^bookmark\\+/ && viewItem =~ /present/"
+        },
+        {
+          "command": "ukemi.bookmark.copyName",
+          "group": "9_copy@1",
+          "when": "view == ukemi.bookmarks && viewItem =~ /^bookmark\\+/"
         }
       ],
       "ukemi.duplicate": [
@@ -1265,6 +1375,10 @@
           "when": "false"
         },
         {
+          "command": "ukemi.bookmark.pushDeleted",
+          "when": "false"
+        },
+        {
           "command": "ukemi.bookmark.delete",
           "when": "false"
         },
@@ -1274,6 +1388,26 @@
         },
         {
           "command": "ukemi.bookmark.track",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.bookmark.untrack",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.bookmark.rename",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.bookmark.newChange",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.bookmark.edit",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.bookmark.copyName",
           "when": "false"
         },
         {

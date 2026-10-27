@@ -73,7 +73,7 @@ export function contextCommit(env: CommandEnv, arg: unknown): Target | null {
   return { model, commit }
 }
 
-export function shortId(commit: CommitView): string {
+export function shortId(commit: { changeId: string; changePrefix: string }): string {
   return commit.changeId.slice(0, Math.max(8, commit.changePrefix.length))
 }
 

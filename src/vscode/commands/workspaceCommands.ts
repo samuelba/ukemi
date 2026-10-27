@@ -3,6 +3,7 @@ import { basename, dirname, join } from 'node:path'
 import * as vscode from 'vscode'
 import type { Workspace } from '../../../shared/model'
 import type { RepoModel } from '../../repo/repoModel'
+import { isBookmarkTreeElement } from '../../repo/bookmarkItems'
 import {
   defaultWorkspaceName,
   isWorkspaceOpen,
@@ -43,6 +44,22 @@ function workspaceTarget(env: CommandEnv, arg: unknown): { model: RepoModel; nam
   const ctx = parseContext(arg)
   const model = contextModel(env, ctx)
   return model && ctx.workspace ? { model, name: ctx.workspace } : null
+}
+
+function bookmarkWorkspace(
+  arg: unknown,
+): { repoId: string | undefined; name: string; remote: string | undefined } | null {
+  if (isBookmarkTreeElement(arg)) {
+    if (!arg.commitId) {
+      return null
+    }
+    return { repoId: arg.repoId, name: arg.name, remote: arg.remote ?? undefined }
+  }
+  const ctx = parseContext(arg)
+  if (!ctx.bookmark) {
+    return null
+  }
+  return { repoId: ctx.repoId, name: ctx.bookmark, remote: ctx.remote }
 }
 
 function workspaceHandler(
@@ -255,15 +272,19 @@ export function workspaceCommands(env: CommandEnv): Record<string, Handler> {
       })
     },
     'ukemi.bookmark.newWorkspace': async (arg?: unknown) => {
-      const ctx = parseContext(arg)
-      const model = contextModel(env, ctx)
-      if (!model || !ctx.bookmark) {
+      const picked = bookmarkWorkspace(arg)
+      if (!picked) {
         return
       }
-      const revision = ctx.remote ? `${ctx.bookmark}@${ctx.remote}` : ctx.bookmark
+      const model =
+        (picked.repoId ? env.registry.modelFor(picked.repoId) : null) ?? env.registry.activeModel
+      if (!model) {
+        return
+      }
+      const revision = picked.remote ? `${picked.name}@${picked.remote}` : picked.name
       await addWorkspace(env, model, {
         revision,
-        suggestedName: ctx.bookmark,
+        suggestedName: picked.name,
         shown: revision,
       })
     },

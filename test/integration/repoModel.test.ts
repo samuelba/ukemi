@@ -118,6 +118,9 @@ describe('RepoModel', () => {
     expect(bookmarks.find((b) => b.name === 'pushed')?.synced).toBe(true)
     expect(bookmarks.find((b) => b.name === 'local-only')?.synced).toBe(false)
     expect(model.graph?.hasUnpushed).toBe(true)
+    expect(
+      model.bookmarks.map((bookmark) => `${bookmark.remote ?? 'local'}:${bookmark.name}`).sort(),
+    ).toEqual(['local:local-only', 'local:pushed', 'origin:pushed'])
   })
 
   test('treats bookmarks as synced when the repository has no remote', async () => {
