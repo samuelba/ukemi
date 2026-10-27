@@ -111,7 +111,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
     workspacesView,
     bookmarksView,
     vscode.window.registerTreeDataProvider('ukemi.workspaces', workspacesView),
-    vscode.window.registerTreeDataProvider('ukemi.bookmarks', bookmarksView),
     vscode.window.registerWebviewViewProvider(GRAPH_VIEW_ID, graphView, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
@@ -152,6 +151,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
     'ukemi.evolution.follow': () => {
       selection.toggleFollow(evolutionView.currentSelection())
     },
+    'ukemi.bookmarks.filter': () => bookmarksView.promptFilter(),
+    'ukemi.bookmarks.clearFilter': () => bookmarksView.clearFilter(),
     'ukemi.split.open': async (arg?: unknown) => {
       const target = contextCommit(env, arg)
       if (target) {

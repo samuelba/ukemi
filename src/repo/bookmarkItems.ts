@@ -25,11 +25,20 @@ export interface BookmarkRowElement {
   id: string
 }
 
+export function bookmarkMatches(query: string, row: ParsedBookmark): boolean {
+  const needle = query.trim().toLowerCase()
+  if (needle.length === 0) {
+    return true
+  }
+  return row.name.toLowerCase().includes(needle)
+}
+
 export function bookmarkGroups(
   rows: readonly ParsedBookmark[],
   repoId: string,
+  query = '',
 ): BookmarkGroupElement[] {
-  const visible = rows.filter((row) => row.remote !== GIT_REMOTE)
+  const visible = rows.filter((row) => row.remote !== GIT_REMOTE && bookmarkMatches(query, row))
   const groups: BookmarkGroupElement[] = []
   if (visible.some((row) => row.remote === null)) {
     groups.push(groupElement(repoId, null, 'Local'))
@@ -48,9 +57,10 @@ export function bookmarkRows(
   group: BookmarkGroupElement,
   trunkName: string | null,
   hasRemotes = true,
+  query = '',
 ): BookmarkRowElement[] {
   return rows
-    .filter((row) => row.remote === group.remote)
+    .filter((row) => row.remote === group.remote && bookmarkMatches(query, row))
     .sort((left, right) => left.name.localeCompare(right.name))
     .map((row) => rowElement(row, rows, group.repoId, trunkName, hasRemotes))
 }

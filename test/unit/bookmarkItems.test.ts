@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'vitest'
 import type { ParsedBookmark } from '../../src/jj/parse'
-import { bookmarkGroups, bookmarkRows, isBookmarkTreeElement } from '../../src/repo/bookmarkItems'
+import {
+  bookmarkGroups,
+  bookmarkMatches,
+  bookmarkRows,
+  isBookmarkTreeElement,
+} from '../../src/repo/bookmarkItems'
 
 function row(overrides: Partial<ParsedBookmark> = {}): ParsedBookmark {
   return {
@@ -241,6 +246,57 @@ describe('bookmarkRows', () => {
       'No commit',
       'deleted',
       'Push deletes old@origin, old@upstream',
+    ])
+  })
+})
+
+describe('bookmarkMatches', () => {
+  test('matches an empty query', () => {
+    expect(bookmarkMatches('', row())).toBe(true)
+    expect(bookmarkMatches('   ', row())).toBe(true)
+  })
+
+  test('matches a substring of the name, ignoring case', () => {
+    expect(bookmarkMatches('fea', row({ name: 'feature', description: '' }))).toBe(true)
+    expect(bookmarkMatches('FEA', row({ name: 'Feature', description: '' }))).toBe(true)
+    expect(bookmarkMatches('ftr', row({ name: 'feature', description: '' }))).toBe(false)
+  })
+
+  test('ignores the description and the remote', () => {
+    expect(bookmarkMatches('gate', row({ description: 'fix the gate' }))).toBe(false)
+    expect(
+      bookmarkMatches('origin', row({ name: 'feature', remote: 'origin', description: '' })),
+    ).toBe(false)
+  })
+})
+
+describe('bookmark filter', () => {
+  test('drops groups and rows that do not match, and keeps alphabetical order', () => {
+    expect(bookmarkGroups(rows, '/repo', 'feat').map((group) => group.label)).toEqual([
+      'Local',
+      'origin',
+    ])
+    const listed = [
+      row({ name: 'zeta', description: '' }),
+      row({ name: 'feature', description: '' }),
+      row({ name: 'fast', description: '' }),
+    ]
+    const local = bookmarkGroups(listed, '/repo', 'f')[0]
+    expect(local && bookmarkRows(listed, local, null, true, 'f').map((item) => item.name)).toEqual([
+      'fast',
+      'feature',
+    ])
+  })
+
+  test('still hides the git remote when the query matches it', () => {
+    expect(bookmarkGroups(rows, '/repo', 'gitty')).toEqual([])
+  })
+
+  test('an empty query lists every visible group', () => {
+    expect(bookmarkGroups(rows, '/repo', '').map((group) => group.label)).toEqual([
+      'Local',
+      'origin',
+      'upstream',
     ])
   })
 })
