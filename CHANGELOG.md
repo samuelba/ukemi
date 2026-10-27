@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/samuelba/ukemi/compare/v0.3.0...v0.4.0) (2026-10-27)
+
+
+### Features
+
+* search filter for bookmarks panel ([53778c3](https://github.com/samuelba/ukemi/commit/53778c39be33f5295dbea3914cf651d84c3b1c28))
+* setting for MR/PR status update frequency ([fd31a26](https://github.com/samuelba/ukemi/commit/fd31a26c3961b4e2e49cf6224afc51f78862c8c8))
+
+
+### Bug Fixes
+
+* settings link in Cursor ([c17ef5d](https://github.com/samuelba/ukemi/commit/c17ef5d436fe1619710c121789fee45ab2668970))
+
 ## [0.3.0](https://github.com/samuelba/ukemi/compare/v0.2.0...v0.3.0) (2026-10-27)
 
 
