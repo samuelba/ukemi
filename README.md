@@ -1,19 +1,30 @@
 # Ukemi: Jujutsu (jj) GUI
 
+<p align="center">
+  <img src="resources/icon.png" alt="Ukemi logo" width="128">
+</p>
+
 Ukemi is a visual interface for [Jujutsu (jj)](https://jj-vcs.github.io/jj/) in VS Code. In judo, _ukemi_ is the art of falling safely. With jj and `undo`, every change is safe to try.
+
+<p align="center">
+  <img src="images/overview.png" alt="Ukemi sidebar: change graph, bookmarks, workspaces and evolution" width="324">
+</p>
 
 ## Features
 
-- **Change graph.** See your changes, bookmarks, tags, workspaces and conflicts. The working copy has a red seal. Filter by _Recent_, _Mine_, _My history_, _Stack_ or _Working copy_ (the working copy and its last 5 parents) and choose the history depth.
-- **Drag and drop.** Drag a change onto another change to rebase it with its descendants. Hold Alt to move only that change. Drag a file to another change to move its changes. Drag a bookmark to move it.
-- **Edit history.** Use the context menu or the hover action to describe, create, edit, squash, split, abandon, duplicate and revert changes. Click a change to show or hide its files.
-- **Split by hunks.** Select hunks in a split editor. The selected hunks go into a new change before the original.
-- **Evolution.** The Evolution panel shows how the selected change evolved: each amend, describe, snapshot and rebase. Select a change in the graph. Click a version to see what it changed, compare it with the current version, or restore its files.
-- **Diffs.** Click a file to see its diff. The Source Control view shows the working copy for repositories that the Git extension does not show.
-- **Sync.** Fetch, push bookmarks, undo and redo from the toolbar. SSH remotes use your SSH agent. For HTTPS remotes, Ukemi uses your git credential helper first, then your GitHub sign-in in the editor or your GitLab sign-in. For GitHub, you can also choose a user name and a personal access token with the `repo` scope. Use **Sign In to GitHub or GitLab** to change the choice, and **Sign Out of GitHub or GitLab** to remove a stored token.
+- **Change graph.** See your changes, bookmarks, tags, workspaces and conflicts. The working copy has a red seal. Filter by _Recent_, _Mine_, _My history_, _Stack_ or _Working copy_ (the working copy and its last 5 first parents) and choose the history depth. _Recent_ also shows the last 10 commits on the trunk. Changed files appear as a list or a tree.
+- **Drag and drop.** Drag a change onto another change to rebase it with its descendants. Hold Alt to move only that change. Hold Ctrl to duplicate it onto the target, and hold Ctrl and Alt to duplicate it with its descendants. Drag a file to move its changes, or hold Ctrl to copy them. Drag a bookmark to move it.
+- **Edit history.** Use the context menu or the hover action to describe, create, edit, squash, split, abandon, duplicate and revert changes. Rebase onto the trunk, onto another change, or insert the change before or after another. **Ship to Trunk Now** moves the trunk bookmark to that change and pushes it. **New Change from Trunk** starts a working copy on the trunk. **Go to Bookmark, Request or Revision** opens a new working copy there. When a local bookmark and a remote bookmark share a name, Ukemi asks which one to use. Click a change to show or hide its files.
+- **Bookmarks.** The Bookmarks panel lists local bookmarks and remote bookmarks. Hover a row to open it as the working copy, edit, rename, delete, forget, track, untrack or push it. The context menu can also create a pull or merge request, or a new workspace.
+- **Workspaces.** The Workspaces panel lists workspaces. Open one in this window or a new window, open a terminal, refresh it, reveal it in the graph, or start a new change in it.
+- **Split by hunks.** Select hunks in a split editor. The selected hunks go into a new change before the original. You can also split by files.
+- **Evolution.** The Evolution panel shows how the selected change evolved: each amend, describe, snapshot and rebase. Select a change in the graph. Click a version to see what it changed, compare it with the current version, or restore its files. **Follow the Selected Change** keeps the panel on the change you select.
+- **Diffs.** Click a file to see its diff. The Source Control view shows the working copy for repositories that the Git extension does not show. Turn on `ukemi.showEditorTitleDiff` to add an **Open Changes (jj)** button to the editor title.
+- **Sync.** Fetch, push the current bookmark, push all bookmarks, undo and redo from the toolbar. Auto fetch stays off until you turn it on. SSH remotes use your SSH agent. For HTTPS remotes, Ukemi uses your git credential helper first, then your GitHub sign-in in the editor or your GitLab sign-in. For GitHub, you can also choose a user name and a personal access token with the `repo` scope. Use **Sign In to GitHub or GitLab** to change the choice, and **Sign Out of GitHub or GitLab** to remove a stored token.
 - **Pull and merge requests.** Create GitHub pull requests and GitLab merge requests from a change. See their status and CI result in the graph. Hover a request you opened to see the jobs, and use the open icon to open it in the browser. Merge them and clean up after the merge.
+- **Clean up.** Review merged and conflicted bookmarks, deleted remote bookmarks, workspaces that are not open, and divergent changes, then apply the selection.
 - **Many repositories.** Ukemi finds repositories in subfolders, for example `tools/firmware/repo`. When it finds more than one, select it in the dropdown. Ukemi follows the active editor.
-- **No setup.** When jj is missing, Ukemi offers to download the official static release and checks its SHA-256 digest.
+- **No setup.** When jj is missing, Ukemi offers to download the official static release and checks its SHA-256 digest. That binary can be added to `PATH` in integrated terminals.
 
 ## Requirements
 
@@ -24,16 +35,31 @@ Ukemi is a visual interface for [Jujutsu (jj)](https://jj-vcs.github.io/jj/) in 
 
 Select the gear in the title bar of the Ukemi view to open the Ukemi settings.
 
-| Setting                                     | Purpose                                                                               |
-| ------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `ukemi.jjPath`                              | Path to jj. Empty means search `PATH` and common folders.                             |
-| `ukemi.defaultFilter`, `ukemi.historyDepth` | Filter and time range that the graph shows first.                                     |
-| `ukemi.repoScanDepth`                       | Folder levels to search for repositories.                                             |
-| `ukemi.showSourceControl`                   | When to show the working copy in Source Control.                                      |
-| `ukemi.gitlab.hosts`, `ukemi.github.hosts`  | Self-hosted GitLab and GitHub Enterprise hosts.                                       |
-| `ukemi.gitlab.oauthApplications`            | GitLab OAuth client IDs by host. The client ID is not a secret.                       |
-| `ukemi.forge.ciOnlyMine`                    | Show CI status only on open requests that you authored. Default: on.                  |
-| `ukemi.forge.requestLimit`                  | How many recently updated merge and pull requests to load. Default: 50. Maximum: 500. |
+| Setting                              | Purpose                                                                                           |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `ukemi.jjPath`                       | Path to jj. Empty means search `PATH` and common folders.                                         |
+| `ukemi.addJjToTerminalPath`          | Add the jj binary that Ukemi downloaded to `PATH` in integrated terminals. Default: on.           |
+| `ukemi.showSourceControl`            | When to show the working copy in Source Control: `auto`, `always` or `never`.                     |
+| `ukemi.showInPanel`                  | Open the change graph in an editor tab. Default: off.                                             |
+| `ukemi.showEditorTitleDiff`          | Show **Open Changes (jj)** in the editor title. Default: off.                                     |
+| `ukemi.followActiveEditor`           | Switch to the repository of the active editor. Default: on.                                       |
+| `ukemi.repoScanDepth`                | Folder levels to search for repositories. Default: 4.                                             |
+| `ukemi.repoScanExclude`              | Folder names to skip during the repository search.                                                |
+| `ukemi.defaultFilter`                | Filter that the graph shows first.                                                                |
+| `ukemi.historyDepth`                 | Default history depth: `7d`, `14d`, `30d`, `1y` or `all`.                                         |
+| `ukemi.changeIdLength`               | Minimum number of change ID characters to show. Default: 4.                                       |
+| `ukemi.showFullPaths`                | Show full file paths in the graph. Default: off.                                                  |
+| `ukemi.showLineStats`                | Show added and removed line counts. This reads those file contents on each refresh. Default: off. |
+| `ukemi.showGitTags`                  | Show git tags on changes. Default: on.                                                            |
+| `ukemi.changedFilesView`             | Show changed files as a `list` or a `tree`.                                                       |
+| `ukemi.workspaces.snapshotOnRefresh` | Snapshot every other workspace on each refresh. Default: off. Each snapshot is a jj operation.    |
+| `ukemi.autoFetch.enabled`            | Fetch the active repository on a timer. Default: off.                                             |
+| `ukemi.autoFetch.interval`           | How often to fetch when auto fetch is on. Example: `10m`. Minimum: 10 seconds.                    |
+| `ukemi.github.hosts`                 | GitHub Enterprise hosts, for example `github.example.com`.                                        |
+| `ukemi.gitlab.hosts`                 | Self-hosted GitLab hosts, for example `git.example.com`.                                          |
+| `ukemi.gitlab.oauthApplications`     | GitLab OAuth client IDs by host. The client ID is not a secret.                                   |
+| `ukemi.forge.ciOnlyMine`             | Show CI status only on open requests that you authored. Default: on.                              |
+| `ukemi.forge.requestLimit`           | How many recently updated merge and pull requests to load. Default: 50. Maximum: 500.             |
 
 ## Sign in
 
@@ -104,19 +130,3 @@ Then run **Developer: Restart Extension Host** or **Developer: Reload Window**. 
 A push to `main` does not publish. [release-please](https://github.com/googleapis/release-please) opens a release pull request from conventional commits (`feat` bumps minor before 1.0, `fix` bumps patch, `feat!` bumps major after 1.0). Merging that pull request creates the `vX.Y.Z` tag, the GitHub Release, and attaches `ukemi-jj-X.Y.Z.vsix`. Merge commits are removed from those notes afterward.
 
 Set the repository secret `RELEASE_PLEASE_TOKEN` to a fine-grained personal access token if CI should run on that pull request. Without it, the release still works.
-
-Upload that `.vsix` by hand. Cursor reads extensions from Open VSX, so publish in both places.
-
-### VS Code Marketplace
-
-1. Create an Azure DevOps organization and a personal access token with Marketplace (publish) scope.
-2. Create the publisher `samuelba` at [marketplace.visualstudio.com/manage](https://marketplace.visualstudio.com/manage). The publisher id must exist before the first upload.
-3. Upload `ukemi-jj-X.Y.Z.vsix` in the web UI, or run `npx vsce publish --packagePath ukemi-jj-X.Y.Z.vsix -p "$VSCE_PAT"`.
-
-### Open VSX (Cursor)
-
-1. Sign in at [open-vsx.org](https://open-vsx.org) with GitHub and sign the Eclipse publisher agreement.
-2. Create a token, then create the namespace once: `npx ovsx create-namespace samuelba -p "$OVSX_PAT"`.
-3. Publish: `npx ovsx publish ukemi-jj-X.Y.Z.vsix -p "$OVSX_PAT"`.
-
-After the first public release, a later change can publish from `.github/workflows/release.yml` with the secrets `VSCE_PAT` and `OVSX_PAT`.
