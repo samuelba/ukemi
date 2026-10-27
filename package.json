@@ -680,6 +680,18 @@
         "title": "Follow the Selected Change",
         "category": "Ukemi",
         "icon": "$(target)"
+      },
+      {
+        "command": "ukemi.bookmarks.filter",
+        "title": "Filter Bookmarks",
+        "category": "Ukemi",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "ukemi.bookmarks.clearFilter",
+        "title": "Clear Bookmark Filter",
+        "category": "Ukemi",
+        "icon": "$(clear-all)"
       }
     ],
     "submenus": [
@@ -953,6 +965,16 @@
           "command": "ukemi.workspaces.refreshAll",
           "group": "navigation@2",
           "when": "view == ukemi.workspaces"
+        },
+        {
+          "command": "ukemi.bookmarks.filter",
+          "group": "navigation@1",
+          "when": "view == ukemi.bookmarks"
+        },
+        {
+          "command": "ukemi.bookmarks.clearFilter",
+          "group": "navigation@2",
+          "when": "view == ukemi.bookmarks && ukemi.bookmarks.filtering"
         },
         {
           "command": "ukemi.evolution.follow",
@@ -1508,6 +1530,10 @@
         {
           "command": "ukemi.evolution.follow",
           "when": "false"
+        },
+        {
+          "command": "ukemi.bookmarks.clearFilter",
+          "when": "ukemi.bookmarks.filtering"
         }
       ]
     },
