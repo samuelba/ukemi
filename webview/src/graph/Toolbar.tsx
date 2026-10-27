@@ -204,12 +204,6 @@ export function Toolbar({
                   onClick={() => command('ukemi.fetch', { repoId })}
                 />
                 <ToolButton
-                  icon={autoFetch.enabled ? 'sync' : 'sync-ignored'}
-                  label={autoFetchLabel(autoFetch)}
-                  isOn={autoFetch.enabled}
-                  onClick={() => command('ukemi.toggleAutoFetch')}
-                />
-                <ToolButton
                   icon="cloud-upload"
                   label={pushCurrentLabel(graph)}
                   isAccent={hasUnsyncedCurrent(graph)}
@@ -287,6 +281,14 @@ export function Toolbar({
               </option>
             ))}
           </select>
+          {graph.hasRemotes && (
+            <ToolButton
+              icon={autoFetch.enabled ? 'sync' : 'sync-ignored'}
+              label={autoFetchLabel(autoFetch)}
+              isOn={autoFetch.enabled}
+              onClick={() => command('ukemi.toggleAutoFetch')}
+            />
+          )}
           <ToolButton
             icon="tag"
             label={showGitTags ? 'Hide git tags' : 'Show git tags'}
