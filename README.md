@@ -1,10 +1,14 @@
 # Ukemi: Jujutsu (jj) GUI
 
+[![CI](https://github.com/samuelba/ukemi/actions/workflows/ci.yml/badge.svg)](https://github.com/samuelba/ukemi/actions/workflows/ci.yml)
+
 <p align="center">
   <img src="resources/icon.png" alt="Ukemi logo" width="128">
 </p>
 
 Ukemi is a visual interface for [Jujutsu (jj)](https://jj-vcs.github.io/jj/) in VS Code. In judo, _ukemi_ is the art of falling safely. With jj and `undo`, every change is safe to try.
+
+Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=samuelba.ukemi-jj) or [Open VSX](https://open-vsx.org/extension/samuelba/ukemi-jj) (Cursor).
 
 <p align="center">
   <img src="images/overview.png" alt="Ukemi sidebar: change graph, bookmarks, workspaces and evolution" width="324">
