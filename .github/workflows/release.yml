@@ -15,12 +15,58 @@ jobs:
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
+      pr: ${{ steps.release.outputs.pr }}
     steps:
       - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
         id: release
         with:
           # A fine-grained PAT lets CI run on the release pull request. Without it, the release still works.
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+
+  dedupe-notes:
+    needs: release-please
+    if: needs.release-please.outputs.pr != '' && needs.release-please.outputs.release_created != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Drop merge commits from the release notes
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          # The action's pr output is the pull request JSON, not the number.
+          pr=$(gh pr list --state open --base main --label 'autorelease: pending' --json number --jq '.[0].number')
+          case "$pr" in
+            '' | null | *[!0-9]*)
+              printf 'no open release pull request\n' >&2
+              exit 1
+              ;;
+          esac
+          script="${RUNNER_TEMP}/dedupeChangelog.ts"
+          body="${RUNNER_TEMP}/release-pr-body.md"
+          cp scripts/dedupeChangelog.ts "$script"
+          gh pr checkout "$pr"
+          gh pr view "$pr" --json body --jq .body > "$body"
+          cp "$body" "${body}.orig"
+          node "$script" \
+            --repo "${{ github.repository }}" \
+            --changelog CHANGELOG.md \
+            --pull-request-body "$body"
+          if ! git diff --quiet -- CHANGELOG.md; then
+            git add CHANGELOG.md
+            git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "chore: drop merge commits from the changelog"
+            git push
+          fi
+          if ! cmp -s "$body" "${body}.orig"; then
+            gh pr edit "$pr" --body-file "$body"
+          fi
 
   vsix:
     needs: release-please
