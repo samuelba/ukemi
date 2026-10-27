@@ -1,7 +1,16 @@
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'out/**', 'node_modules/**', 'coverage/**', '.vscode-test/**', 'scripts/preview/state.generated.js'] },
+  {
+    ignores: [
+      'dist/**',
+      'out/**',
+      'node_modules/**',
+      'coverage/**',
+      '.vscode-test/**',
+      'scripts/preview/state.generated.js',
+    ],
+  },
   ...tseslint.configs.recommended,
   {
     rules: {

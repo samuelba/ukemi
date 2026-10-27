@@ -244,7 +244,10 @@ export function SplitApp() {
     })
 
   return (
-    <div className="split" style={{ '--split-header-height': `${headerHeight}px` } as CSSProperties}>
+    <div
+      className="split"
+      style={{ '--split-header-height': `${headerHeight}px` } as CSSProperties}
+    >
       <header className="split-header" ref={headerRef}>
         <h1>Split “{request.title || '(no description)'}”</h1>
         <p className="muted">

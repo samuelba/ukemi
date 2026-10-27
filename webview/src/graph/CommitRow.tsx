@@ -148,8 +148,7 @@ export function CommitRow(props: CommitRowProps) {
       data-commit-id={commit.commitId}
       draggable={!commit.isImmutable || copyModifier}
       onDragStart={(event) => {
-        const copy =
-          event.ctrlKey || event.metaKey || dragModifiers.snapshot().copy
+        const copy = event.ctrlKey || event.metaKey || dragModifiers.snapshot().copy
         if (commit.isImmutable && !copy) {
           event.preventDefault()
           return

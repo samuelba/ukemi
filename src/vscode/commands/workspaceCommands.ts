@@ -35,10 +35,7 @@ function findWorkspace(model: RepoModel, name: string): Workspace | undefined {
   return model.graph?.workspaces.find((workspace) => workspace.name === name)
 }
 
-function workspaceTarget(
-  env: CommandEnv,
-  arg: unknown,
-): { model: RepoModel; name: string } | null {
+function workspaceTarget(env: CommandEnv, arg: unknown): { model: RepoModel; name: string } | null {
   if (isWorkspaceTreeElement(arg)) {
     const model = env.registry.modelFor(arg.repoId) ?? env.registry.activeModel
     return model ? { model, name: arg.workspace.name } : null
@@ -225,9 +222,8 @@ async function refreshAll(env: CommandEnv, model: RepoModel): Promise<void> {
 }
 
 export function workspaceCommands(env: CommandEnv): Record<string, Handler> {
-  const onWorkspace = (
-    fn: (model: RepoModel, name: string) => Promise<unknown>,
-  ): Handler => workspaceHandler(env, fn)
+  const onWorkspace = (fn: (model: RepoModel, name: string) => Promise<unknown>): Handler =>
+    workspaceHandler(env, fn)
 
   return {
     'ukemi.addWorkspace': async () => {

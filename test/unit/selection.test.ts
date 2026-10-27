@@ -12,15 +12,13 @@ describe('resolveSelectedCommit', () => {
     const commits = [commit('c1', 'change'), commit('c2', 'change')]
 
     expect(resolveSelectedCommit(commits, selected, '/repo')?.commitId).toBe('c1')
-    expect(
-      resolveSelectedCommit(commits, { ...selected, commitId: 'c2' }, '/repo')?.commitId,
-    ).toBe('c2')
+    expect(resolveSelectedCommit(commits, { ...selected, commitId: 'c2' }, '/repo')?.commitId).toBe(
+      'c2',
+    )
   })
 
   test('follows a rewritten change when one commit remains', () => {
-    expect(
-      resolveSelectedCommit([commit('c3', 'change')], selected, '/repo')?.commitId,
-    ).toBe('c3')
+    expect(resolveSelectedCommit([commit('c3', 'change')], selected, '/repo')?.commitId).toBe('c3')
   })
 
   test('does not guess when the selected commit is gone and the change is still divergent', () => {

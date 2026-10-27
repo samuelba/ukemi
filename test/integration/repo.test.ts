@@ -189,10 +189,9 @@ describe('mutations', () => {
 
     const [sourceAfter] = await repo.log(source.changeId)
     const [targetAfter] = await repo.log(target.changeId)
-    expect((await repo.files(sourceAfter?.commitId ?? '')).map((file) => file.path).sort()).toEqual([
-      'a.txt',
-      'c.txt',
-    ])
+    expect((await repo.files(sourceAfter?.commitId ?? '')).map((file) => file.path).sort()).toEqual(
+      ['a.txt', 'c.txt'],
+    )
     expect((await repo.files(targetAfter?.commitId ?? '')).map((file) => file.path)).toEqual([
       'a.txt',
     ])
@@ -246,9 +245,9 @@ describe('mutations', () => {
       (commit) => commit.description === 'source\n',
     )
     expect(copies).toHaveLength(2)
-    expect(copies.every((commit) => commit.parents.length === 1 && commit.parents[0] === parent)).toBe(
-      true,
-    )
+    expect(
+      copies.every((commit) => commit.parents.length === 1 && commit.parents[0] === parent),
+    ).toBe(true)
   })
 
   test('duplicate onto a destination makes the copy a child of that commit', async () => {

@@ -82,9 +82,10 @@ export class ForgeService implements vscode.Disposable {
     private readonly registry: RepoRegistry,
     private readonly secrets: vscode.SecretStorage,
     private readonly logger: Logger,
+    extensionId: string,
   ) {
     this.github = new GithubCredentials(secrets, githubSession, githubTokenUi)
-    this.gitlabAuth = new GitlabAuth(secrets, logger)
+    this.gitlabAuth = new GitlabAuth(secrets, logger, extensionId)
     this.disposables.push(
       this.gitlabAuth,
       registry.onDidChangeModel((model) => {
@@ -105,7 +106,10 @@ export class ForgeService implements vscode.Disposable {
     return detectForge(await model.repo.remotes(), readConfig())
   }
 
-  private async credential(target: ForgeHost, interactive: boolean): Promise<ForgeCredential | null> {
+  private async credential(
+    target: ForgeHost,
+    interactive: boolean,
+  ): Promise<ForgeCredential | null> {
     if (target.kind === 'github') {
       const githubCredential = await this.github.get(
         target.host,

@@ -2,8 +2,10 @@
   "name": "ukemi",
   "displayName": "Ukemi: Jujutsu (jj) GUI",
   "version": "0.1.0",
-  "repository": "https://github.com/samuelba/ukemi",
-  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/samuelba/ukemi.git"
+  },
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -14,6 +16,8 @@
     "package:build": "node esbuild.mjs --production",
     "typecheck": "tsc -p .",
     "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "icons": "node scripts/render-icons.mjs",
@@ -46,7 +50,7 @@
     "typescript-eslint": "^8.72.0",
     "vitest": "^3.2.7"
   },
-  "publisher": "ukemi",
+  "publisher": "samuelba",
   "description": "Jujutsu (jj) version control GUI: change graph, drag and drop rebase, hunk split, undo, GitHub PRs and GitLab MRs.",
   "license": "MIT",
   "icon": "resources/icon.png",
@@ -1533,7 +1537,7 @@
             "type": "string"
           },
           "default": {},
-          "markdownDescription": "GitLab OAuth application client IDs, keyed by host. The client ID is not a secret. Example: `{ \"git.example.com\": \"abc123\" }`. Create a non-confidential application with the `api` scope and redirect URIs `vscode://ukemi.ukemi/gitlab-auth` and `cursor://ukemi.ukemi/gitlab-auth`."
+          "markdownDescription": "GitLab OAuth application client IDs, keyed by host. The client ID is not a secret. Example: `{ \"git.example.com\": \"abc123\" }`. Create a non-confidential application with the `api` scope and redirect URIs `vscode://samuelba.ukemi/gitlab-auth` and `cursor://samuelba.ukemi/gitlab-auth`."
         },
         "ukemi.forge.ciOnlyMine": {
           "type": "boolean",

@@ -1,0 +1,28 @@
+name: Install jj
+description: Download a pinned jj release and check its SHA-256 digest.
+
+inputs:
+  version:
+    description: jj release version, without a leading v.
+    required: true
+  sha256:
+    description: SHA-256 digest of the x86_64 musl tarball.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Download and verify jj
+      shell: bash
+      run: |
+        set -euo pipefail
+        version="${{ inputs.version }}"
+        archive="${RUNNER_TEMP:-/tmp}/jj.tar.gz"
+        url="https://github.com/jj-vcs/jj/releases/download/v${version}/jj-v${version}-x86_64-unknown-linux-musl.tar.gz"
+        curl -fsSL -o "$archive" "$url"
+        echo "${{ inputs.sha256 }}  ${archive}" | sha256sum -c -
+        install_dir="${RUNNER_TEMP:-/tmp}/jj-bin"
+        mkdir -p "$install_dir"
+        tar -xzf "$archive" -C "$install_dir" ./jj
+        echo "$install_dir" >> "$GITHUB_PATH"
+        "$install_dir/jj" --version

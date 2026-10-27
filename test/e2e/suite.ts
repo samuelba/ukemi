@@ -34,7 +34,7 @@ async function step(name: string, body: () => Promise<void>): Promise<void> {
 export async function run(): Promise<void> {
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
   assert.ok(root, 'the test workspace has a folder')
-  const extension = vscode.extensions.getExtension<UkemiApi>('ukemi.ukemi')
+  const extension = vscode.extensions.getExtension<UkemiApi>('samuelba.ukemi')
   assert.ok(extension, 'the extension is installed')
   const api = await extension.activate()
   const model = await waitFor(

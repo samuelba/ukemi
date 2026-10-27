@@ -361,14 +361,20 @@ describe('GitlabClient', () => {
       't',
       fakeFetch(
         {
-          '/pipelines/42/jobs': [job(3, 'prep', 'merge-prep', 'success'), job(1, 'version-job', 'version', 'success')],
+          '/pipelines/42/jobs': [
+            job(3, 'prep', 'merge-prep', 'success'),
+            job(1, 'version-job', 'version', 'success'),
+          ],
           '/pipelines/42/bridges': [
             {
               ...job(2, 'pipeline_all', 'triggers', 'success'),
               downstream_pipeline: { id: 99, project_id: 21 },
             },
           ],
-          '/pipelines/99/jobs': [job(11, 'build-image', 'build', 'failed'), job(10, 'child-version', 'version', 'success')],
+          '/pipelines/99/jobs': [
+            job(11, 'build-image', 'build', 'failed'),
+            job(10, 'child-version', 'version', 'success'),
+          ],
           '/pipelines/99/bridges': [job(12, 'install-desktop', 'hardware-in-the-loop', 'skipped')],
           '/merge_requests/7/approvals': { approved: false, approved_by: [] },
           '/merge_requests/7': { head_pipeline: { id: 42, status: 'success' } },
@@ -492,11 +498,13 @@ describe('forge helpers', () => {
   })
 
   test('allows https links on the forge host only', () => {
-    expect(isAllowedForgeUrl('https://git.anybotics.com/group/repo/-/jobs/1', 'git.anybotics.com')).toBe(
-      true,
-    )
+    expect(
+      isAllowedForgeUrl('https://git.anybotics.com/group/repo/-/jobs/1', 'git.anybotics.com'),
+    ).toBe(true)
     expect(isAllowedForgeUrl('https://github.com/o/r/pull/1', 'git.anybotics.com')).toBe(false)
-    expect(isAllowedForgeUrl('http://git.anybotics.com/group/repo', 'git.anybotics.com')).toBe(false)
+    expect(isAllowedForgeUrl('http://git.anybotics.com/group/repo', 'git.anybotics.com')).toBe(
+      false,
+    )
     expect(isAllowedForgeUrl('not a url', 'git.anybotics.com')).toBe(false)
   })
 })

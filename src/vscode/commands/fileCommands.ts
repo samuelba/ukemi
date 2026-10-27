@@ -112,7 +112,9 @@ async function attachFilesToChat(uris: readonly vscode.Uri[]): Promise<void> {
   const available = new Set(await vscode.commands.getCommands(false))
   const command = CHAT_ATTACH_COMMANDS.find((id) => available.has(id))
   if (!command) {
-    void vscode.window.showWarningMessage('Ukemi: this editor has no command to add a file to chat.')
+    void vscode.window.showWarningMessage(
+      'Ukemi: this editor has no command to add a file to chat.',
+    )
     return
   }
   for (const uri of uris) {

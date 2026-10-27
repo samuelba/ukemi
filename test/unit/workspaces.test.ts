@@ -115,9 +115,7 @@ describe('workspace names', () => {
       localBookmarks: [{ name: 'feature' }],
     }
     expect(suggestedWorkspaceName(commit.changeId, commit)).toBe('feature')
-    expect(
-      suggestedWorkspaceName('ignored', { ...commit, localBookmarks: [] }),
-    ).toBe('1234abcd')
+    expect(suggestedWorkspaceName('ignored', { ...commit, localBookmarks: [] })).toBe('1234abcd')
   })
 })
 

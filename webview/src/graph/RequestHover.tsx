@@ -32,7 +32,11 @@ function RequestPopoverBody({ request }: { request: RequestBadge }) {
   const pipelineUrl = request.pipelineUrl
   return (
     <>
-      <button type="button" className="request-popover-title" onClick={() => openExternal(request.url)}>
+      <button
+        type="button"
+        className="request-popover-title"
+        onClick={() => openExternal(request.url)}
+      >
         #{request.number} {request.title}
       </button>
       <div className="request-popover-meta">
@@ -66,7 +70,13 @@ function RequestPopoverBody({ request }: { request: RequestBadge }) {
   )
 }
 
-export function RequestHover({ request, children }: { request: RequestBadge; children: ReactNode }) {
+export function RequestHover({
+  request,
+  children,
+}: {
+  request: RequestBadge
+  children: ReactNode
+}) {
   const anchor = useRef<HTMLSpanElement>(null)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null)

@@ -301,12 +301,7 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
     ),
     'ukemi.commit.duplicateOnto': duplicateAt(env, false, 'onto', 'Duplicate onto'),
     'ukemi.commit.duplicateOntoSubtree': duplicateAt(env, true, 'onto', 'Duplicate onto'),
-    'ukemi.commit.duplicateInsertAfter': duplicateAt(
-      env,
-      false,
-      'after',
-      'Duplicate insert after',
-    ),
+    'ukemi.commit.duplicateInsertAfter': duplicateAt(env, false, 'after', 'Duplicate insert after'),
     'ukemi.commit.duplicateInsertAfterSubtree': duplicateAt(
       env,
       true,
