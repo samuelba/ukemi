@@ -15,6 +15,7 @@ import {
   InterdiffContentProvider,
   RevisionContentProvider,
 } from './vscode/diff'
+import { BookmarksView } from './vscode/bookmarksView'
 import { ChangeSelection } from './vscode/changeSelection'
 import { EvolutionView } from './vscode/evolutionView'
 import { ForgeService } from './vscode/forgeService'
@@ -55,6 +56,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
   const selection = new ChangeSelection()
   const evolutionView = new EvolutionView(registry, selection, logger)
   const workspacesView = new WorkspacesView(registry)
+  const bookmarksView = new BookmarksView(registry)
   const forge = new ForgeService(registry, context.secrets, logger, context.extension.id)
   const askpass = new AskpassServer(
     process.execPath,
@@ -107,7 +109,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
     new ScmController(registry),
     new RepoStatusBar(registry),
     workspacesView,
+    bookmarksView,
     vscode.window.registerTreeDataProvider('ukemi.workspaces', workspacesView),
+    vscode.window.registerTreeDataProvider('ukemi.bookmarks', bookmarksView),
     vscode.window.registerWebviewViewProvider(GRAPH_VIEW_ID, graphView, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
