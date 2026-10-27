@@ -87,6 +87,41 @@ body {
   width: 28%;
 }
 
+.cleanup-table.deleted .col-name {
+  width: 28%;
+}
+
+.cleanup-table.deleted .col-remote {
+  width: 7rem;
+}
+
+.cleanup-table.undescribed .col-files {
+  width: 4rem;
+}
+
+.cleanup-table.undescribed .col-action {
+  width: 7rem;
+}
+
+.cleanup-note {
+  margin: 0 0 8px;
+}
+
+.cleanup-file {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--vscode-textLink-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+.cleanup-files {
+  margin: 0;
+  padding: 0 0 0 1.5rem;
+  list-style: none;
+}
+
 .cleanup-table th,
 .cleanup-table td {
   padding: 6px 8px;

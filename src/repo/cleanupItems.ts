@@ -1,9 +1,11 @@
 import type {
   CleanupBookmark,
+  CleanupDeletedBookmark,
   CleanupDivergence,
   CleanupRevision,
   CleanupSelection,
   CleanupSnapshot,
+  CleanupUndescribed,
   CleanupWorkspace,
 } from '../../shared/cleanup'
 
@@ -41,7 +43,19 @@ export interface DivergentCommit {
   isDivergent: boolean
 }
 
+export interface UndescribedCommit {
+  changePrefix: string
+  commitId: string
+  commitPrefix: string
+  description: string
+  timestamp: string
+  isWorkingCopy: boolean
+  isEmpty: boolean
+  isImmutable: boolean
+}
+
 export type CleanupStep =
+  | { kind: 'pushDeletedBookmark'; name: string }
   | { kind: 'forgetBookmark'; name: string }
   | { kind: 'rebase'; revset: string; onto: string }
   | { kind: 'abandon'; commitId: string }
@@ -109,6 +123,71 @@ export function classifyBookmarks(
     }
   }
   return items
+}
+
+function liveTrackedRemotes(name: string, rows: readonly BookmarkRecord[]): string[] {
+  return [
+    ...new Set(
+      rows.flatMap((row) =>
+        row.name === name &&
+        row.remote !== null &&
+        row.remote !== GIT_REMOTE &&
+        row.tracked &&
+        row.present
+          ? [row.remote]
+          : [],
+      ),
+    ),
+  ].sort((left, right) => left.localeCompare(right))
+}
+
+function deletedDetail(name: string, remotes: readonly string[]): string {
+  if (remotes.length === 0) {
+    return 'No remote bookmark.'
+  }
+  return `Push deletes ${remotes.map((remote) => `${name}@${remote}`).join(', ')}.`
+}
+
+export function classifyDeletedBookmarks(
+  rows: readonly BookmarkRecord[],
+): CleanupDeletedBookmark[] {
+  return rows
+    .filter((row) => row.remote === null && !row.present)
+    .sort(byName)
+    .map((row) => {
+      const remotes = liveTrackedRemotes(row.name, rows)
+      return {
+        name: row.name,
+        remotes,
+        detail: deletedDetail(row.name, remotes),
+        checked: true,
+        canDeleteRemote: remotes.length > 0,
+      }
+    })
+}
+
+function isBlank(text: string): boolean {
+  return firstLine(text).length === 0
+}
+
+function isVirtualRoot(commitId: string): boolean {
+  return /^0+$/.test(commitId)
+}
+
+export function classifyUndescribed(commits: readonly UndescribedCommit[]): CleanupUndescribed[] {
+  return commits
+    .filter(
+      (commit) =>
+        !commit.isWorkingCopy && !isVirtualRoot(commit.commitId) && isBlank(commit.description),
+    )
+    .map((commit) => ({
+      commitId: commit.commitId,
+      changePrefix: commit.changePrefix,
+      commitPrefix: commit.commitPrefix,
+      timestamp: commit.timestamp,
+      isEmpty: commit.isEmpty,
+      isImmutable: commit.isImmutable,
+    }))
 }
 
 function workspaceDetail(row: WorkspaceRecord): string {
@@ -235,6 +314,26 @@ function divergentSteps(group: CleanupDivergence, dropIds: ReadonlySet<string>):
   ]
 }
 
+function deletedBookmarkSteps(
+  snapshot: CleanupSnapshot,
+  selection: CleanupSelection,
+): CleanupStep[] {
+  const selected = new Set(selection.deletedBookmarks)
+  const pushNames = new Set(selection.deleteRemote)
+  const steps: CleanupStep[] = []
+  for (const bookmark of snapshot.deletedBookmarks) {
+    if (!selected.has(bookmark.name)) {
+      continue
+    }
+    if (bookmark.canDeleteRemote && pushNames.has(bookmark.name)) {
+      steps.push({ kind: 'pushDeletedBookmark', name: bookmark.name })
+    } else {
+      steps.push({ kind: 'forgetBookmark', name: bookmark.name })
+    }
+  }
+  return steps
+}
+
 export function cleanupSteps(
   snapshot: CleanupSnapshot,
   selection: CleanupSelection,
@@ -242,19 +341,24 @@ export function cleanupSteps(
   const bookmarkNames = new Set(selection.bookmarks)
   const workspaceNames = new Set(selection.workspaces)
   const dropIds = new Set(selection.divergent)
-  const steps: CleanupStep[] = []
+  const deleted = deletedBookmarkSteps(snapshot, selection)
+  const forgets: CleanupStep[] = []
   for (const bookmark of snapshot.bookmarks) {
     if (bookmarkNames.has(bookmark.name)) {
-      steps.push({ kind: 'forgetBookmark', name: bookmark.name })
+      forgets.push({ kind: 'forgetBookmark', name: bookmark.name })
     }
   }
-  for (const group of snapshot.divergent) {
-    steps.push(...divergentSteps(group, dropIds))
-  }
+  const workspaceSteps: CleanupStep[] = []
   for (const workspace of snapshot.workspaces) {
     if (workspaceNames.has(workspace.name)) {
-      steps.push({ kind: 'forgetWorkspace', name: workspace.name })
+      workspaceSteps.push({ kind: 'forgetWorkspace', name: workspace.name })
     }
   }
-  return steps
+  return [
+    ...deleted.filter((step) => step.kind === 'pushDeletedBookmark'),
+    ...forgets,
+    ...deleted.filter((step) => step.kind === 'forgetBookmark'),
+    ...snapshot.divergent.flatMap((group) => divergentSteps(group, dropIds)),
+    ...workspaceSteps,
+  ]
 }

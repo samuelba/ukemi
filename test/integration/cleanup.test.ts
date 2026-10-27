@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import type { CleanupSelection } from '../../shared/cleanup'
 import { applyCleanup, loadCleanup } from '../../src/repo/loadCleanup'
 import { JJ_BINARY, initRepo, jj, makeRepo, makeTempDir, type Fixture } from '../helpers/jjFixture'
 import type { JjRepo } from '../../src/jj/repo'
@@ -34,6 +35,24 @@ function divergeSameChange(): void {
   jj(root, 'op', 'integrate', newOp)
 }
 
+function selection(overrides: Partial<CleanupSelection> = {}): CleanupSelection {
+  return {
+    bookmarks: [],
+    deletedBookmarks: [],
+    deleteRemote: [],
+    workspaces: [],
+    divergent: [],
+    ...overrides,
+  }
+}
+
+function initBare(dir: string): void {
+  const result = spawnSync('git', ['init', '--bare', dir], { encoding: 'utf8' })
+  if (result.status !== 0) {
+    throw new Error(result.stderr)
+  }
+}
+
 describe('cleanup', () => {
   test('offers a bookmark on trunk and forgets it', async () => {
     jj(root, 'bookmark', 'create', 'wip', '-r', '@')
@@ -44,11 +63,7 @@ describe('cleanup', () => {
 
     expect(snapshot.bookmarks.map((bookmark) => bookmark.name)).toEqual(['landed'])
     expect(landed?.checked).toBe(true)
-    await applyCleanup(repo, snapshot, {
-      bookmarks: ['landed'],
-      workspaces: [],
-      divergent: [],
-    })
+    await applyCleanup(repo, snapshot, selection({ bookmarks: ['landed'] }))
 
     const after = await repo.bookmarkList()
     expect(after.some((bookmark) => bookmark.name === 'landed' && bookmark.remote === null)).toBe(
@@ -71,13 +86,68 @@ describe('cleanup', () => {
       throw new Error('expected a divergent group')
     }
 
-    await applyCleanup(repo, snapshot, {
-      bookmarks: [],
-      workspaces: [],
-      divergent: group.revisions
-        .filter((revision) => revision.checked)
-        .map((revision) => revision.commitId),
-    })
+    await applyCleanup(
+      repo,
+      snapshot,
+      selection({
+        divergent: group.revisions
+          .filter((revision) => revision.checked)
+          .map((revision) => revision.commitId),
+      }),
+    )
     expect(await loadCleanup(repo, [])).toMatchObject({ divergent: [] })
+  })
+
+  test('lists a commit with no description and skips the working copy', async () => {
+    jj(root, 'new')
+    jj(root, 'new', '-m', 'later')
+    const [parent] = await repo.log('@-', 1)
+    const [workingCopy] = await repo.log('@', 1)
+    if (!parent || !workingCopy) {
+      throw new Error('expected a parent and a working copy')
+    }
+
+    const snapshot = await loadCleanup(repo, [])
+    const ids = snapshot.undescribed.map((commit) => commit.commitId)
+
+    expect(ids).toContain(parent.commitId)
+    expect(ids).not.toContain(workingCopy.commitId)
+    expect(ids.some((id) => /^0+$/.test(id))).toBe(false)
+    expect(snapshot.undescribedTruncated).toBe(false)
+    expect(
+      snapshot.undescribed.find((commit) => commit.commitId === parent.commitId),
+    ).toMatchObject({ isEmpty: true })
+  })
+
+  test('forgets a deleted local bookmark and leaves the remote', async () => {
+    const bare = join(fixture.dir, 'origin.git')
+    initBare(bare)
+    jj(root, 'describe', '-m', 'topic work')
+    jj(root, 'bookmark', 'create', 'topic', '-r', '@')
+    jj(root, 'git', 'remote', 'add', 'origin', bare)
+    jj(root, 'git', 'push', '--bookmark', 'topic')
+    jj(root, 'bookmark', 'delete', 'topic')
+
+    const snapshot = await loadCleanup(repo, [])
+    expect(snapshot.deletedBookmarks).toEqual([
+      expect.objectContaining({
+        name: 'topic',
+        remotes: ['origin'],
+        checked: true,
+        canDeleteRemote: true,
+      }),
+    ])
+
+    await applyCleanup(repo, snapshot, selection({ deletedBookmarks: ['topic'] }))
+
+    const after = await repo.bookmarkList()
+    expect(after.some((bookmark) => bookmark.name === 'topic' && bookmark.remote === null)).toBe(
+      false,
+    )
+    expect(
+      after.some(
+        (bookmark) => bookmark.name === 'topic' && bookmark.remote === 'origin' && bookmark.present,
+      ),
+    ).toBe(true)
   })
 })

@@ -1,21 +1,36 @@
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
-import type {
-  CleanupDivergence,
-  CleanupHostMessage,
-  CleanupRevision,
-  CleanupSelection,
-  CleanupSnapshot,
-  CleanupWebviewMessage,
+import {
+  UNDESCRIBED_LIMIT,
+  type CleanupDeletedBookmark,
+  type CleanupDivergence,
+  type CleanupHostMessage,
+  type CleanupRevision,
+  type CleanupSelection,
+  type CleanupSnapshot,
+  type CleanupUndescribed,
+  type CleanupWebviewMessage,
 } from '../../../shared/cleanup'
+import type { ChangedFile } from '../../../shared/model'
+import { relativeTime } from '../shared/format'
 import { postMessage } from '../shared/vscodeApi'
 
 const send = (message: CleanupWebviewMessage) => postMessage(message)
 
+const FILE_STATUS: Record<ChangedFile['status'], string> = {
+  added: 'A',
+  modified: 'M',
+  removed: 'D',
+  renamed: 'R',
+  copied: 'C',
+}
+
 function isEmpty(snapshot: CleanupSnapshot): boolean {
   return (
     snapshot.bookmarks.length === 0 &&
+    snapshot.deletedBookmarks.length === 0 &&
     snapshot.workspaces.length === 0 &&
-    snapshot.divergent.length === 0
+    snapshot.divergent.length === 0 &&
+    snapshot.undescribed.length === 0
   )
 }
 
@@ -41,8 +56,12 @@ function initialDrops(snapshot: CleanupSnapshot): Set<string> {
 export function CleanupApp() {
   const [snapshot, setSnapshot] = useState<CleanupSnapshot | null>(null)
   const [bookmarks, setBookmarks] = useState<ReadonlySet<string>>(new Set())
+  const [deleted, setDeleted] = useState<ReadonlySet<string>>(new Set())
+  const [deleteRemote, setDeleteRemote] = useState<ReadonlySet<string>>(new Set())
   const [workspaces, setWorkspaces] = useState<ReadonlySet<string>>(new Set())
   const [drops, setDrops] = useState<ReadonlySet<string>>(new Set())
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
+  const [filesByCommit, setFilesByCommit] = useState<Readonly<Record<string, ChangedFile[]>>>({})
   const [headerHeight, setHeaderHeight] = useState(0)
   const headerRef = useCallback((node: HTMLElement | null) => {
     if (!node) {
@@ -55,6 +74,11 @@ export function CleanupApp() {
 
   useEffect(() => {
     const onMessage = (event: MessageEvent<CleanupHostMessage>) => {
+      if (event.data.type === 'files') {
+        const { commitId, files } = event.data
+        setFilesByCommit((current) => ({ ...current, [commitId]: files }))
+        return
+      }
       if (event.data.type !== 'load') {
         return
       }
@@ -63,10 +87,16 @@ export function CleanupApp() {
       setBookmarks(
         new Set(next.bookmarks.filter((bookmark) => bookmark.checked).map((b) => b.name)),
       )
+      setDeleted(
+        new Set(next.deletedBookmarks.filter((bookmark) => bookmark.checked).map((b) => b.name)),
+      )
+      setDeleteRemote(new Set())
       setWorkspaces(
         new Set(next.workspaces.filter((workspace) => workspace.checked).map((w) => w.name)),
       )
       setDrops(initialDrops(next))
+      setExpanded(new Set())
+      setFilesByCommit({})
     }
     window.addEventListener('message', onMessage)
     send({ type: 'ready' })
@@ -85,9 +115,11 @@ export function CleanupApp() {
     )
   }
 
-  const count = bookmarks.size + workspaces.size + drops.size
+  const count = bookmarks.size + deleted.size + workspaces.size + drops.size
   const selection: CleanupSelection = {
     bookmarks: [...bookmarks],
+    deletedBookmarks: [...deleted],
+    deleteRemote: [...deleteRemote].filter((name) => deleted.has(name)),
     workspaces: [...workspaces],
     divergent: [...drops],
   }
@@ -110,6 +142,7 @@ export function CleanupApp() {
         <h1>Clean up</h1>
         <p className="muted">
           Checked rows are removed. Forget leaves remote branches and workspace files in place.
+          Delete remote pushes that deletion.
         </p>
         <div className="cleanup-buttons">
           <button className="button secondary" onClick={() => send({ type: 'cancel' })}>
@@ -172,6 +205,25 @@ export function CleanupApp() {
             </tbody>
           </table>
         </section>
+      )}
+      {snapshot.deletedBookmarks.length > 0 && (
+        <DeletedBookmarks
+          bookmarks={snapshot.deletedBookmarks}
+          selected={deleted}
+          deleteRemote={deleteRemote}
+          onToggle={(name, selected) => {
+            setDeleted(toggle(deleted, name, selected))
+            if (!selected) {
+              setDeleteRemote(toggle(deleteRemote, name, false))
+            }
+          }}
+          onDeleteRemote={(name, selected) => {
+            setDeleteRemote(toggle(deleteRemote, name, selected))
+            if (selected) {
+              setDeleted(toggle(deleted, name, true))
+            }
+          }}
+        />
       )}
       {snapshot.workspaces.length > 0 && (
         <section className="cleanup-section">
@@ -249,6 +301,21 @@ export function CleanupApp() {
           </table>
         </section>
       )}
+      {snapshot.undescribed.length > 0 && (
+        <UndescribedCommits
+          commits={snapshot.undescribed}
+          truncated={snapshot.undescribedTruncated}
+          expanded={expanded}
+          filesByCommit={filesByCommit}
+          onToggle={(commitId) => {
+            const open = expanded.has(commitId)
+            setExpanded(toggle(expanded, commitId, !open))
+            if (!open && filesByCommit[commitId] === undefined) {
+              send({ type: 'loadFiles', commitId })
+            }
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -310,5 +377,195 @@ function DivergenceGroup({
         )
       })}
     </tbody>
+  )
+}
+
+function DeletedBookmarks({
+  bookmarks,
+  selected,
+  deleteRemote,
+  onToggle,
+  onDeleteRemote,
+}: {
+  bookmarks: readonly CleanupDeletedBookmark[]
+  selected: ReadonlySet<string>
+  deleteRemote: ReadonlySet<string>
+  onToggle: (name: string, selected: boolean) => void
+  onDeleteRemote: (name: string, selected: boolean) => void
+}) {
+  return (
+    <section className="cleanup-section">
+      <h2>
+        Deleted bookmarks <span className="muted">({bookmarks.length})</span>
+      </h2>
+      <table className="cleanup-table deleted">
+        <caption className="sr-only">Deleted bookmarks</caption>
+        <colgroup>
+          <col className="col-check" />
+          <col className="col-name" />
+          <col className="col-text" />
+          <col className="col-remote" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th scope="col" />
+            <th scope="col">Bookmark</th>
+            <th scope="col">Detail</th>
+            <th scope="col">Delete remote</th>
+          </tr>
+        </thead>
+        <tbody>
+          {bookmarks.map((bookmark) => {
+            const inputId = `deleted-${bookmark.name}`
+            return (
+              <tr key={bookmark.name}>
+                <td>
+                  <input
+                    id={inputId}
+                    type="checkbox"
+                    checked={selected.has(bookmark.name)}
+                    onChange={(event) => onToggle(bookmark.name, event.target.checked)}
+                  />
+                </td>
+                <Cell htmlFor={inputId} className="name">
+                  {bookmark.name}
+                </Cell>
+                <Cell htmlFor={inputId} className="muted">
+                  {bookmark.detail}
+                </Cell>
+                <td>
+                  <input
+                    type="checkbox"
+                    aria-label={`Delete remote bookmark ${bookmark.name}`}
+                    checked={bookmark.canDeleteRemote && deleteRemote.has(bookmark.name)}
+                    disabled={!bookmark.canDeleteRemote}
+                    onChange={(event) => onDeleteRemote(bookmark.name, event.target.checked)}
+                  />
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </section>
+  )
+}
+
+function undescribedNote(commit: CleanupUndescribed): string {
+  const notes: string[] = []
+  if (commit.isEmpty) {
+    notes.push('empty')
+  }
+  if (commit.isImmutable) {
+    notes.push('immutable')
+  }
+  return notes.join(', ')
+}
+
+function UndescribedCommits({
+  commits,
+  truncated,
+  expanded,
+  filesByCommit,
+  onToggle,
+}: {
+  commits: readonly CleanupUndescribed[]
+  truncated: boolean
+  expanded: ReadonlySet<string>
+  filesByCommit: Readonly<Record<string, ChangedFile[]>>
+  onToggle: (commitId: string) => void
+}) {
+  const now = Date.now()
+  return (
+    <section className="cleanup-section">
+      <h2>
+        No description <span className="muted">({commits.length})</span>
+      </h2>
+      <p className="muted cleanup-note">
+        Listed only.
+        {truncated ? ` Showing the latest ${UNDESCRIBED_LIMIT}.` : ''}
+      </p>
+      <table className="cleanup-table undescribed">
+        <caption className="sr-only">Commits with no description</caption>
+        <colgroup>
+          <col className="col-files" />
+          <col className="col-id" />
+          <col className="col-id" />
+          <col className="col-note" />
+          <col className="col-text" />
+          <col className="col-action" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th scope="col" />
+            <th scope="col">Change</th>
+            <th scope="col">Commit</th>
+            <th scope="col">When</th>
+            <th scope="col">Note</th>
+            <th scope="col" />
+          </tr>
+        </thead>
+        {commits.map((commit) => (
+          <tbody key={commit.commitId}>
+            <tr>
+              <td>
+                <button
+                  type="button"
+                  className="cleanup-file"
+                  aria-expanded={expanded.has(commit.commitId)}
+                  onClick={() => onToggle(commit.commitId)}
+                >
+                  {expanded.has(commit.commitId) ? 'Hide' : 'Files'}
+                </button>
+              </td>
+              <td className="name">{commit.changePrefix}</td>
+              <td className="name">{commit.commitPrefix}</td>
+              <td className="muted">{relativeTime(commit.timestamp, now)}</td>
+              <td className="muted">{undescribedNote(commit)}</td>
+              <td>
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => send({ type: 'openDiff', commitId: commit.commitId })}
+                >
+                  Open diff
+                </button>
+              </td>
+            </tr>
+            {expanded.has(commit.commitId) && (
+              <tr>
+                <td colSpan={6}>
+                  <ChangedFiles commitId={commit.commitId} files={filesByCommit[commit.commitId]} />
+                </td>
+              </tr>
+            )}
+          </tbody>
+        ))}
+      </table>
+    </section>
+  )
+}
+
+function ChangedFiles({ commitId, files }: { commitId: string; files: ChangedFile[] | undefined }) {
+  if (!files) {
+    return <p className="muted">Loading…</p>
+  }
+  if (files.length === 0) {
+    return <p className="muted">(no file changes)</p>
+  }
+  return (
+    <ul className="cleanup-files">
+      {files.map((file) => (
+        <li key={file.path}>
+          <button
+            type="button"
+            className="cleanup-file"
+            onClick={() => send({ type: 'openFile', commitId, path: file.path })}
+          >
+            {FILE_STATUS[file.status]} {file.path}
+          </button>
+        </li>
+      ))}
+    </ul>
   )
 }
