@@ -1,17 +1,26 @@
 import { existsSync } from 'node:fs'
-import type { CleanupSelection, CleanupSnapshot } from '../../shared/cleanup'
+import {
+  UNDESCRIBED_LIMIT,
+  type CleanupSelection,
+  type CleanupSnapshot,
+} from '../../shared/cleanup'
 import type { JjRepo } from '../jj/repo'
 import {
   classifyBookmarks,
+  classifyDeletedBookmarks,
   classifyDivergent,
+  classifyUndescribed,
   classifyWorkspaces,
   cleanupSteps,
   type CleanupStep,
   type DivergentCommit,
+  type UndescribedCommit,
 } from './cleanupItems'
 import { isCurrentWorkspace, isWorkspaceOpen } from './workspaceItems'
 
 const DIVERGENT_REVSET = 'divergent() | children(divergent())'
+// jj string escapes `\\` to one backslash, so the regex is `^\s*$`.
+const UNDESCRIBED_REVSET = 'description(regex:"^\\\\s*$") ~ @ ~ root()'
 
 function divergentCommit(commit: {
   changeId: string
@@ -39,18 +48,42 @@ function divergentCommit(commit: {
   }
 }
 
+function undescribedCommit(commit: {
+  changePrefix: string
+  commitId: string
+  commitPrefix: string
+  description: string
+  committer: { timestamp: string }
+  isWorkingCopy: boolean
+  isEmpty: boolean
+  isImmutable: boolean
+}): UndescribedCommit {
+  return {
+    changePrefix: commit.changePrefix,
+    commitId: commit.commitId,
+    commitPrefix: commit.commitPrefix,
+    description: commit.description,
+    timestamp: commit.committer.timestamp,
+    isWorkingCopy: commit.isWorkingCopy,
+    isEmpty: commit.isEmpty,
+    isImmutable: commit.isImmutable,
+  }
+}
+
 export async function loadCleanup(
   repo: JjRepo,
   openFolders: readonly string[],
 ): Promise<CleanupSnapshot> {
-  const [bookmarks, workspaces, commits, trunkName] = await Promise.all([
+  const [bookmarks, workspaces, commits, undescribed, trunkName] = await Promise.all([
     repo.bookmarkList(),
     repo.workspaces(),
     repo.log(DIVERGENT_REVSET),
+    repo.log(UNDESCRIBED_REVSET, UNDESCRIBED_LIMIT),
     repo.trunkBookmark(),
   ])
   return {
     bookmarks: classifyBookmarks(bookmarks, trunkName),
+    deletedBookmarks: classifyDeletedBookmarks(bookmarks),
     workspaces: classifyWorkspaces(
       workspaces.map((workspace) => ({
         name: workspace.name,
@@ -62,6 +95,8 @@ export async function loadCleanup(
       })),
     ),
     divergent: classifyDivergent(commits.map(divergentCommit)),
+    undescribed: classifyUndescribed(undescribed.map(undescribedCommit)),
+    undescribedTruncated: undescribed.length === UNDESCRIBED_LIMIT,
   }
 }
 
@@ -71,6 +106,9 @@ export async function applyCleanupSteps(
 ): Promise<void> {
   for (const step of steps) {
     switch (step.kind) {
+      case 'pushDeletedBookmark':
+        await repo.push(step.name)
+        break
       case 'forgetBookmark':
         await repo.forgetBookmark(step.name)
         break
