@@ -18,6 +18,7 @@ export interface CommandEnv {
   forge: ForgeService
   runner: JjRunner
   logger: Logger
+  extensionId: string
   extensionUri: vscode.Uri
   storageUri: vscode.Uri
   selection: ChangeSelection

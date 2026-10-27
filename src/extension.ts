@@ -50,7 +50,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
   const selection = new ChangeSelection()
   const evolutionView = new EvolutionView(registry, selection, logger)
   const workspacesView = new WorkspacesView(registry)
-  const forge = new ForgeService(registry, context.secrets, logger)
+  const forge = new ForgeService(registry, context.secrets, logger, context.extension.id)
   const askpass = new AskpassServer(
     process.execPath,
     [vscode.Uri.joinPath(context.extensionUri, 'dist', 'askpass.js').fsPath],
@@ -70,6 +70,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
     forge,
     runner,
     logger,
+    extensionId: context.extension.id,
     extensionUri: context.extensionUri,
     storageUri: context.globalStorageUri,
     selection,

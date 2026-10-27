@@ -1,10 +1,10 @@
 # Ukemi: Jujutsu (jj) GUI
 
-Ukemi is a visual interface for [Jujutsu (jj)](https://jj-vcs.github.io/jj/) in VS Code. In judo, *ukemi* is the art of falling safely. With jj and `undo`, every change is safe to try.
+Ukemi is a visual interface for [Jujutsu (jj)](https://jj-vcs.github.io/jj/) in VS Code. In judo, _ukemi_ is the art of falling safely. With jj and `undo`, every change is safe to try.
 
 ## Features
 
-- **Change graph.** See your changes, bookmarks, tags, workspaces and conflicts. The working copy has a red seal. Filter by *Recent*, *Mine*, *My history*, *Stack* or *Working copy* (the working copy and its last 5 parents) and choose the history depth.
+- **Change graph.** See your changes, bookmarks, tags, workspaces and conflicts. The working copy has a red seal. Filter by _Recent_, _Mine_, _My history_, _Stack_ or _Working copy_ (the working copy and its last 5 parents) and choose the history depth.
 - **Drag and drop.** Drag a change onto another change to rebase it with its descendants. Hold Alt to move only that change. Drag a file to another change to move its changes. Drag a bookmark to move it.
 - **Edit history.** Use the context menu or the hover action to describe, create, edit, squash, split, abandon, duplicate and revert changes. Click a change to show or hide its files.
 - **Split by hunks.** Select hunks in a split editor. The selected hunks go into a new change before the original.
@@ -24,16 +24,16 @@ Ukemi is a visual interface for [Jujutsu (jj)](https://jj-vcs.github.io/jj/) in 
 
 Select the gear in the title bar of the Ukemi view to open the Ukemi settings.
 
-| Setting | Purpose |
-| --- | --- |
-| `ukemi.jjPath` | Path to jj. Empty means search `PATH` and common folders. |
-| `ukemi.defaultFilter`, `ukemi.historyDepth` | Filter and time range that the graph shows first. |
-| `ukemi.repoScanDepth` | Folder levels to search for repositories. |
-| `ukemi.showSourceControl` | When to show the working copy in Source Control. |
-| `ukemi.gitlab.hosts`, `ukemi.github.hosts` | Self-hosted GitLab and GitHub Enterprise hosts. |
-| `ukemi.gitlab.oauthApplications` | GitLab OAuth client IDs by host. The client ID is not a secret. |
-| `ukemi.forge.ciOnlyMine` | Show CI status only on open requests that you authored. Default: on. |
-| `ukemi.forge.requestLimit` | How many recently updated merge and pull requests to load. Default: 50. Maximum: 500. |
+| Setting                                     | Purpose                                                                               |
+| ------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `ukemi.jjPath`                              | Path to jj. Empty means search `PATH` and common folders.                             |
+| `ukemi.defaultFilter`, `ukemi.historyDepth` | Filter and time range that the graph shows first.                                     |
+| `ukemi.repoScanDepth`                       | Folder levels to search for repositories.                                             |
+| `ukemi.showSourceControl`                   | When to show the working copy in Source Control.                                      |
+| `ukemi.gitlab.hosts`, `ukemi.github.hosts`  | Self-hosted GitLab and GitHub Enterprise hosts.                                       |
+| `ukemi.gitlab.oauthApplications`            | GitLab OAuth client IDs by host. The client ID is not a secret.                       |
+| `ukemi.forge.ciOnlyMine`                    | Show CI status only on open requests that you authored. Default: on.                  |
+| `ukemi.forge.requestLimit`                  | How many recently updated merge and pull requests to load. Default: 50. Maximum: 500. |
 
 ## Sign in
 
@@ -45,8 +45,8 @@ Select the gear in the title bar of the Ukemi view to open the Ukemi settings.
 
 OAuth needs a non-confidential application on that GitLab host, with the `api` scope and these redirect URIs:
 
-- `vscode://ukemi.ukemi/gitlab-auth`
-- `cursor://ukemi.ukemi/gitlab-auth`
+- `vscode://samuelba.ukemi/gitlab-auth`
+- `cursor://samuelba.ukemi/gitlab-auth`
 
 Put the client ID in `ukemi.gitlab.oauthApplications`, for example `{ "git.example.com": "abc123" }`. If the host has no client ID, Ukemi asks for a personal access token with the `api` scope instead.
 
@@ -73,11 +73,11 @@ The launch configuration disables VisualJJ in the development window, so that on
 
 The `watch` task stays active and rebuilds `dist/` each time you save. There is no hot reload. After a rebuild:
 
-| You changed | Do this in the Extension Development Host |
-| --- | --- |
-| `webview/src/**` | Run **Developer: Reload Webviews**, or close and open the Ukemi view. |
-| `src/**` or `shared/**` | Run **Developer: Reload Window** (Ctrl+R). |
-| `package.json` contributions | Stop the debug session and press F5 again. |
+| You changed                  | Do this in the Extension Development Host                             |
+| ---------------------------- | --------------------------------------------------------------------- |
+| `webview/src/**`             | Run **Developer: Reload Webviews**, or close and open the Ukemi view. |
+| `src/**` or `shared/**`      | Run **Developer: Reload Window** (Ctrl+R).                            |
+| `package.json` contributions | Stop the debug session and press F5 again.                            |
 
 To watch without the debugger, run `npm run watch` in a terminal.
 
@@ -97,4 +97,26 @@ code --install-extension ukemi-0.1.0.vsix
 
 In Cursor, `npm run install:cursor` packages and installs in one step.
 
-Then run **Developer: Restart Extension Host** or **Developer: Reload Window**. The editor keeps the old code loaded and does not ask for a restart when the version number is the same. To remove it, run `code --uninstall-extension ukemi.ukemi`.
+Then run **Developer: Restart Extension Host** or **Developer: Reload Window**. The editor keeps the old code loaded and does not ask for a restart when the version number is the same. To remove it, run `code --uninstall-extension samuelba.ukemi`.
+
+## Release
+
+A push to `main` does not publish. [release-please](https://github.com/googleapis/release-please) opens a release pull request from conventional commits (`feat` bumps minor before 1.0, `fix` bumps patch, `feat!` bumps major after 1.0). Merging that pull request creates the `vX.Y.Z` tag, the GitHub Release, and attaches `ukemi-X.Y.Z.vsix`.
+
+Set the repository secret `RELEASE_PLEASE_TOKEN` to a fine-grained personal access token if CI should run on that pull request. Without it, the release still works.
+
+Upload that `.vsix` by hand. Cursor reads extensions from Open VSX, so publish in both places.
+
+### VS Code Marketplace
+
+1. Create an Azure DevOps organization and a personal access token with Marketplace (publish) scope.
+2. Create the publisher `samuelba` at [marketplace.visualstudio.com/manage](https://marketplace.visualstudio.com/manage). The publisher id must exist before the first upload.
+3. Upload `ukemi-X.Y.Z.vsix` in the web UI, or run `npx vsce publish --packagePath ukemi-X.Y.Z.vsix -p "$VSCE_PAT"`.
+
+### Open VSX (Cursor)
+
+1. Sign in at [open-vsx.org](https://open-vsx.org) with GitHub and sign the Eclipse publisher agreement.
+2. Create a token, then create the namespace once: `npx ovsx create-namespace samuelba -p "$OVSX_PAT"`.
+3. Publish: `npx ovsx publish ukemi-X.Y.Z.vsix -p "$OVSX_PAT"`.
+
+After the first public release, a later change can publish from `.github/workflows/release.yml` with the secrets `VSCE_PAT` and `OVSX_PAT`.

@@ -232,7 +232,7 @@ export function globalCommands(env: CommandEnv): Record<string, Handler> {
     }),
     'ukemi.forge.signOut': withModel(env, (model) => env.forge.signOut(model)),
     'ukemi.openSettings': () =>
-      vscode.commands.executeCommand('workbench.action.openSettings', '@ext:ukemi.ukemi'),
+      vscode.commands.executeCommand('workbench.action.openSettings', `@ext:${env.extensionId}`),
     'ukemi.view.asList': () => setChangedFilesView('list'),
     'ukemi.view.asTree': () => setChangedFilesView('tree'),
   }

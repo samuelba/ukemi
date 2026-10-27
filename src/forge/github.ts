@@ -9,7 +9,6 @@ import {
   type MergeMethod,
 } from './types'
 
-
 const checkRunSchema = z.object({
   __typename: z.literal('CheckRun'),
   name: z.string(),

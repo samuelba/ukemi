@@ -44,10 +44,14 @@ describe('evolutionVersionNodes', () => {
   })
 
   test('hides restore on an immutable change', () => {
-    const nodes = evolutionVersionNodes(entries, { ...commit, isImmutable: true }, {
-      now: NOW,
-      changeIdLength: 3,
-    })
+    const nodes = evolutionVersionNodes(
+      entries,
+      { ...commit, isImmutable: true },
+      {
+        now: NOW,
+        changeIdLength: 3,
+      },
+    )
 
     expect(nodes[1]?.contextValue).toBe('version:openable:comparable')
   })

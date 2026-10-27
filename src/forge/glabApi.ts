@@ -56,7 +56,10 @@ export function responseFromGlab(stdout: string, code: number): Response {
   return new Response(separated, { status: Number(statusLine[1]) })
 }
 
-export function runGlab(args: readonly string[], stdin: string | undefined): Promise<GlabRunResult> {
+export function runGlab(
+  args: readonly string[],
+  stdin: string | undefined,
+): Promise<GlabRunResult> {
   return new Promise((resolve, reject) => {
     const child = spawn('glab', args, { stdio: ['pipe', 'pipe', 'pipe'] })
     const stdout: Buffer[] = []

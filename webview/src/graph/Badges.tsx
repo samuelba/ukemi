@@ -56,7 +56,9 @@ export function Badges({ commit, repoId, hasForge, showGitTags }: BadgesProps) {
         </span>
       )}
       {commit.isWorkingCopy && commit.isEmpty && (
-        <span className="badge is-empty" title="No file changes yet">empty</span>
+        <span className="badge is-empty" title="No file changes yet">
+          empty
+        </span>
       )}
       {commit.localBookmarks.map((b) => (
         <span
@@ -167,7 +169,9 @@ function RequestBadge({
     <span
       className={`badge request request-${request.state}`}
       title={
-        details ? undefined : `#${request.number} ${request.title} (${REQUEST_LABEL[request.state]})`
+        details
+          ? undefined
+          : `#${request.number} ${request.title} (${REQUEST_LABEL[request.state]})`
       }
       data-vscode-context={vscodeContext({
         webviewSection: 'request',

@@ -118,12 +118,7 @@ export function createMessageHandler(env: CommandEnv) {
         }
         const target = model.findCommit(message.targetId)
         const source = model.findCommit(message.fromCommitId)
-        if (
-          !target ||
-          !source ||
-          target.isImmutable ||
-          message.fromCommitId === message.targetId
-        ) {
+        if (!target || !source || target.isImmutable || message.fromCommitId === message.targetId) {
           return
         }
         if (message.action === 'copy') {

@@ -49,6 +49,7 @@ export class GitlabAuth implements vscode.Disposable {
   constructor(
     private readonly secrets: SecretStore,
     private readonly logger: Logger,
+    private readonly extensionId: string,
   ) {
     this.subscription = vscode.window.registerUriHandler({
       handleUri: (uri) => this.handleUri(uri),
@@ -82,7 +83,7 @@ export class GitlabAuth implements vscode.Disposable {
     this.cancelHost(host)
     const { verifier, challenge } = createPkcePair()
     const state = randomBytes(16).toString('base64url')
-    const redirectUri = `${vscode.env.uriScheme}://ukemi.ukemi/gitlab-auth`
+    const redirectUri = `${vscode.env.uriScheme}://${this.extensionId}/gitlab-auth`
     const url = gitlabAuthorizeUrl({ host, clientId, redirectUri, state, challenge })
     const token = new Promise<string | null>((resolve) => {
       const timer = setTimeout(() => {

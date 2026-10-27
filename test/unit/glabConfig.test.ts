@@ -41,7 +41,9 @@ describe('glab config', () => {
         },
       }),
     ).toBe(false)
-    expect(glabConfigFile({ XDG_CONFIG_HOME: '/xdg' }, '/home/sam')).toBe('/xdg/glab-cli/config.yml')
+    expect(glabConfigFile({ XDG_CONFIG_HOME: '/xdg' }, '/home/sam')).toBe(
+      '/xdg/glab-cli/config.yml',
+    )
   })
 })
 
@@ -77,10 +79,13 @@ describe('glab api', () => {
       return { code: 0, stdout: 'HTTP/2.0 201 Created\n\n{"iid":1}\n' }
     })
 
-    const response = await fetchImpl('https://gitlab.com/api/v4/projects/group%2Fname/merge_requests', {
-      method: 'POST',
-      body: '{"title":"x"}',
-    })
+    const response = await fetchImpl(
+      'https://gitlab.com/api/v4/projects/group%2Fname/merge_requests',
+      {
+        method: 'POST',
+        body: '{"title":"x"}',
+      },
+    )
 
     expect(response.status).toBe(201)
     expect(seen).toBe(
@@ -89,7 +94,10 @@ describe('glab api', () => {
   })
 
   test('reads the status from an error response', () => {
-    const response = responseFromGlab('HTTP/2.0 401 Unauthorized\n\n{"message":"401 Unauthorized"}\n', 1)
+    const response = responseFromGlab(
+      'HTTP/2.0 401 Unauthorized\n\n{"message":"401 Unauthorized"}\n',
+      1,
+    )
     expect(response.status).toBe(401)
   })
 
