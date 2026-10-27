@@ -3,7 +3,12 @@ import * as vscode from 'vscode'
 import type { ChangedFilesView } from '../../../shared/protocol'
 import { JjRepo } from '../../jj/repo'
 import type { RepoModel } from '../../repo/repoModel'
-import { collectBookmarks } from '../../repo/workspaceItems'
+import {
+  bookmarkGoToItems,
+  bookmarkRefsFromList,
+  resolveBookmarkGoTo,
+} from '../../repo/goToTargets'
+import { collectBookmarks, type BookmarkRef } from '../../repo/workspaceItems'
 import { errorMessage } from '../../util/logger'
 import { openCommitDiff } from '../diff'
 import { GRAPH_VIEW_ID } from '../graphView'
@@ -86,49 +91,137 @@ export async function initRepo(env: CommandEnv, root?: string): Promise<void> {
   }
 }
 
-async function goTo(env: CommandEnv, model: RepoModel): Promise<void> {
-  const graph = model.graph
-  type Item = vscode.QuickPickItem & { revision?: string; workspaceRoot?: string }
-  const { local, remote } = collectBookmarks(graph?.commits ?? [])
-  const bookmarks: Item[] = [
-    ...local.map((bookmark) => ({
-      label: `$(bookmark) ${bookmark.name}`,
-      revision: bookmark.commitId,
-    })),
-    ...remote.map((bookmark) => ({
-      label: `$(cloud) ${bookmark.name}@${bookmark.remote}`,
-      revision: bookmark.commitId,
-    })),
-  ]
-  const requests: Item[] = (graph?.commits ?? []).flatMap((c) =>
-    c.requests.map((r) => ({
-      label: `$(git-pull-request) #${r.number} ${r.title}`,
-      revision: c.commitId,
+type GoToItem = vscode.QuickPickItem & {
+  revision?: string
+  bookmarkName?: string
+  workspaceRoot?: string
+}
+
+function goToItems(
+  model: RepoModel,
+  local: readonly BookmarkRef[],
+  remote: readonly BookmarkRef[],
+): GoToItem[] {
+  const commits = model.graph?.commits ?? []
+  const bookmarks = bookmarkGoToItems(local, remote).map((item) => ({
+    label: item.label,
+    description: item.description,
+    bookmarkName: item.name,
+    ...(item.revision ? { revision: item.revision } : {}),
+  }))
+  const requests = commits.flatMap((commit) =>
+    commit.requests.map((request) => ({
+      label: `$(git-pull-request) #${request.number} ${request.title}`,
+      revision: commit.commitId,
     })),
   )
-  const workspaces: Item[] = (graph?.workspaces ?? [])
-    .filter((w) => w.root && w.root !== model.root)
-    .map((w) => ({
-      label: `$(folder) ${w.name}`,
+  const workspaces = (model.graph?.workspaces ?? [])
+    .filter((workspace) => workspace.root && workspace.root !== model.root)
+    .map((workspace) => ({
+      label: `$(folder) ${workspace.name}`,
       description: 'workspace',
-      workspaceRoot: w.root ?? undefined,
+      workspaceRoot: workspace.root ?? undefined,
     }))
+  return [...bookmarks, ...requests, ...workspaces]
+}
 
-  const pick = vscode.window.createQuickPick<Item>()
+interface GoToPick {
+  choice: Promise<GoToItem | string | undefined>
+  update: (items: readonly GoToItem[]) => void
+}
+
+function showGoToPick(items: readonly GoToItem[]): GoToPick {
+  const pick = vscode.window.createQuickPick<GoToItem>()
   pick.title = 'Go to branch, request or workspace'
   pick.placeholder = 'Starts a new change on the target. Type a change id or revset to jump there.'
-  pick.items = [...bookmarks, ...requests, ...workspaces]
-  const choice = await new Promise<Item | string | undefined>((resolve) => {
+  pick.matchOnDescription = true
+  pick.items = [...items]
+  let disposed = false
+  const choice = new Promise<GoToItem | string | undefined>((resolve) => {
     pick.onDidAccept(() => {
       resolve(pick.selectedItems[0] ?? (pick.value.trim() || undefined))
       pick.hide()
     })
     pick.onDidHide(() => {
+      disposed = true
       resolve(undefined)
       pick.dispose()
     })
     pick.show()
   })
+  return {
+    choice,
+    update(next) {
+      if (!disposed) {
+        pick.items = [...next]
+      }
+    },
+  }
+}
+
+async function chooseBookmarkRevision(
+  name: string,
+  local: readonly BookmarkRef[],
+  remote: readonly BookmarkRef[],
+): Promise<string | undefined> {
+  const resolved = resolveBookmarkGoTo(name, local, remote)
+  if (resolved.kind === 'single') {
+    return resolved.revision
+  }
+  if (resolved.kind !== 'ambiguous') {
+    return undefined
+  }
+  const picked = await vscode.window.showQuickPick<vscode.QuickPickItem & { revision: string }>(
+    resolved.choices.map((choice) => ({ label: choice.label, revision: choice.revision })),
+    { title: `Go to ${name}` },
+  )
+  return picked?.revision
+}
+
+async function resolveGoToRevision(
+  choice: GoToItem | string,
+  local: readonly BookmarkRef[],
+  remote: readonly BookmarkRef[],
+): Promise<string | undefined> {
+  if (typeof choice === 'string') {
+    const resolved = resolveBookmarkGoTo(choice, local, remote)
+    if (resolved.kind === 'unknown') {
+      return choice
+    }
+    if (resolved.kind === 'single') {
+      return resolved.revision
+    }
+    return chooseBookmarkRevision(choice, local, remote)
+  }
+  if (choice.revision) {
+    return choice.revision
+  }
+  if (!choice.bookmarkName) {
+    return undefined
+  }
+  return chooseBookmarkRevision(choice.bookmarkName, local, remote)
+}
+
+async function goToBookmarks(
+  env: CommandEnv,
+  model: RepoModel,
+): Promise<{ local: BookmarkRef[]; remote: BookmarkRef[] }> {
+  try {
+    return bookmarkRefsFromList(await model.repo.bookmarkList())
+  } catch (error: unknown) {
+    env.logger.warn(`Go to bookmark list failed: ${errorMessage(error)}`)
+    return collectBookmarks(model.graph?.commits ?? [])
+  }
+}
+
+async function goTo(env: CommandEnv, model: RepoModel): Promise<void> {
+  const visible = collectBookmarks(model.graph?.commits ?? [])
+  const pick = showGoToPick(goToItems(model, visible.local, visible.remote))
+  const listed = goToBookmarks(env, model)
+  void listed.then((bookmarks) => {
+    pick.update(goToItems(model, bookmarks.local, bookmarks.remote))
+  })
+  const choice = await pick.choice
   if (!choice) {
     return
   }
@@ -136,13 +229,12 @@ async function goTo(env: CommandEnv, model: RepoModel): Promise<void> {
     await vscode.commands.executeCommand(
       'vscode.openFolder',
       vscode.Uri.file(choice.workspaceRoot),
-      {
-        forceNewWindow: true,
-      },
+      { forceNewWindow: true },
     )
     return
   }
-  const revision = typeof choice === 'string' ? choice : choice.revision
+  const { local, remote } = typeof choice !== 'string' && choice.revision ? visible : await listed
+  const revision = await resolveGoToRevision(choice, local, remote)
   if (revision) {
     await env.operations.run('Go to', model, () => model.repo.newChange([revision]))
   }
