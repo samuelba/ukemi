@@ -175,6 +175,7 @@ export function Toolbar({
               {singleLabel}
             </span>
           )}
+          <SettingsGear />
         </div>
       )}
       <div className="toolbar-row">
@@ -250,7 +251,7 @@ export function Toolbar({
           label="Refresh"
           onClick={() => command('ukemi.refresh')}
         />
-        <SettingsGear />
+        {!showRepoRow && <SettingsGear />}
       </div>
       {graph && (
         <div className="toolbar-row filters">
