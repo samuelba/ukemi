@@ -1,9 +1,18 @@
 import { spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import type { CleanupSelection } from '../../shared/cleanup'
 import { applyCleanup, loadCleanup } from '../../src/repo/loadCleanup'
-import { JJ_BINARY, initRepo, jj, makeRepo, makeTempDir, type Fixture } from '../helpers/jjFixture'
+import {
+  JJ_BINARY,
+  initRepo,
+  jj,
+  makeRepo,
+  makeTempDir,
+  writeFile,
+  type Fixture,
+} from '../helpers/jjFixture'
 import type { JjRepo } from '../../src/jj/repo'
 
 let fixture: Fixture
@@ -38,12 +47,23 @@ function divergeSameChange(): void {
 function selection(overrides: Partial<CleanupSelection> = {}): CleanupSelection {
   return {
     bookmarks: [],
+    abandonBookmarkCommits: [],
     deletedBookmarks: [],
     deleteRemote: [],
     workspaces: [],
+    deleteWorkspaceFiles: [],
     divergent: [],
+    undescribed: [],
     ...overrides,
   }
+}
+
+function gitRefs(dir: string): string[] {
+  const result = spawnSync('git', ['show-ref'], { cwd: dir, encoding: 'utf8' })
+  return result.stdout
+    .split('\n')
+    .map((line) => line.trim().split(' ').at(1) ?? '')
+    .filter((ref) => ref.length > 0)
 }
 
 function initBare(dir: string): void {
@@ -149,5 +169,86 @@ describe('cleanup', () => {
         (bookmark) => bookmark.name === 'topic' && bookmark.remote === 'origin' && bookmark.present,
       ),
     ).toBe(true)
+  })
+
+  test('forgets a slashed local bookmark and leaves the remote branch', async () => {
+    const bare = join(fixture.dir, 'origin.git')
+    initBare(bare)
+    jj(root, 'describe', '-m', 'review')
+    jj(root, 'bookmark', 'create', 'master', '-r', '@')
+    writeFile(
+      root,
+      '.jj/repo/config.toml',
+      '[revset-aliases]\n"trunk()" = "bookmarks(exact:\\"master\\")"\n',
+    )
+    jj(root, 'bookmark', 'create', 'feature/calendar-sync', '-r', '@')
+    jj(root, 'git', 'remote', 'add', 'origin', bare)
+    jj(root, 'git', 'push', '--bookmark', 'feature/calendar-sync')
+
+    const snapshot = await loadCleanup(repo, [])
+    expect(snapshot.bookmarks.map((bookmark) => bookmark.name)).toContain('feature/calendar-sync')
+
+    await applyCleanup(repo, snapshot, selection({ bookmarks: ['feature/calendar-sync'] }))
+
+    const after = await repo.bookmarkList()
+    expect(
+      after.some(
+        (bookmark) => bookmark.name === 'feature/calendar-sync' && bookmark.remote === null,
+      ),
+    ).toBe(false)
+    const refs = gitRefs(root)
+    expect(refs).not.toContain('refs/heads/feature/calendar-sync')
+    expect(refs).toContain('refs/remotes/origin/feature/calendar-sync')
+  })
+
+  test('abandons a commit with no description', async () => {
+    jj(root, 'new')
+    jj(root, 'new', '-m', 'later')
+    const [parent] = await repo.log('@-', 1)
+    if (!parent) {
+      throw new Error('expected a parent')
+    }
+
+    const snapshot = await loadCleanup(repo, [])
+    expect(snapshot.undescribed).toContainEqual(
+      expect.objectContaining({ commitId: parent.commitId, canAbandon: true }),
+    )
+
+    await applyCleanup(repo, snapshot, selection({ undescribed: [parent.commitId] }))
+
+    const after = await loadCleanup(repo, [])
+    expect(after.undescribed.some((commit) => commit.commitId === parent.commitId)).toBe(false)
+  })
+
+  test('forgets a workspace and deletes its folder only when asked', async () => {
+    const kept = join(fixture.dir, 'kept-ws')
+    const removed = join(fixture.dir, 'removed-ws')
+    await repo.addWorkspace(kept, 'kept', '@')
+    await repo.addWorkspace(removed, 'removed', '@')
+    writeFile(kept, 'keep.txt', 'stay\n')
+    writeFile(removed, 'drop.txt', 'gone\n')
+
+    const snapshot = await loadCleanup(repo, [])
+    expect(snapshot.workspaces).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'kept', canDeleteFiles: true }),
+        expect.objectContaining({ name: 'removed', canDeleteFiles: true }),
+      ]),
+    )
+
+    await applyCleanup(
+      repo,
+      snapshot,
+      selection({
+        workspaces: ['kept', 'removed'],
+        deleteWorkspaceFiles: ['removed'],
+      }),
+    )
+
+    expect(existsSync(join(kept, 'keep.txt'))).toBe(true)
+    expect(existsSync(removed)).toBe(false)
+    const names = (await repo.workspaces()).map((workspace) => workspace.name)
+    expect(names).not.toContain('kept')
+    expect(names).not.toContain('removed')
   })
 })

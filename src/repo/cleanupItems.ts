@@ -1,3 +1,4 @@
+import { isAbsolute, relative, resolve } from 'node:path'
 import type {
   CleanupBookmark,
   CleanupDeletedBookmark,
@@ -8,6 +9,7 @@ import type {
   CleanupUndescribed,
   CleanupWorkspace,
 } from '../../shared/cleanup'
+import { quoteRevsetString } from '../jj/revsets'
 
 const GIT_REMOTE = 'git'
 
@@ -28,6 +30,7 @@ export interface WorkspaceRecord {
   isCurrent: boolean
   isOpen: boolean
   rootMissing: boolean
+  root: string | null
 }
 
 export interface DivergentCommit {
@@ -56,10 +59,11 @@ export interface UndescribedCommit {
 
 export type CleanupStep =
   | { kind: 'pushDeletedBookmark'; name: string }
-  | { kind: 'forgetBookmark'; name: string }
+  | { kind: 'forgetBookmark'; name: string; includeGit: boolean }
   | { kind: 'rebase'; revset: string; onto: string }
-  | { kind: 'abandon'; commitId: string }
+  | { kind: 'abandon'; revset: string }
   | { kind: 'forgetWorkspace'; name: string }
+  | { kind: 'deleteWorkspaceFiles'; root: string }
 
 function firstLine(text: string): string {
   return text.split('\n')[0]?.trim() ?? ''
@@ -76,12 +80,29 @@ function trackedRemotesDeleted(name: string, rows: readonly BookmarkRecord[]): b
   return tracked.length > 0 && tracked.every((row) => !row.present)
 }
 
+function hasGitRemote(name: string, rows: readonly BookmarkRecord[]): boolean {
+  return rows.some((row) => row.name === name && row.remote === GIT_REMOTE && row.present)
+}
+
+function bookmarkFields(
+  local: BookmarkRecord,
+  rows: readonly BookmarkRecord[],
+): Pick<CleanupBookmark, 'hasGitRemote' | 'abandonCommitIds'> {
+  return { hasGitRemote: hasGitRemote(local.name, rows), abandonCommitIds: [] }
+}
+
+export function bookmarkAbandonRevset(name: string): string {
+  const exact = `bookmarks(exact:${quoteRevsetString(name)})`
+  return `::${exact} ~ ::(trunk() | (bookmarks() ~ ${exact})) ~ immutable() ~ @`
+}
+
 function bookmarkItem(
   local: BookmarkRecord,
   rows: readonly BookmarkRecord[],
   trunkName: string | null,
 ): CleanupBookmark | null {
   const description = firstLine(local.description)
+  const fields = bookmarkFields(local, rows)
   if (trackedRemotesDeleted(local.name, rows)) {
     return {
       name: local.name,
@@ -89,6 +110,7 @@ function bookmarkItem(
       detail: 'Remote bookmark was deleted.',
       description,
       checked: true,
+      ...fields,
     }
   }
   if (local.conflict) {
@@ -98,11 +120,19 @@ function bookmarkItem(
       detail: 'Bookmark is conflicted.',
       description,
       checked: false,
+      ...fields,
     }
   }
   if (local.inTrunk) {
     const where = trunkName ? `Already in trunk (${trunkName}).` : 'Already in trunk.'
-    return { name: local.name, reason: 'merged', detail: where, description, checked: true }
+    return {
+      name: local.name,
+      reason: 'merged',
+      detail: where,
+      description,
+      checked: true,
+      ...fields,
+    }
   }
   return null
 }
@@ -174,7 +204,10 @@ function isVirtualRoot(commitId: string): boolean {
   return /^0+$/.test(commitId)
 }
 
-export function classifyUndescribed(commits: readonly UndescribedCommit[]): CleanupUndescribed[] {
+export function classifyUndescribed(
+  commits: readonly UndescribedCommit[],
+  blockedIds: ReadonlySet<string> = new Set(),
+): CleanupUndescribed[] {
   return commits
     .filter(
       (commit) =>
@@ -187,6 +220,7 @@ export function classifyUndescribed(commits: readonly UndescribedCommit[]): Clea
       timestamp: commit.timestamp,
       isEmpty: commit.isEmpty,
       isImmutable: commit.isImmutable,
+      canAbandon: !commit.isImmutable && !blockedIds.has(commit.commitId),
     }))
 }
 
@@ -201,7 +235,31 @@ function workspaceDetail(row: WorkspaceRecord): string {
   return line.length > 0 ? line : '(no description)'
 }
 
-export function classifyWorkspaces(rows: readonly WorkspaceRecord[]): CleanupWorkspace[] {
+function containsPath(parent: string, child: string): boolean {
+  const rel = relative(parent, child)
+  return rel.length > 0 && !rel.startsWith('..') && !isAbsolute(rel)
+}
+
+export function removableWorkspaceFolder(repoRoot: string, root: string | null): string | null {
+  if (root === null) {
+    return null
+  }
+  const target = resolve(root)
+  const repo = resolve(repoRoot)
+  if (target === repo || containsPath(target, repo)) {
+    return null
+  }
+  return target
+}
+
+export function canDeleteWorkspaceFiles(repoRoot: string, row: WorkspaceRecord): boolean {
+  return !row.rootMissing && removableWorkspaceFolder(repoRoot, row.root) !== null
+}
+
+export function classifyWorkspaces(
+  rows: readonly WorkspaceRecord[],
+  repoRoot: string,
+): CleanupWorkspace[] {
   return rows
     .filter((row) => !row.isCurrent && !row.isOpen)
     .sort(byName)
@@ -209,6 +267,8 @@ export function classifyWorkspaces(rows: readonly WorkspaceRecord[]): CleanupWor
       name: row.name,
       detail: workspaceDetail(row),
       checked: row.rootMissing,
+      root: row.root,
+      canDeleteFiles: canDeleteWorkspaceFiles(repoRoot, row),
     }))
 }
 
@@ -310,7 +370,7 @@ function divergentSteps(group: CleanupDivergence, dropIds: ReadonlySet<string>):
   }
   return [
     ...rebases,
-    ...dropping.map((revision) => ({ kind: 'abandon' as const, commitId: revision.commitId })),
+    ...dropping.map((revision) => ({ kind: 'abandon' as const, revset: revision.commitId })),
   ]
 }
 
@@ -328,10 +388,54 @@ function deletedBookmarkSteps(
     if (bookmark.canDeleteRemote && pushNames.has(bookmark.name)) {
       steps.push({ kind: 'pushDeletedBookmark', name: bookmark.name })
     } else {
-      steps.push({ kind: 'forgetBookmark', name: bookmark.name })
+      steps.push({ kind: 'forgetBookmark', name: bookmark.name, includeGit: false })
     }
   }
   return steps
+}
+
+function bookmarkAbandonStep(
+  snapshot: CleanupSnapshot,
+  selection: CleanupSelection,
+): CleanupStep[] {
+  const names = new Set(selection.abandonBookmarkCommits)
+  const selected = new Set(selection.bookmarks)
+  const ids = [
+    ...new Set(
+      snapshot.bookmarks.flatMap((bookmark) =>
+        selected.has(bookmark.name) && names.has(bookmark.name) ? bookmark.abandonCommitIds : [],
+      ),
+    ),
+  ]
+  return ids.length === 0 ? [] : [{ kind: 'abandon', revset: ids.join('|') }]
+}
+
+function undescribedAbandonStep(
+  snapshot: CleanupSnapshot,
+  selection: CleanupSelection,
+): CleanupStep[] {
+  const selected = new Set(selection.undescribed)
+  const ids = snapshot.undescribed
+    .filter((commit) => commit.canAbandon && selected.has(commit.commitId))
+    .map((commit) => commit.commitId)
+  return ids.length === 0 ? [] : [{ kind: 'abandon', revset: ids.join('|') }]
+}
+
+function workspaceSteps(snapshot: CleanupSnapshot, selection: CleanupSelection): CleanupStep[] {
+  const names = new Set(selection.workspaces)
+  const deleteFiles = new Set(selection.deleteWorkspaceFiles)
+  const forgets: CleanupStep[] = []
+  const deletes: CleanupStep[] = []
+  for (const workspace of snapshot.workspaces) {
+    if (!names.has(workspace.name)) {
+      continue
+    }
+    forgets.push({ kind: 'forgetWorkspace', name: workspace.name })
+    if (deleteFiles.has(workspace.name) && workspace.canDeleteFiles && workspace.root !== null) {
+      deletes.push({ kind: 'deleteWorkspaceFiles', root: workspace.root })
+    }
+  }
+  return [...forgets, ...deletes]
 }
 
 export function cleanupSteps(
@@ -339,26 +443,25 @@ export function cleanupSteps(
   selection: CleanupSelection,
 ): CleanupStep[] {
   const bookmarkNames = new Set(selection.bookmarks)
-  const workspaceNames = new Set(selection.workspaces)
   const dropIds = new Set(selection.divergent)
   const deleted = deletedBookmarkSteps(snapshot, selection)
   const forgets: CleanupStep[] = []
   for (const bookmark of snapshot.bookmarks) {
     if (bookmarkNames.has(bookmark.name)) {
-      forgets.push({ kind: 'forgetBookmark', name: bookmark.name })
-    }
-  }
-  const workspaceSteps: CleanupStep[] = []
-  for (const workspace of snapshot.workspaces) {
-    if (workspaceNames.has(workspace.name)) {
-      workspaceSteps.push({ kind: 'forgetWorkspace', name: workspace.name })
+      forgets.push({
+        kind: 'forgetBookmark',
+        name: bookmark.name,
+        includeGit: bookmark.hasGitRemote,
+      })
     }
   }
   return [
+    ...bookmarkAbandonStep(snapshot, selection),
     ...deleted.filter((step) => step.kind === 'pushDeletedBookmark'),
     ...forgets,
     ...deleted.filter((step) => step.kind === 'forgetBookmark'),
     ...snapshot.divergent.flatMap((group) => divergentSteps(group, dropIds)),
-    ...workspaceSteps,
+    ...undescribedAbandonStep(snapshot, selection),
+    ...workspaceSteps(snapshot, selection),
   ]
 }

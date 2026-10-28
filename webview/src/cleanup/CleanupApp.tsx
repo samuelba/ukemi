@@ -56,10 +56,13 @@ function initialDrops(snapshot: CleanupSnapshot): Set<string> {
 export function CleanupApp() {
   const [snapshot, setSnapshot] = useState<CleanupSnapshot | null>(null)
   const [bookmarks, setBookmarks] = useState<ReadonlySet<string>>(new Set())
+  const [abandonCommits, setAbandonCommits] = useState<ReadonlySet<string>>(new Set())
   const [deleted, setDeleted] = useState<ReadonlySet<string>>(new Set())
   const [deleteRemote, setDeleteRemote] = useState<ReadonlySet<string>>(new Set())
   const [workspaces, setWorkspaces] = useState<ReadonlySet<string>>(new Set())
+  const [deleteFiles, setDeleteFiles] = useState<ReadonlySet<string>>(new Set())
   const [drops, setDrops] = useState<ReadonlySet<string>>(new Set())
+  const [undescribedDrops, setUndescribedDrops] = useState<ReadonlySet<string>>(new Set())
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const [filesByCommit, setFilesByCommit] = useState<Readonly<Record<string, ChangedFile[]>>>({})
   const [headerHeight, setHeaderHeight] = useState(0)
@@ -87,6 +90,7 @@ export function CleanupApp() {
       setBookmarks(
         new Set(next.bookmarks.filter((bookmark) => bookmark.checked).map((b) => b.name)),
       )
+      setAbandonCommits(new Set())
       setDeleted(
         new Set(next.deletedBookmarks.filter((bookmark) => bookmark.checked).map((b) => b.name)),
       )
@@ -94,7 +98,9 @@ export function CleanupApp() {
       setWorkspaces(
         new Set(next.workspaces.filter((workspace) => workspace.checked).map((w) => w.name)),
       )
+      setDeleteFiles(new Set())
       setDrops(initialDrops(next))
+      setUndescribedDrops(new Set())
       setExpanded(new Set())
       setFilesByCommit({})
     }
@@ -115,13 +121,16 @@ export function CleanupApp() {
     )
   }
 
-  const count = bookmarks.size + deleted.size + workspaces.size + drops.size
+  const count = bookmarks.size + deleted.size + workspaces.size + drops.size + undescribedDrops.size
   const selection: CleanupSelection = {
     bookmarks: [...bookmarks],
+    abandonBookmarkCommits: [...abandonCommits].filter((name) => bookmarks.has(name)),
     deletedBookmarks: [...deleted],
     deleteRemote: [...deleteRemote].filter((name) => deleted.has(name)),
     workspaces: [...workspaces],
+    deleteWorkspaceFiles: [...deleteFiles].filter((name) => workspaces.has(name)),
     divergent: [...drops],
+    undescribed: [...undescribedDrops],
   }
   const toggle = (current: ReadonlySet<string>, name: string, selected: boolean) => {
     const next = new Set(current)
@@ -139,11 +148,11 @@ export function CleanupApp() {
       style={{ '--cleanup-header-height': `${headerHeight}px` } as CSSProperties}
     >
       <header className="cleanup-header" ref={headerRef}>
+        <div className="cleanup-warning" role="alert">
+          <i className="codicon codicon-warning" aria-hidden="true" />
+          <p>Checked rows are removed. jj undo can restore the repository.</p>
+        </div>
         <h1>Clean up</h1>
-        <p className="muted">
-          Checked rows are removed. Forget leaves remote branches and workspace files in place.
-          Delete remote pushes that deletion.
-        </p>
         <div className="cleanup-buttons">
           <button className="button secondary" onClick={() => send({ type: 'cancel' })}>
             Cancel
@@ -162,6 +171,12 @@ export function CleanupApp() {
           <h2>
             Bookmarks <span className="muted">({snapshot.bookmarks.length})</span>
           </h2>
+          <p className="muted cleanup-note">
+            Forgets the local bookmark and its Git branch (refs/heads/…). The remote bookmark stays.
+            Abandon commits deletes only commits that are on this bookmark and not on trunk or
+            another bookmark, back to that fork. A bookmark already in trunk has none of those
+            commits, so the control stays off.
+          </p>
           <table className="cleanup-table bookmarks">
             <caption className="sr-only">Bookmarks</caption>
             <colgroup>
@@ -169,6 +184,7 @@ export function CleanupApp() {
               <col className="col-name" />
               <col className="col-reason" />
               <col className="col-text" />
+              <col className="col-option" />
             </colgroup>
             <thead>
               <tr>
@@ -176,6 +192,7 @@ export function CleanupApp() {
                 <th scope="col">Bookmark</th>
                 <th scope="col">Reason</th>
                 <th scope="col">Description</th>
+                <th scope="col">Abandon commits</th>
               </tr>
             </thead>
             <tbody>
@@ -186,9 +203,13 @@ export function CleanupApp() {
                       id={`bookmark-${bookmark.name}`}
                       type="checkbox"
                       checked={bookmarks.has(bookmark.name)}
-                      onChange={(event) =>
-                        setBookmarks(toggle(bookmarks, bookmark.name, event.target.checked))
-                      }
+                      onChange={(event) => {
+                        const selected = event.target.checked
+                        setBookmarks(toggle(bookmarks, bookmark.name, selected))
+                        if (!selected) {
+                          setAbandonCommits(toggle(abandonCommits, bookmark.name, false))
+                        }
+                      }}
                     />
                   </td>
                   <Cell htmlFor={`bookmark-${bookmark.name}`} className="name">
@@ -200,6 +221,28 @@ export function CleanupApp() {
                   <Cell htmlFor={`bookmark-${bookmark.name}`}>
                     {bookmark.description || '(no description)'}
                   </Cell>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label={`Abandon commits for ${bookmark.name}`}
+                      checked={
+                        bookmark.abandonCommitIds.length > 0 &&
+                        bookmarks.has(bookmark.name) &&
+                        abandonCommits.has(bookmark.name)
+                      }
+                      disabled={
+                        bookmark.abandonCommitIds.length === 0 || !bookmarks.has(bookmark.name)
+                      }
+                      onChange={(event) =>
+                        setAbandonCommits(
+                          toggle(abandonCommits, bookmark.name, event.target.checked),
+                        )
+                      }
+                    />
+                    {bookmark.abandonCommitIds.length > 0 && (
+                      <span className="muted"> {bookmark.abandonCommitIds.length}</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -230,18 +273,25 @@ export function CleanupApp() {
           <h2>
             Workspaces <span className="muted">({snapshot.workspaces.length})</span>
           </h2>
+          <p className="muted cleanup-note">
+            Forgets the workspace in the repository. The folder and its files stay on disk unless
+            Delete files is checked. Delete files removes that folder after the workspace is
+            forgotten. jj undo does not restore those files.
+          </p>
           <table className="cleanup-table workspaces">
             <caption className="sr-only">Workspaces</caption>
             <colgroup>
               <col className="col-check" />
               <col className="col-name" />
               <col className="col-text" />
+              <col className="col-option" />
             </colgroup>
             <thead>
               <tr>
                 <th scope="col" />
                 <th scope="col">Workspace</th>
                 <th scope="col">Detail</th>
+                <th scope="col">Delete files</th>
               </tr>
             </thead>
             <tbody>
@@ -252,9 +302,13 @@ export function CleanupApp() {
                       id={`workspace-${workspace.name}`}
                       type="checkbox"
                       checked={workspaces.has(workspace.name)}
-                      onChange={(event) =>
-                        setWorkspaces(toggle(workspaces, workspace.name, event.target.checked))
-                      }
+                      onChange={(event) => {
+                        const selected = event.target.checked
+                        setWorkspaces(toggle(workspaces, workspace.name, selected))
+                        if (!selected) {
+                          setDeleteFiles(toggle(deleteFiles, workspace.name, false))
+                        }
+                      }}
                     />
                   </td>
                   <Cell htmlFor={`workspace-${workspace.name}`} className="name">
@@ -263,6 +317,21 @@ export function CleanupApp() {
                   <Cell htmlFor={`workspace-${workspace.name}`} className="muted">
                     {workspace.detail}
                   </Cell>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label={`Delete files for ${workspace.name}`}
+                      checked={workspace.canDeleteFiles && deleteFiles.has(workspace.name)}
+                      disabled={!workspace.canDeleteFiles}
+                      onChange={(event) => {
+                        const selected = event.target.checked
+                        setDeleteFiles(toggle(deleteFiles, workspace.name, selected))
+                        if (selected) {
+                          setWorkspaces(toggle(workspaces, workspace.name, true))
+                        }
+                      }}
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -274,6 +343,11 @@ export function CleanupApp() {
           <h2>
             Divergent changes <span className="muted">({snapshot.divergent.length})</span>
           </h2>
+          <p className="muted cleanup-note">
+            Abandons the checked commits and rebases kept children onto the commit you keep. The
+            working copy is left unchecked. An immutable commit, or a commit with an immutable
+            child, cannot be abandoned.
+          </p>
           <table className="cleanup-table divergent">
             <caption className="sr-only">Divergent changes</caption>
             <colgroup>
@@ -307,6 +381,10 @@ export function CleanupApp() {
           truncated={snapshot.undescribedTruncated}
           expanded={expanded}
           filesByCommit={filesByCommit}
+          selected={undescribedDrops}
+          onSelect={(commitId, selected) =>
+            setUndescribedDrops(toggle(undescribedDrops, commitId, selected))
+          }
           onToggle={(commitId) => {
             const open = expanded.has(commitId)
             setExpanded(toggle(expanded, commitId, !open))
@@ -398,6 +476,10 @@ function DeletedBookmarks({
       <h2>
         Deleted bookmarks <span className="muted">({bookmarks.length})</span>
       </h2>
+      <p className="muted cleanup-note">
+        Forgets the local record. The remote stays unless Delete remote is checked. That checkbox
+        pushes the deletion.
+      </p>
       <table className="cleanup-table deleted">
         <caption className="sr-only">Deleted bookmarks</caption>
         <colgroup>
@@ -459,6 +541,9 @@ function undescribedNote(commit: CleanupUndescribed): string {
   if (commit.isImmutable) {
     notes.push('immutable')
   }
+  if (!commit.canAbandon) {
+    notes.push('cannot abandon')
+  }
   return notes.join(', ')
 }
 
@@ -467,12 +552,16 @@ function UndescribedCommits({
   truncated,
   expanded,
   filesByCommit,
+  selected,
+  onSelect,
   onToggle,
 }: {
   commits: readonly CleanupUndescribed[]
   truncated: boolean
   expanded: ReadonlySet<string>
   filesByCommit: Readonly<Record<string, ChangedFile[]>>
+  selected: ReadonlySet<string>
+  onSelect: (commitId: string, selected: boolean) => void
   onToggle: (commitId: string) => void
 }) {
   const now = Date.now()
@@ -482,12 +571,15 @@ function UndescribedCommits({
         No description <span className="muted">({commits.length})</span>
       </h2>
       <p className="muted cleanup-note">
-        Listed only.
+        Abandons the checked commits and rebases their children onto the parent. Nothing is checked
+        at first. An immutable commit, or a commit with an immutable child, cannot be abandoned.
+        Open diff only shows the change.
         {truncated ? ` Showing the latest ${UNDESCRIBED_LIMIT}.` : ''}
       </p>
       <table className="cleanup-table undescribed">
         <caption className="sr-only">Commits with no description</caption>
         <colgroup>
+          <col className="col-check" />
           <col className="col-files" />
           <col className="col-id" />
           <col className="col-id" />
@@ -498,6 +590,7 @@ function UndescribedCommits({
         <thead>
           <tr>
             <th scope="col" />
+            <th scope="col" />
             <th scope="col">Change</th>
             <th scope="col">Commit</th>
             <th scope="col">When</th>
@@ -507,7 +600,16 @@ function UndescribedCommits({
         </thead>
         {commits.map((commit) => (
           <tbody key={commit.commitId}>
-            <tr>
+            <tr className={commit.canAbandon ? undefined : 'is-disabled'}>
+              <td>
+                <input
+                  type="checkbox"
+                  aria-label={`Abandon commit ${commit.commitPrefix}`}
+                  checked={commit.canAbandon && selected.has(commit.commitId)}
+                  disabled={!commit.canAbandon}
+                  onChange={(event) => onSelect(commit.commitId, event.target.checked)}
+                />
+              </td>
               <td>
                 <button
                   type="button"
@@ -534,7 +636,7 @@ function UndescribedCommits({
             </tr>
             {expanded.has(commit.commitId) && (
               <tr>
-                <td colSpan={6}>
+                <td colSpan={7}>
                   <ChangedFiles commitId={commit.commitId} files={filesByCommit[commit.commitId]} />
                 </td>
               </tr>

@@ -22,6 +22,7 @@ import {
 } from './parse'
 import { rootFileset } from './revsets'
 import { JjRunner, NETWORK_TIMEOUT_MS, type RunResult } from './runner'
+import { jjString } from './templates'
 import {
   BOOKMARK_LIST_TEMPLATE,
   COMMIT_ID_TEMPLATE,
@@ -383,6 +384,10 @@ export class JjRepo {
 
   forgetBookmark(name: string) {
     return this.mutate(['bookmark', 'forget', `exact:${name}`])
+  }
+
+  forgetCleanupBookmark(name: string) {
+    return this.mutate(['bookmark', 'forget', `exact:${jjString(name)}`])
   }
 
   trackBookmark(name: string, remote: string) {
