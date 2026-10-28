@@ -1,5 +1,8 @@
+import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { readdir, rm, stat } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
+import { promisify } from 'node:util'
 import type {
   ChangedFile,
   Commit,
@@ -8,6 +11,7 @@ import type {
   Remote,
   Workspace,
 } from '../../shared/model'
+import { errorMessage } from '../util/logger'
 import { SerialQueue } from '../util/serialQueue'
 import {
   parseBookmarks,
@@ -21,7 +25,7 @@ import {
   parseWorkspaces,
 } from './parse'
 import { rootFileset } from './revsets'
-import { JjRunner, NETWORK_TIMEOUT_MS, type RunResult } from './runner'
+import { JjError, JjRunner, NETWORK_TIMEOUT_MS, type RunResult } from './runner'
 import { jjString } from './templates'
 import {
   BOOKMARK_LIST_TEMPLATE,
@@ -455,6 +459,14 @@ export class JjRepo {
     await runner.run({ cwd: directory, args: ['git', 'init', '--colocate'] })
   }
 
+  static initNew(
+    runner: JjRunner,
+    directory: string,
+    options: NewRepoOptions,
+  ): Promise<NewRepoResult> {
+    return initNewRepo(runner, directory, options)
+  }
+
   static async findRoot(runner: JjRunner, directory: string): Promise<string | null> {
     try {
       const { stdout } = await runner.run({
@@ -473,4 +485,169 @@ function pushArgs(names: readonly string[]): readonly string[] {
   const targets =
     names.length > 0 ? names.flatMap((name) => ['--bookmark', `exact:${name}`]) : ['--tracked']
   return ['git', 'push', ...targets]
+}
+
+export type InitFolder = 'jj' | 'git' | 'empty' | 'occupied'
+
+export interface NewRepoOptions {
+  branch: string
+  remoteName: string
+  remoteUrl?: string
+}
+
+export type NewRepoResult = { kind: 'cloned' } | { kind: 'created'; historyNotDownloaded: boolean }
+
+export class InitIncompleteError extends Error {
+  constructor(cause: unknown) {
+    super(errorMessage(cause))
+    this.name = 'InitIncompleteError'
+  }
+}
+
+const execFileAsync = promisify(execFile)
+const MISSING_BRANCH = /No matching branches found on remote/i
+const EMPTY_REMOTE = /no commits|empty repository/i
+
+export async function readInitFolder(directory: string): Promise<InitFolder> {
+  if (await isDirectory(join(directory, '.jj'))) {
+    return 'jj'
+  }
+  if (await pathExists(join(directory, '.git'))) {
+    return 'git'
+  }
+  const entries = await readdir(directory)
+  return entries.length === 0 ? 'empty' : 'occupied'
+}
+
+async function initNewRepo(
+  runner: JjRunner,
+  directory: string,
+  options: NewRepoOptions,
+): Promise<NewRepoResult> {
+  const remoteUrl = options.remoteUrl?.trim() ?? ''
+  const state = await readInitFolder(directory)
+  if (remoteUrl && state === 'empty') {
+    return cloneNewRepo(runner, directory, { ...options, remoteUrl })
+  }
+  return createLocalRepo(runner, directory, {
+    branch: options.branch,
+    remoteName: options.remoteName,
+    remoteUrl,
+    historyNotDownloaded: remoteUrl.length > 0 && state === 'occupied',
+  })
+}
+
+async function cloneNewRepo(
+  runner: JjRunner,
+  directory: string,
+  options: NewRepoOptions & { remoteUrl: string },
+): Promise<NewRepoResult> {
+  const local = {
+    branch: options.branch,
+    remoteName: options.remoteName,
+    remoteUrl: options.remoteUrl,
+    historyNotDownloaded: false,
+  }
+  try {
+    const result = await runClone(runner, directory, options)
+    if (!MISSING_BRANCH.test(result.stderr)) {
+      return { kind: 'cloned' }
+    }
+  } catch (error: unknown) {
+    await removeCloneMetadata(directory)
+    if (error instanceof JjError && EMPTY_REMOTE.test(error.stderr)) {
+      return createLocalRepo(runner, directory, local)
+    }
+    throw error
+  }
+  await removeCloneMetadata(directory)
+  if (await remoteHasHeads(runner, options.remoteUrl)) {
+    throw new Error(missingBranchMessage(options.branch))
+  }
+  return createLocalRepo(runner, directory, local)
+}
+
+function runClone(
+  runner: JjRunner,
+  directory: string,
+  options: NewRepoOptions & { remoteUrl: string },
+): Promise<RunResult> {
+  return runner.run({
+    cwd: dirname(directory),
+    args: [
+      'git',
+      'clone',
+      '--colocate',
+      '--remote',
+      options.remoteName,
+      '-b',
+      options.branch,
+      options.remoteUrl,
+      directory,
+    ],
+    timeoutMs: NETWORK_TIMEOUT_MS,
+  })
+}
+
+async function createLocalRepo(
+  runner: JjRunner,
+  directory: string,
+  options: {
+    branch: string
+    remoteName: string
+    remoteUrl: string
+    historyNotDownloaded: boolean
+  },
+): Promise<NewRepoResult> {
+  await runner.run({ cwd: directory, args: ['git', 'init', '--colocate'] })
+  try {
+    await runner.run({
+      cwd: directory,
+      args: ['bookmark', 'create', options.branch, '-r', '@'],
+    })
+    if (options.remoteUrl) {
+      await runner.run({
+        cwd: directory,
+        args: ['git', 'remote', 'add', options.remoteName, options.remoteUrl],
+      })
+    }
+  } catch (error: unknown) {
+    throw new InitIncompleteError(error)
+  }
+  return { kind: 'created', historyNotDownloaded: options.historyNotDownloaded }
+}
+
+async function remoteHasHeads(runner: JjRunner, url: string): Promise<boolean> {
+  const { stdout } = await execFileAsync('git', ['ls-remote', '--heads', url], {
+    env: runner.spawnEnv(),
+    timeout: NETWORK_TIMEOUT_MS,
+    encoding: 'utf8',
+  })
+  return stdout.trim().length > 0
+}
+
+function missingBranchMessage(branch: string): string {
+  return `No matching branches found on remote: ${branch}`
+}
+
+async function removeCloneMetadata(directory: string): Promise<void> {
+  await rm(join(directory, '.jj'), { recursive: true, force: true })
+  await rm(join(directory, '.git'), { recursive: true, force: true })
+}
+
+async function isDirectory(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isDirectory()
+  } catch {
+    return false
+  }
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await stat(path)
+    return true
+  } catch {
+    return false
+  }
 }

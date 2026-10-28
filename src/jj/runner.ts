@@ -92,6 +92,15 @@ export class JjRunner {
     this.extraEnv = env
   }
 
+  spawnEnv(overrides: Readonly<Record<string, string>> = {}): NodeJS.ProcessEnv {
+    return {
+      ...process.env,
+      ...this.extraEnv,
+      ...overrides,
+      GIT_TERMINAL_PROMPT: '0',
+    }
+  }
+
   async run(options: RunOptions): Promise<RunResult> {
     for (let attempt = 0; ; attempt++) {
       try {
