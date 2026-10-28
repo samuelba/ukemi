@@ -1,8 +1,14 @@
 import * as vscode from 'vscode'
 import type { Commit } from '../../../shared/model'
 import type { RequestBadge } from '../../../shared/protocol'
-import { quoteRevsetString } from '../../jj/revsets'
+import {
+  parentBookmarkRevset,
+  parentBookmarks,
+  shouldPushBase,
+  stackDetail,
+} from '../../forge/requestBase'
 import type { MergeMethod } from '../../forge/types'
+import { quoteRevsetString } from '../../jj/revsets'
 import type { RepoModel } from '../../repo/repoModel'
 import { isBookmarkTreeElement } from '../../repo/bookmarkItems'
 import { bodyAfterTitle, bookmarkSlug, firstLine, validateBookmarkName } from '../../util/text'
@@ -90,6 +96,94 @@ async function askBookmarkName(commit: Commit): Promise<string | undefined> {
   })
 }
 
+interface TargetBranchPick extends vscode.QuickPickItem {
+  branch?: string
+  isOther?: boolean
+}
+
+function openRequestNumber(model: RepoModel, branch: string): number | undefined {
+  const requests = model.graph?.commits.flatMap((commit) => commit.requests) ?? []
+  return requests.find(
+    (request) =>
+      request.headBranch === branch && request.state !== 'merged' && request.state !== 'closed',
+  )?.number
+}
+
+async function askTargetBranch(
+  model: RepoModel,
+  commit: Commit,
+  trunk: string,
+  head: string,
+): Promise<string | undefined> {
+  const ancestors = await model.repo.log(parentBookmarkRevset(commit.commitId))
+  const parents = parentBookmarks(ancestors, trunk, head)
+  const picks: TargetBranchPick[] = [
+    ...parents.map((branch) => ({
+      label: branch,
+      detail: stackDetail(branch, openRequestNumber(model, branch)),
+      branch,
+    })),
+    { label: trunk, description: 'trunk', branch: trunk },
+    { label: 'Other branch…', isOther: true },
+  ]
+  const pick = await vscode.window.showQuickPick(picks, {
+    title: `Target branch for ${shortId(commit)}`,
+    placeHolder: 'Branch the request merges into',
+  })
+  if (!pick) {
+    return undefined
+  }
+  if (!pick.isOther) {
+    return pick.branch
+  }
+  return vscode.window.showInputBox({
+    title: 'Target branch',
+    placeHolder: 'Branch name',
+    validateInput: validateBookmarkName,
+  })
+}
+
+async function pushBaseIfNeeded(model: RepoModel, base: string, head: string): Promise<void> {
+  const [localNames, pushedNames] = await Promise.all([
+    model.repo.bookmarkNames(`bookmarks(exact:${quoteRevsetString(base)})`),
+    model.repo.pushedBookmarkNames(),
+  ])
+  if (shouldPushBase(base, head, localNames, pushedNames)) {
+    await model.repo.push(base)
+  }
+}
+
+interface NewRequestChoice {
+  name: string
+  base: string
+  isDraft: boolean
+}
+
+async function askNewRequest(
+  model: RepoModel,
+  commit: Commit,
+  askName: boolean,
+  bookmarkName: string | undefined,
+): Promise<NewRequestChoice | undefined> {
+  const trunk = model.graph?.trunkName ?? 'main'
+  const existing = bookmarkName ?? reusableBookmark(commit, trunk)
+  const name = askName || !existing ? await askBookmarkName(commit) : existing
+  if (!name) {
+    return undefined
+  }
+  const base = await askTargetBranch(model, commit, trunk, name)
+  if (!base) {
+    return undefined
+  }
+  const kind = await vscode.window.showQuickPick(['Ready for review', 'Draft'], {
+    title: `Create request for ${shortId(commit)} into ${base}`,
+  })
+  if (!kind) {
+    return undefined
+  }
+  return { name, base, isDraft: kind === 'Draft' }
+}
+
 async function createRequest(
   env: CommandEnv,
   model: RepoModel,
@@ -110,27 +204,20 @@ async function createRequest(
     void vscode.window.showWarningMessage('Ukemi: sign-in was cancelled.')
     return
   }
-  const trunk = model.graph?.trunkName ?? 'main'
-  const existing = bookmarkName ?? reusableBookmark(commit, trunk)
-  const name = askName || !existing ? await askBookmarkName(commit) : existing
-  if (!name) {
-    return
-  }
-  const kind = await vscode.window.showQuickPick(['Ready for review', 'Draft'], {
-    title: `Create request for ${shortId(commit)} into ${trunk}`,
-  })
-  if (!kind) {
+  const request = await askNewRequest(model, commit, askName, bookmarkName)
+  if (!request) {
     return
   }
   const created = await env.operations.run('Create request', model, async () => {
-    await model.repo.setBookmark(name, commit.commitId)
-    await model.repo.push(name)
+    await pushBaseIfNeeded(model, request.base, request.name)
+    await model.repo.setBookmark(request.name, commit.commitId)
+    await model.repo.push(request.name)
     return client.createRequest({
-      head: name,
-      base: trunk,
+      head: request.name,
+      base: request.base,
       title: firstLine(commit.description),
       body: bodyAfterTitle(commit.description),
-      isDraft: kind === 'Draft',
+      isDraft: request.isDraft,
     })
   })
   if (!created) {
