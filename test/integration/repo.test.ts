@@ -348,6 +348,47 @@ describe('mutations', () => {
     expect(stillKeeper?.parents).toEqual([parent])
   })
 
+  test('rebase branch mode moves the whole stack onto trunk from its tip', async () => {
+    const remote = join(fixture.dir, 'remote.git')
+    execFileSync('git', ['init', '--bare', '-q', remote])
+    jj(root, 'git', 'remote', 'add', 'origin', remote)
+    writeFile(root, 'base.txt', 'base\n')
+    jj(root, 'describe', '-m', 'old-trunk')
+    const oldTrunk = await current()
+    await repo.setBookmark('main', oldTrunk.commitId)
+    await repo.push('main')
+    await repo.fetch()
+
+    jj(root, 'new', oldTrunk.commitId, '-m', 'A')
+    writeFile(root, 'a.txt', 'a\n')
+    const a = await current()
+    jj(root, 'new', '-m', 'B')
+    writeFile(root, 'b.txt', 'b\n')
+    const b = await current()
+    jj(root, 'new', '-m', 'C')
+    writeFile(root, 'c.txt', 'c\n')
+    const c = await current()
+
+    jj(root, 'new', oldTrunk.commitId, '-m', 'new-trunk')
+    writeFile(root, 'trunk.txt', 't\n')
+    const newTrunk = await current()
+    await repo.setBookmark('main', newTrunk.commitId)
+    await repo.push('main')
+    await repo.fetch()
+
+    expect(a.parents).toEqual([oldTrunk.commitId])
+    expect((await repo.log('trunk()'))[0]?.commitId).toBe(newTrunk.commitId)
+
+    await repo.rebase(c.commitId, 'trunk()', 'branch')
+
+    const [movedA] = await repo.log(a.changeId)
+    const [movedB] = await repo.log(b.changeId)
+    const [movedC] = await repo.log(c.changeId)
+    expect(movedA?.parents).toEqual([newTrunk.commitId])
+    expect(movedB?.parents).toEqual([movedA?.commitId])
+    expect(movedC?.parents).toEqual([movedB?.commitId])
+  })
+
   test('squashIntoParent uses the combined message', async () => {
     writeFile(root, 'a.txt', 'a\n')
     jj(root, 'describe', '-m', 'parent')

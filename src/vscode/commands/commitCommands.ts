@@ -326,6 +326,11 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
       ({ model, commit }) => model.repo.rebase(commit.commitId, 'trunk()', 'source'),
       true,
     ),
+    'ukemi.commit.rebaseStackTrunk': run(
+      'Rebase stack',
+      ({ model, commit }) => model.repo.rebase(commit.commitId, 'trunk()', 'branch'),
+      true,
+    ),
     'ukemi.commit.rebaseOnto': rebaseAt(env, 'onto', 'Rebase onto'),
     'ukemi.commit.rebaseInsertAfter': rebaseAt(env, 'after', 'Rebase insert after'),
     'ukemi.commit.rebaseInsertBefore': rebaseAt(env, 'before', 'Rebase insert before'),
