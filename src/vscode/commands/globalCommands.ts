@@ -184,7 +184,6 @@ async function createNewRepo(
 type GoToItem = vscode.QuickPickItem & {
   revision?: string
   bookmarkName?: string
-  workspaceRoot?: string
 }
 
 function goToItems(
@@ -205,14 +204,7 @@ function goToItems(
       revision: commit.commitId,
     })),
   )
-  const workspaces = (model.graph?.workspaces ?? [])
-    .filter((workspace) => workspace.root && workspace.root !== model.root)
-    .map((workspace) => ({
-      label: `$(folder) ${workspace.name}`,
-      description: 'workspace',
-      workspaceRoot: workspace.root ?? undefined,
-    }))
-  return [...bookmarks, ...requests, ...workspaces]
+  return [...bookmarks, ...requests]
 }
 
 interface GoToPick {
@@ -222,8 +214,8 @@ interface GoToPick {
 
 function showGoToPick(items: readonly GoToItem[]): GoToPick {
   const pick = vscode.window.createQuickPick<GoToItem>()
-  pick.title = 'Go to branch, request or workspace'
-  pick.placeholder = 'Starts a new change on the target. Type a change id or revset to jump there.'
+  pick.title = 'New change from bookmark, request or revision'
+  pick.placeholder = 'Type a change id or revset to start a new change there.'
   pick.matchOnDescription = true
   pick.items = [...items]
   let disposed = false
@@ -263,7 +255,7 @@ async function chooseBookmarkRevision(
   }
   const picked = await vscode.window.showQuickPick<vscode.QuickPickItem & { revision: string }>(
     resolved.choices.map((choice) => ({ label: choice.label, revision: choice.revision })),
-    { title: `Go to ${name}` },
+    { title: `New change from ${name}` },
   )
   return picked?.revision
 }
@@ -315,18 +307,10 @@ async function goTo(env: CommandEnv, model: RepoModel): Promise<void> {
   if (!choice) {
     return
   }
-  if (typeof choice !== 'string' && choice.workspaceRoot) {
-    await vscode.commands.executeCommand(
-      'vscode.openFolder',
-      vscode.Uri.file(choice.workspaceRoot),
-      { forceNewWindow: true },
-    )
-    return
-  }
   const { local, remote } = typeof choice !== 'string' && choice.revision ? visible : await listed
   const revision = await resolveGoToRevision(choice, local, remote)
   if (revision) {
-    await env.operations.run('Go to', model, () => model.repo.newChange([revision]))
+    await env.operations.run('New change', model, () => model.repo.newChange([revision]))
   }
 }
 

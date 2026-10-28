@@ -113,6 +113,15 @@ function CleanIcon() {
   )
 }
 
+function NewChangeIcon() {
+  return (
+    <span className="icon-with-badge">
+      <i className="codicon codicon-git-branch" />
+      <i className="codicon codicon-add icon-badge" />
+    </span>
+  )
+}
+
 function PushAllIcon() {
   return (
     <svg className="svg-icon" viewBox="0 0 16 16" aria-hidden="true">
@@ -192,8 +201,8 @@ export function Toolbar({
               onClick={() => command('ukemi.newFromTrunk', { repoId })}
             />
             <ToolButton
-              icon="search"
-              label="Go to bookmark, request or revision"
+              icon={<NewChangeIcon />}
+              label="New change from bookmark, request, or revision"
               onClick={() => command('ukemi.goTo', { repoId })}
             />
             {graph.hasRemotes && (
