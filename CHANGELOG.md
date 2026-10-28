@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.5.0](https://github.com/samuelba/ukemi/compare/v0.4.0...v0.5.0) (2026-10-28)
+
+
+### Features
+
+* choose target branch when creating a request ([719f2be](https://github.com/samuelba/ukemi/commit/719f2be901d2cb972ba776fef81c0e88c283e7e5))
+* improve cleanup editor ([c8f14bc](https://github.com/samuelba/ukemi/commit/c8f14bc4428c3b8f8450bb570b3d011d97f75820))
+* improve repo initialization ([38ad775](https://github.com/samuelba/ukemi/commit/38ad77536f9b5186610855e28dad2e071514ef04))
+* merge conflict editor ([be0fc0a](https://github.com/samuelba/ukemi/commit/be0fc0a7fe7531c57fb5e8c2ff02672a64d49180))
+* progress animation ([1faf8da](https://github.com/samuelba/ukemi/commit/1faf8dab8fb2b68bca85b19377a959ca48c792ea))
+* rebase stack onto trunk ([7b9c070](https://github.com/samuelba/ukemi/commit/7b9c0709a215e80d7afde5fd9070253648697a98))
+
+
+### Bug Fixes
+
+* add CI badge, add urls to marketplaces to readme ([f8beb39](https://github.com/samuelba/ukemi/commit/f8beb39cec64a9f37c1ee7f60d21fdcc49456ae5))
+* **graph:** open the context menu on the first right-click when the webview is unfocused ([69a71d4](https://github.com/samuelba/ukemi/commit/69a71d4f0b5aeed8d63455c4ff340d3c941ec45a))
+* improve go-to action in toolbar ([8bf1e41](https://github.com/samuelba/ukemi/commit/8bf1e41c1665de313e31ce09be3bdff62dda3760))
+* remove auto fetch menu entry ([1e1eb55](https://github.com/samuelba/ukemi/commit/1e1eb5530b52fa02189b592a423f4f6c5db394b7))
+* removing a workspace, updates repo dropdown ([a3ccff5](https://github.com/samuelba/ukemi/commit/a3ccff53d21e0097431d2cffbb413f23244b560a))
+* toolbar layout, align days dropdown on the left ([39d1624](https://github.com/samuelba/ukemi/commit/39d16246f74be58bcd3fdb290c11cddbc9430dbd))
+
 ## [0.4.0](https://github.com/samuelba/ukemi/compare/v0.3.0...v0.4.0) (2026-10-27)
 
 
