@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.5.0](https://github.com/samuelba/ukemi/compare/v0.4.0...v0.5.0) (2026-10-28)
+
+
+### Features
+
+* choose target branch when creating a request ([7910b99](https://github.com/samuelba/ukemi/commit/7910b992d87ee2a6b5e00f26cdd58b17af443724))
+* choose target branch when creating a request ([719f2be](https://github.com/samuelba/ukemi/commit/719f2be901d2cb972ba776fef81c0e88c283e7e5))
+* improve cleanup editor ([5e3d89b](https://github.com/samuelba/ukemi/commit/5e3d89b52f1d60adde204f58781814cab4a12129))
+* improve cleanup editor ([c8f14bc](https://github.com/samuelba/ukemi/commit/c8f14bc4428c3b8f8450bb570b3d011d97f75820))
+* improve repo initialization ([3637278](https://github.com/samuelba/ukemi/commit/3637278244d5f46cc99512186d9d29568b70e25a))
+* improve repo initialization ([38ad775](https://github.com/samuelba/ukemi/commit/38ad77536f9b5186610855e28dad2e071514ef04))
+* merge conflict editor ([b240587](https://github.com/samuelba/ukemi/commit/b240587d27000c3bdde811af9d950b46d29e622a))
+* merge conflict editor ([be0fc0a](https://github.com/samuelba/ukemi/commit/be0fc0a7fe7531c57fb5e8c2ff02672a64d49180))
+* progress animation ([5987f34](https://github.com/samuelba/ukemi/commit/5987f34f293ff448d8afb170310bf071b6d7d0bd))
+* progress animation ([1faf8da](https://github.com/samuelba/ukemi/commit/1faf8dab8fb2b68bca85b19377a959ca48c792ea))
+* rebase stack onto trunk ([11b6a50](https://github.com/samuelba/ukemi/commit/11b6a507e874404ef79bf8ce5dcb75204502f082))
+* rebase stack onto trunk ([7b9c070](https://github.com/samuelba/ukemi/commit/7b9c0709a215e80d7afde5fd9070253648697a98))
+
+
+### Bug Fixes
+
+* add CI badge, add urls to marketplaces to readme ([123e15c](https://github.com/samuelba/ukemi/commit/123e15c1639727f51cb493ec5bc124cd3f8c1562))
+* add CI badge, add urls to marketplaces to readme ([f8beb39](https://github.com/samuelba/ukemi/commit/f8beb39cec64a9f37c1ee7f60d21fdcc49456ae5))
+* **graph:** open the context menu on the first right-click when the webview is unfocused ([87982c6](https://github.com/samuelba/ukemi/commit/87982c6b1e1cad31aaf8b944cbbbb819d02d68a6))
+* **graph:** open the context menu on the first right-click when the webview is unfocused ([69a71d4](https://github.com/samuelba/ukemi/commit/69a71d4f0b5aeed8d63455c4ff340d3c941ec45a))
+* improve go-to action in toolbar ([a83bbb6](https://github.com/samuelba/ukemi/commit/a83bbb65b936b51e46d86dfa5bb8def1386a6506))
+* improve go-to action in toolbar ([8bf1e41](https://github.com/samuelba/ukemi/commit/8bf1e41c1665de313e31ce09be3bdff62dda3760))
+* remove auto fetch menu entry ([90abe5b](https://github.com/samuelba/ukemi/commit/90abe5bd2b11001d5881c1fe9031927d4937db99))
+* remove auto fetch menu entry ([1e1eb55](https://github.com/samuelba/ukemi/commit/1e1eb5530b52fa02189b592a423f4f6c5db394b7))
+* removing a workspace, updates repo dropdown ([45f6e45](https://github.com/samuelba/ukemi/commit/45f6e45a762c07f904c3cb90d726bf63bf68f00b))
+* removing a workspace, updates repo dropdown ([a3ccff5](https://github.com/samuelba/ukemi/commit/a3ccff53d21e0097431d2cffbb413f23244b560a))
+* toolbar layout, align days dropdown on the left ([63d5202](https://github.com/samuelba/ukemi/commit/63d5202e60e8b4d8a34fbde42592f6eff68ba081))
+* toolbar layout, align days dropdown on the left ([39d1624](https://github.com/samuelba/ukemi/commit/39d16246f74be58bcd3fdb290c11cddbc9430dbd))
+
 ## [0.4.0](https://github.com/samuelba/ukemi/compare/v0.3.0...v0.4.0) (2026-10-27)
 
 
