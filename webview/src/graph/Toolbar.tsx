@@ -264,7 +264,6 @@ export function Toolbar({
               </option>
             ))}
           </select>
-          <span className="toolbar-spacer" />
           <select
             className="compact-select"
             value={graph.depth}
@@ -281,6 +280,7 @@ export function Toolbar({
               </option>
             ))}
           </select>
+          <span className="toolbar-spacer" />
           {graph.hasRemotes && (
             <ToolButton
               icon={autoFetch.enabled ? 'sync' : 'sync-ignored'}
