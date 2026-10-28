@@ -5,7 +5,6 @@
 
 ### Bug Fixes
 
-* opening log from Cursor ([f62655d](https://github.com/samuelba/ukemi/commit/f62655d2df386aae89b600f99b9bc1ed45016733))
 * opening log from Cursor ([a6c35af](https://github.com/samuelba/ukemi/commit/a6c35af5a5a5fef7cdbd8814cafad09230d47c27))
 
 ## [0.5.0](https://github.com/samuelba/ukemi/compare/v0.4.0...v0.5.0) (2026-10-28)
