@@ -26,6 +26,7 @@ import { installJj, locateJj, offerInstall, updateTerminalPath } from './vscode/
 import { AutoFetcher } from './vscode/autoFetch'
 import { Operations } from './vscode/operations'
 import { createOutputLogger } from './vscode/outputLogger'
+import { LOG_CHANNEL_NAME, showLog } from './vscode/showLog'
 import { RepoRegistry } from './vscode/registry'
 import { ScmController } from './vscode/scm'
 import { openSplitPanel } from './vscode/splitPanel'
@@ -43,7 +44,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
     'ukemi.inCursor',
     vscode.env.appName === 'Cursor',
   )
-  const channel = vscode.window.createOutputChannel('Ukemi', { log: true })
+  const channel = vscode.window.createOutputChannel(LOG_CHANNEL_NAME, { log: true })
   const logger = createOutputLogger(channel)
   const storageDir = context.globalStorageUri.fsPath
 
@@ -171,7 +172,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
         await reloadJj()
       }
     },
-    'ukemi.showLog': () => channel.show(),
+    'ukemi.showLog': () => {
+      void showLog(channel, context.extension.id, context.storageUri, context.logUri)
+    },
   })
 
   if (!located) {
