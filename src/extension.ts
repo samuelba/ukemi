@@ -9,6 +9,8 @@ import { fileCommands } from './vscode/commands/fileCommands'
 import { globalCommands } from './vscode/commands/globalCommands'
 import { refCommands } from './vscode/commands/refCommands'
 import { workspaceCommands } from './vscode/commands/workspaceCommands'
+import { ConflictDecorator } from './vscode/conflictDecorations'
+import { conflictCommands, registerConflictLenses } from './vscode/conflictLens'
 import {
   DIFF_SCHEME,
   INTERDIFF_SCHEME,
@@ -84,6 +86,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
     autoFetch,
   }
   graphView.setHandler(createMessageHandler(env))
+  const conflictDecorator = new ConflictDecorator(registry)
 
   const reloadJj = async () => {
     const found = await locateJj(storageDir, logger)
@@ -108,6 +111,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
     forge,
     new ScmController(registry),
     new RepoStatusBar(registry),
+    registerConflictLenses(registry),
+    conflictDecorator,
     workspacesView,
     bookmarksView,
     vscode.window.registerTreeDataProvider('ukemi.workspaces', workspacesView),
@@ -145,6 +150,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
     ...globalCommands(env),
     ...commitCommands(env),
     ...fileCommands(env),
+    ...conflictCommands(env),
+    ...conflictDecorator.commands(),
     ...refCommands(env),
     ...workspaceCommands(env),
     ...evolutionCommands(env),
