@@ -1032,15 +1032,6 @@
           "when": "view == ukemi.graph"
         },
         {
-          "command": "ukemi.toggleAutoFetch",
-          "group": "4_fetch@1",
-          "when": "view == ukemi.graph",
-          "toggled": {
-            "condition": "config.ukemi.autoFetch.enabled",
-            "icon": "$(sync)"
-          }
-        },
-        {
           "command": "ukemi.showLog",
           "group": "9_misc@1",
           "when": "view == ukemi.graph"
