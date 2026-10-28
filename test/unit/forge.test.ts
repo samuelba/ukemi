@@ -253,6 +253,35 @@ describe('GithubClient', () => {
     expect(calls).toEqual(['POST https://ghe.corp/api/v3/repos/o/r/pulls'])
     expect(created.state).toBe('draft')
   })
+
+  test('sends the chosen base branch', async () => {
+    let body: Record<string, unknown> = {}
+    const client = new GithubClient('github.com', 'o/r', 't', async (_url, init) => {
+      body = JSON.parse(String(init.body)) as Record<string, unknown>
+      return new Response(
+        JSON.stringify({
+          number: 9,
+          title: 'Stack',
+          html_url: 'https://github.com/o/r/pull/9',
+          draft: false,
+          head: { ref: 'top' },
+          base: { ref: 'parent' },
+        }),
+        { status: 200 },
+      )
+    })
+
+    const created = await client.createRequest({
+      head: 'top',
+      base: 'parent',
+      title: 'Stack',
+      body: '',
+      isDraft: false,
+    })
+
+    expect(body).toMatchObject({ head: 'top', base: 'parent' })
+    expect(created.baseBranch).toBe('parent')
+  })
 })
 
 describe('GitlabClient', () => {
@@ -471,6 +500,35 @@ describe('GitlabClient', () => {
 
     expect(pages).toEqual(['1', '2'])
     expect(requests.map((request) => request.number)).toEqual([101])
+  })
+
+  test('sends the chosen target branch', async () => {
+    let body: Record<string, unknown> = {}
+    const client = new GitlabClient('gitlab.com', 'a/b', 't', async (_url, init) => {
+      body = JSON.parse(String(init.body)) as Record<string, unknown>
+      return new Response(
+        JSON.stringify({
+          iid: 9,
+          title: 'Stack',
+          web_url: 'https://gitlab.com/a/b/-/merge_requests/9',
+          state: 'opened',
+          source_branch: 'top',
+          target_branch: 'parent',
+        }),
+        { status: 200 },
+      )
+    })
+
+    const created = await client.createRequest({
+      head: 'top',
+      base: 'parent',
+      title: 'Stack',
+      body: '',
+      isDraft: false,
+    })
+
+    expect(body).toMatchObject({ source_branch: 'top', target_branch: 'parent' })
+    expect(created.baseBranch).toBe('parent')
   })
 
   test('sends a bearer token for an OAuth session', async () => {
