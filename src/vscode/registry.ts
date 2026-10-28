@@ -158,6 +158,21 @@ export class RepoRegistry implements vscode.Disposable {
     )
   }
 
+  async remove(root: string): Promise<void> {
+    const entry = this.entries.get(root)
+    if (!entry) {
+      return
+    }
+    this.disposeEntry(entry)
+    this.entries.delete(root)
+    if (this.activeRoot === root) {
+      const remembered = this.memento.get<string>(ACTIVE_REPO_KEY)
+      await this.setActive(this.preferredRoot(remembered), { remember: false })
+      return
+    }
+    this.changeEmitter.fire()
+  }
+
   async addRepo(root: string): Promise<void> {
     const existing = this.entries.get(root)
     if (existing) {

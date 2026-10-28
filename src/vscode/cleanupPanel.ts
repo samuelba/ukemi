@@ -6,7 +6,7 @@ import type {
   CleanupSnapshot,
   CleanupWebviewMessage,
 } from '../../shared/cleanup'
-import { cleanupSteps } from '../repo/cleanupItems'
+import { cleanupSteps, forgottenWorkspaceRoots } from '../repo/cleanupItems'
 import { applyCleanupSteps, loadCleanup } from '../repo/loadCleanup'
 import type { RepoModel } from '../repo/repoModel'
 import { errorMessage } from '../util/logger'
@@ -47,11 +47,20 @@ export function openCleanupPanel(env: CommandEnv, model: RepoModel): void {
         }
         applied = true
         const steps = cleanupSteps(snapshot, message.selection)
+        const roots = forgottenWorkspaceRoots(snapshot, message.selection, model.root)
         panel.dispose()
         if (steps.length === 0) {
           return
         }
-        await env.operations.run('Clean up', model, () => applyCleanupSteps(model.repo, steps))
+        const cleaned = await env.operations.run('Clean up', model, async () => {
+          await applyCleanupSteps(model.repo, steps)
+          return true
+        })
+        if (cleaned) {
+          for (const root of roots) {
+            await env.registry.remove(root)
+          }
+        }
         return
       }
       case 'loadFiles':

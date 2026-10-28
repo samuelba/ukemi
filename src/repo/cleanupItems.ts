@@ -10,6 +10,7 @@ import type {
   CleanupWorkspace,
 } from '../../shared/cleanup'
 import { quoteRevsetString } from '../jj/revsets'
+import { sameFolder } from './workspaceItems'
 
 const GIT_REMOTE = 'git'
 
@@ -419,6 +420,23 @@ function undescribedAbandonStep(
     .filter((commit) => commit.canAbandon && selected.has(commit.commitId))
     .map((commit) => commit.commitId)
   return ids.length === 0 ? [] : [{ kind: 'abandon', revset: ids.join('|') }]
+}
+
+export function forgottenWorkspaceRoots(
+  snapshot: CleanupSnapshot,
+  selection: CleanupSelection,
+  activeRoot: string,
+): string[] {
+  const names = new Set(selection.workspaces)
+  return snapshot.workspaces.flatMap((workspace) => {
+    if (!names.has(workspace.name) || workspace.root === null) {
+      return []
+    }
+    if (sameFolder(workspace.root, activeRoot)) {
+      return []
+    }
+    return [workspace.root]
+  })
 }
 
 function workspaceSteps(snapshot: CleanupSnapshot, selection: CleanupSelection): CleanupStep[] {
