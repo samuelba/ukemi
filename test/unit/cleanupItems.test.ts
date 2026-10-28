@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import type { CleanupSnapshot } from '../../shared/cleanup'
+import type { CleanupSelection, CleanupSnapshot } from '../../shared/cleanup'
 import {
   classifyBookmarks,
   classifyDeletedBookmarks,
@@ -51,9 +51,12 @@ function workspace(overrides: Partial<WorkspaceRecord> = {}): WorkspaceRecord {
     isCurrent: false,
     isOpen: false,
     rootMissing: false,
+    root: '/tmp/ukemi-other',
     ...overrides,
   }
 }
+
+const REPO_ROOT = '/repo'
 
 function undescribed(overrides: Partial<UndescribedCommit> = {}): UndescribedCommit {
   return {
@@ -100,6 +103,8 @@ describe('classifyBookmarks', () => {
         detail: 'Already in trunk (main).',
         description: 'first',
         checked: true,
+        hasGitRemote: false,
+        abandonCommitIds: [],
       },
     ])
   })
@@ -115,6 +120,7 @@ describe('classifyBookmarks', () => {
       name: 'topic',
       reason: 'deleted-remote',
       checked: true,
+      hasGitRemote: true,
     })
   })
 
@@ -134,6 +140,8 @@ describe('classifyBookmarks', () => {
         detail: 'Bookmark is conflicted.',
         description: '',
         checked: false,
+        hasGitRemote: false,
+        abandonCommitIds: [],
       },
     ])
   })
@@ -209,6 +217,7 @@ describe('classifyUndescribed', () => {
         timestamp: '2026-01-01T00:00:00Z',
         isEmpty: false,
         isImmutable: false,
+        canAbandon: true,
       },
       {
         commitId: later.commitId,
@@ -217,6 +226,7 @@ describe('classifyUndescribed', () => {
         timestamp: '2026-01-01T00:00:00Z',
         isEmpty: true,
         isImmutable: false,
+        canAbandon: true,
       },
     ])
   })
@@ -231,15 +241,33 @@ describe('classifyWorkspaces', () => {
       workspace({ name: 'kept', description: 'still working' }),
     ]
 
-    expect(classifyWorkspaces(rows)).toEqual([
-      { name: 'gone', detail: 'Working copy folder is missing.', checked: true },
-      { name: 'kept', detail: 'still working', checked: false },
+    expect(classifyWorkspaces(rows, REPO_ROOT)).toEqual([
+      {
+        name: 'gone',
+        detail: 'Working copy folder is missing.',
+        checked: true,
+        root: '/tmp/ukemi-other',
+        canDeleteFiles: false,
+      },
+      {
+        name: 'kept',
+        detail: 'still working',
+        checked: false,
+        root: '/tmp/ukemi-other',
+        canDeleteFiles: true,
+      },
     ])
   })
 
   test('marks an empty workspace', () => {
-    expect(classifyWorkspaces([workspace({ isEmpty: true, description: '' })])).toEqual([
-      { name: 'other', detail: '(empty)', checked: false },
+    expect(classifyWorkspaces([workspace({ isEmpty: true, description: '' })], REPO_ROOT)).toEqual([
+      {
+        name: 'other',
+        detail: '(empty)',
+        checked: false,
+        root: '/tmp/ukemi-other',
+        canDeleteFiles: true,
+      },
     ])
   })
 })
@@ -299,20 +327,44 @@ describe('classifyDivergent', () => {
   })
 })
 
+function selection(overrides: Partial<CleanupSelection> = {}): CleanupSelection {
+  return {
+    bookmarks: [],
+    abandonBookmarkCommits: [],
+    deletedBookmarks: [],
+    deleteRemote: [],
+    workspaces: [],
+    deleteWorkspaceFiles: [],
+    divergent: [],
+    undescribed: [],
+    ...overrides,
+  }
+}
+
+function bookmark(
+  name: string,
+  overrides: Partial<CleanupSnapshot['bookmarks'][number]> = {},
+): CleanupSnapshot['bookmarks'][number] {
+  return {
+    name,
+    reason: 'merged',
+    detail: '',
+    description: '',
+    checked: true,
+    hasGitRemote: false,
+    abandonCommitIds: [],
+    ...overrides,
+  }
+}
+
 describe('cleanupSteps', () => {
   test('forgets bookmarks, rebases children, abandons drops, then forgets workspaces', () => {
     const snapshot: CleanupSnapshot = {
-      bookmarks: [
-        {
-          name: 'landed',
-          reason: 'merged',
-          detail: '',
-          description: '',
-          checked: true,
-        },
-      ],
+      bookmarks: [bookmark('landed', { hasGitRemote: true })],
       deletedBookmarks: [],
-      workspaces: [{ name: 'old', detail: '', checked: true }],
+      workspaces: [
+        { name: 'old', detail: '', checked: true, root: '/tmp/old', canDeleteFiles: true },
+      ],
       undescribed: [],
       undescribedTruncated: false,
       divergent: [
@@ -356,32 +408,25 @@ describe('cleanupSteps', () => {
     }
 
     expect(
-      cleanupSteps(snapshot, {
-        bookmarks: ['landed', 'missing'],
-        deletedBookmarks: [],
-        deleteRemote: [],
-        workspaces: ['old'],
-        divergent: ['drop', 'stuck'],
-      }),
+      cleanupSteps(
+        snapshot,
+        selection({
+          bookmarks: ['landed', 'missing'],
+          workspaces: ['old'],
+          divergent: ['drop', 'stuck'],
+        }),
+      ),
     ).toEqual([
-      { kind: 'forgetBookmark', name: 'landed' },
+      { kind: 'forgetBookmark', name: 'landed', includeGit: true },
       { kind: 'rebase', revset: 'kid', onto: 'keep' },
-      { kind: 'abandon', commitId: 'drop' },
+      { kind: 'abandon', revset: 'drop' },
       { kind: 'forgetWorkspace', name: 'old' },
     ])
   })
 
   test('pushes a deleted bookmark and forgets one that cannot delete the remote', () => {
     const snapshot: CleanupSnapshot = {
-      bookmarks: [
-        {
-          name: 'landed',
-          reason: 'merged',
-          detail: '',
-          description: '',
-          checked: true,
-        },
-      ],
+      bookmarks: [bookmark('landed')],
       deletedBookmarks: [
         {
           name: 'topic',
@@ -405,17 +450,18 @@ describe('cleanupSteps', () => {
     }
 
     expect(
-      cleanupSteps(snapshot, {
-        bookmarks: ['landed'],
-        deletedBookmarks: ['topic', 'gone', 'missing'],
-        deleteRemote: ['topic', 'gone'],
-        workspaces: [],
-        divergent: [],
-      }),
+      cleanupSteps(
+        snapshot,
+        selection({
+          bookmarks: ['landed'],
+          deletedBookmarks: ['topic', 'gone', 'missing'],
+          deleteRemote: ['topic', 'gone'],
+        }),
+      ),
     ).toEqual([
       { kind: 'pushDeletedBookmark', name: 'topic' },
-      { kind: 'forgetBookmark', name: 'landed' },
-      { kind: 'forgetBookmark', name: 'gone' },
+      { kind: 'forgetBookmark', name: 'landed', includeGit: false },
+      { kind: 'forgetBookmark', name: 'gone', includeGit: false },
     ])
   })
 
@@ -437,14 +483,108 @@ describe('cleanupSteps', () => {
       undescribedTruncated: false,
     }
 
+    expect(cleanupSteps(snapshot, selection({ deletedBookmarks: ['topic'] }))).toEqual([
+      { kind: 'forgetBookmark', name: 'topic', includeGit: false },
+    ])
+  })
+
+  test("abandons a bookmark's commits before forgetting it", () => {
+    const snapshot: CleanupSnapshot = {
+      bookmarks: [
+        bookmark('topic', { reason: 'deleted-remote', abandonCommitIds: ['aaa', 'bbb'] }),
+      ],
+      deletedBookmarks: [],
+      workspaces: [],
+      divergent: [],
+      undescribed: [],
+      undescribedTruncated: false,
+    }
+
     expect(
-      cleanupSteps(snapshot, {
-        bookmarks: [],
-        deletedBookmarks: ['topic'],
-        deleteRemote: [],
-        workspaces: [],
-        divergent: [],
-      }),
-    ).toEqual([{ kind: 'forgetBookmark', name: 'topic' }])
+      cleanupSteps(
+        snapshot,
+        selection({ bookmarks: ['topic'], abandonBookmarkCommits: ['topic'] }),
+      ),
+    ).toEqual([
+      { kind: 'abandon', revset: 'aaa|bbb' },
+      { kind: 'forgetBookmark', name: 'topic', includeGit: false },
+    ])
+  })
+
+  test('skips bookmark abandon when the bookmark itself is not selected', () => {
+    const snapshot: CleanupSnapshot = {
+      bookmarks: [bookmark('topic', { abandonCommitIds: ['aaa'] })],
+      deletedBookmarks: [],
+      workspaces: [],
+      divergent: [],
+      undescribed: [],
+      undescribedTruncated: false,
+    }
+
+    expect(cleanupSteps(snapshot, selection({ abandonBookmarkCommits: ['topic'] }))).toEqual([])
+  })
+
+  test('abandons checked commits that have no description', () => {
+    const snapshot: CleanupSnapshot = {
+      bookmarks: [],
+      deletedBookmarks: [],
+      workspaces: [],
+      divergent: [],
+      undescribed: [
+        {
+          commitId: 'empty',
+          changePrefix: 'emp',
+          commitPrefix: 'eee',
+          timestamp: '',
+          isEmpty: true,
+          isImmutable: false,
+          canAbandon: true,
+        },
+        {
+          commitId: 'stuck',
+          changePrefix: 'stu',
+          commitPrefix: 'sss',
+          timestamp: '',
+          isEmpty: false,
+          isImmutable: true,
+          canAbandon: false,
+        },
+      ],
+      undescribedTruncated: false,
+    }
+
+    expect(cleanupSteps(snapshot, selection({ undescribed: ['empty', 'stuck'] }))).toEqual([
+      { kind: 'abandon', revset: 'empty' },
+    ])
+  })
+
+  test('deletes a workspace folder only when that box is checked', () => {
+    const snapshot: CleanupSnapshot = {
+      bookmarks: [],
+      deletedBookmarks: [],
+      workspaces: [
+        { name: 'kept', detail: '', checked: true, root: '/tmp/kept', canDeleteFiles: true },
+        { name: 'removed', detail: '', checked: true, root: '/tmp/removed', canDeleteFiles: true },
+        { name: 'missing', detail: '', checked: true, root: null, canDeleteFiles: false },
+      ],
+      divergent: [],
+      undescribed: [],
+      undescribedTruncated: false,
+    }
+
+    expect(
+      cleanupSteps(
+        snapshot,
+        selection({
+          workspaces: ['kept', 'removed', 'missing'],
+          deleteWorkspaceFiles: ['removed', 'missing'],
+        }),
+      ),
+    ).toEqual([
+      { kind: 'forgetWorkspace', name: 'kept' },
+      { kind: 'forgetWorkspace', name: 'removed' },
+      { kind: 'forgetWorkspace', name: 'missing' },
+      { kind: 'deleteWorkspaceFiles', root: '/tmp/removed' },
+    ])
   })
 })

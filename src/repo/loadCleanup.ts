@@ -1,17 +1,21 @@
 import { existsSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
 import {
   UNDESCRIBED_LIMIT,
+  type CleanupBookmark,
   type CleanupSelection,
   type CleanupSnapshot,
 } from '../../shared/cleanup'
 import type { JjRepo } from '../jj/repo'
 import {
+  bookmarkAbandonRevset,
   classifyBookmarks,
   classifyDeletedBookmarks,
   classifyDivergent,
   classifyUndescribed,
   classifyWorkspaces,
   cleanupSteps,
+  removableWorkspaceFolder,
   type CleanupStep,
   type DivergentCommit,
   type UndescribedCommit,
@@ -70,6 +74,32 @@ function undescribedCommit(commit: {
   }
 }
 
+async function withAbandonCommits(
+  repo: JjRepo,
+  bookmarks: readonly CleanupBookmark[],
+): Promise<CleanupBookmark[]> {
+  return Promise.all(
+    bookmarks.map(async (bookmark) => {
+      if (bookmark.reason === 'merged') {
+        return bookmark
+      }
+      const abandonCommitIds = await repo.commitIds(bookmarkAbandonRevset(bookmark.name))
+      return { ...bookmark, abandonCommitIds }
+    }),
+  )
+}
+
+async function undescribedBlockedIds(
+  repo: JjRepo,
+  commitIds: readonly string[],
+): Promise<ReadonlySet<string>> {
+  if (commitIds.length === 0) {
+    return new Set()
+  }
+  const blocked = await repo.commitIds(`(${commitIds.join('|')}) & parents(immutable())`)
+  return new Set(blocked)
+}
+
 export async function loadCleanup(
   repo: JjRepo,
   openFolders: readonly string[],
@@ -81,8 +111,14 @@ export async function loadCleanup(
     repo.log(UNDESCRIBED_REVSET, UNDESCRIBED_LIMIT),
     repo.trunkBookmark(),
   ])
+  const undescribedCommits = undescribed.map(undescribedCommit)
+  const listed = classifyUndescribed(undescribedCommits)
+  const blockedIds = await undescribedBlockedIds(
+    repo,
+    listed.filter((commit) => !commit.isImmutable).map((commit) => commit.commitId),
+  )
   return {
-    bookmarks: classifyBookmarks(bookmarks, trunkName),
+    bookmarks: await withAbandonCommits(repo, classifyBookmarks(bookmarks, trunkName)),
     deletedBookmarks: classifyDeletedBookmarks(bookmarks),
     workspaces: classifyWorkspaces(
       workspaces.map((workspace) => ({
@@ -92,10 +128,12 @@ export async function loadCleanup(
         isCurrent: isCurrentWorkspace(workspace, repo.root),
         isOpen: workspace.root !== null && isWorkspaceOpen(workspace.root, openFolders),
         rootMissing: workspace.root === null || !existsSync(workspace.root),
+        root: workspace.root,
       })),
+      repo.root,
     ),
     divergent: classifyDivergent(commits.map(divergentCommit)),
-    undescribed: classifyUndescribed(undescribed.map(undescribedCommit)),
+    undescribed: classifyUndescribed(undescribedCommits, blockedIds),
     undescribedTruncated: undescribed.length === UNDESCRIBED_LIMIT,
   }
 }
@@ -110,17 +148,24 @@ export async function applyCleanupSteps(
         await repo.push(step.name)
         break
       case 'forgetBookmark':
-        await repo.forgetBookmark(step.name)
+        await repo.forgetCleanupBookmark(step.name)
         break
       case 'rebase':
         await repo.rebase(step.revset, step.onto, 'source')
         break
       case 'abandon':
-        await repo.abandon(step.commitId)
+        await repo.abandon(step.revset)
         break
       case 'forgetWorkspace':
         await repo.forgetWorkspace(step.name)
         break
+      case 'deleteWorkspaceFiles': {
+        const target = removableWorkspaceFolder(repo.root, step.root)
+        if (target !== null && existsSync(target)) {
+          await rm(target, { recursive: true, force: true })
+        }
+        break
+      }
     }
   }
 }

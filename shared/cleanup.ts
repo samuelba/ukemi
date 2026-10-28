@@ -10,6 +10,8 @@ export interface CleanupBookmark {
   detail: string
   description: string
   checked: boolean
+  hasGitRemote: boolean
+  abandonCommitIds: readonly string[]
 }
 
 export interface CleanupDeletedBookmark {
@@ -24,6 +26,8 @@ export interface CleanupWorkspace {
   name: string
   detail: string
   checked: boolean
+  root: string | null
+  canDeleteFiles: boolean
 }
 
 export interface CleanupRevision {
@@ -50,6 +54,7 @@ export interface CleanupUndescribed {
   timestamp: string
   isEmpty: boolean
   isImmutable: boolean
+  canAbandon: boolean
 }
 
 export interface CleanupSnapshot {
@@ -63,10 +68,13 @@ export interface CleanupSnapshot {
 
 export interface CleanupSelection {
   bookmarks: readonly string[]
+  abandonBookmarkCommits: readonly string[]
   deletedBookmarks: readonly string[]
   deleteRemote: readonly string[]
   workspaces: readonly string[]
+  deleteWorkspaceFiles: readonly string[]
   divergent: readonly string[]
+  undescribed: readonly string[]
 }
 
 export type CleanupHostMessage =
