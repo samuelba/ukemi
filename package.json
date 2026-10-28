@@ -220,9 +220,9 @@
       },
       {
         "command": "ukemi.goTo",
-        "title": "Go to Bookmark, Request or Revision…",
+        "title": "New Change from Bookmark, Request or Revision…",
         "category": "Ukemi",
-        "icon": "$(search)"
+        "icon": "$(git-branch)"
       },
       {
         "command": "ukemi.cleanup",

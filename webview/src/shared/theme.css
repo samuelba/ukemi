@@ -113,6 +113,23 @@ a.icon-button {
   background: var(--vscode-toolbar-hoverBackground);
 }
 
+.icon-with-badge {
+  position: relative;
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+}
+
+.icon-with-badge .icon-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -3px;
+  font-size: 10px;
+  line-height: 1;
+  background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  border-radius: 2px;
+}
+
 .icon-button.accent {
   color: var(--ukemi-accent);
 }
