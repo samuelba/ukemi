@@ -148,7 +148,7 @@ export function App() {
   }, [])
 
   if (!state) {
-    return <EmptyState status="loading" repos={[]} activeRepoId={null} error={null} />
+    return <EmptyState status="loading" repos={[]} activeRepoId={null} error={null} busy={null} />
   }
 
   const filesFor = (commit: CommitView) =>
@@ -216,6 +216,7 @@ export function App() {
             repos={state.repos}
             activeRepoId={state.activeRepoId}
             error={state.error}
+            busy={state.busy}
           />
         )}
         {describing && (

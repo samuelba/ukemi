@@ -12,6 +12,7 @@ import {
 } from '../../../shared/cleanup'
 import type { ChangedFile } from '../../../shared/model'
 import { relativeTime } from '../shared/format'
+import { LoadingScreen } from '../shared/LoadingMark'
 import { postMessage } from '../shared/vscodeApi'
 
 const send = (message: CleanupWebviewMessage) => postMessage(message)
@@ -110,7 +111,7 @@ export function CleanupApp() {
   }, [])
 
   if (!snapshot) {
-    return <div className="muted padded">Loading…</div>
+    return <LoadingScreen heading="Loading…" />
   }
   if (isEmpty(snapshot)) {
     return (
@@ -650,7 +651,7 @@ function UndescribedCommits({
 
 function ChangedFiles({ commitId, files }: { commitId: string; files: ChangedFile[] | undefined }) {
   if (!files) {
-    return <p className="muted">Loading…</p>
+    return <LoadingScreen heading="Loading…" />
   }
   if (files.length === 0) {
     return <p className="muted">(no file changes)</p>

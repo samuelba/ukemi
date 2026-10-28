@@ -103,8 +103,10 @@ async function initColocatedRepo(env: CommandEnv, folder: string): Promise<void>
     return
   }
   try {
-    await JjRepo.initColocated(env.runner, folder)
-    await env.registry.addRepo(folder)
+    await env.operations.indicate('Initializing', async () => {
+      await JjRepo.initColocated(env.runner, folder)
+      await env.registry.addRepo(folder)
+    })
   } catch (error: unknown) {
     void vscode.window.showErrorMessage(`Ukemi: jj init failed: ${errorMessage(error)}`)
   }
@@ -154,15 +156,18 @@ async function createNewRepo(
   options: NewRepoOptions,
 ): Promise<void> {
   const cloning = Boolean(options.remoteUrl) && (await readInitFolder(folder)) === 'empty'
-  const run = () => JjRepo.initNew(env.runner, folder, options)
+  const create = async () => {
+    const result = await JjRepo.initNew(env.runner, folder, options)
+    await env.registry.addRepo(folder)
+    return result
+  }
   try {
     const outcome = cloning
       ? await vscode.window.withProgress(
           { location: vscode.ProgressLocation.Notification, title: 'Cloning repository' },
-          run,
+          () => env.operations.indicate('Cloning', create),
         )
-      : await run()
-    await env.registry.addRepo(folder)
+      : await env.operations.indicate('Initializing', create)
     if (outcome.kind === 'created' && outcome.historyNotDownloaded) {
       void vscode.window.showInformationMessage(
         `Ukemi: added the remote. Its commits were not downloaded because ${basename(folder)} already has files.`,
