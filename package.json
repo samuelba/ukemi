@@ -255,6 +255,30 @@
         "icon": "$(discard)"
       },
       {
+        "command": "ukemi.conflict.accept",
+        "title": "Accept Conflict Side…",
+        "category": "Ukemi",
+        "icon": "$(check)"
+      },
+      {
+        "command": "ukemi.conflict.acceptAll",
+        "title": "Accept All Conflicts in File…",
+        "category": "Ukemi",
+        "icon": "$(check-all)"
+      },
+      {
+        "command": "ukemi.conflict.previous",
+        "title": "Previous Conflict",
+        "category": "Ukemi",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "ukemi.conflict.next",
+        "title": "Next Conflict",
+        "category": "Ukemi",
+        "icon": "$(arrow-down)"
+      },
+      {
         "command": "ukemi.forge.signIn",
         "title": "Sign In to GitHub or GitLab",
         "category": "Ukemi",
@@ -1237,6 +1261,21 @@
       ],
       "editor/title": [
         {
+          "command": "ukemi.conflict.previous",
+          "group": "navigation@1",
+          "when": "ukemi.editorHasConflicts"
+        },
+        {
+          "command": "ukemi.conflict.next",
+          "group": "navigation@2",
+          "when": "ukemi.editorHasConflicts"
+        },
+        {
+          "command": "ukemi.conflict.acceptAll",
+          "group": "navigation@3",
+          "when": "ukemi.editorHasConflicts"
+        },
+        {
           "command": "ukemi.openFileDiff",
           "group": "navigation",
           "when": "resourceScheme == file && config.ukemi.showEditorTitleDiff"
@@ -1537,6 +1576,116 @@
         }
       ]
     },
+    "colors": [
+      {
+        "id": "ukemi.conflict.markerBackground",
+        "description": "Background of the start and end line of a jj conflict.",
+        "defaults": {
+          "dark": "#8080804d",
+          "light": "#80808033",
+          "highContrast": "#80808080"
+        }
+      },
+      {
+        "id": "ukemi.conflict.side1HeaderBackground",
+        "description": "Header of side 1 (current) in a jj conflict.",
+        "defaults": {
+          "dark": "merge.currentHeaderBackground",
+          "light": "merge.currentHeaderBackground",
+          "highContrast": "merge.currentHeaderBackground"
+        }
+      },
+      {
+        "id": "ukemi.conflict.side1ContentBackground",
+        "description": "Lines of side 1 (current) in a jj conflict.",
+        "defaults": {
+          "dark": "merge.currentContentBackground",
+          "light": "merge.currentContentBackground",
+          "highContrast": "merge.currentContentBackground"
+        }
+      },
+      {
+        "id": "ukemi.conflict.side2HeaderBackground",
+        "description": "Header of side 2 (incoming) in a jj conflict.",
+        "defaults": {
+          "dark": "merge.incomingHeaderBackground",
+          "light": "merge.incomingHeaderBackground",
+          "highContrast": "merge.incomingHeaderBackground"
+        }
+      },
+      {
+        "id": "ukemi.conflict.side2ContentBackground",
+        "description": "Lines of side 2 (incoming) in a jj conflict.",
+        "defaults": {
+          "dark": "merge.incomingContentBackground",
+          "light": "merge.incomingContentBackground",
+          "highContrast": "merge.incomingContentBackground"
+        }
+      },
+      {
+        "id": "ukemi.conflict.side3HeaderBackground",
+        "description": "Header of side 3 in a jj conflict.",
+        "defaults": {
+          "dark": "#a371f780",
+          "light": "#a371f766",
+          "highContrast": "#a371f7"
+        }
+      },
+      {
+        "id": "ukemi.conflict.side3ContentBackground",
+        "description": "Lines of side 3 in a jj conflict.",
+        "defaults": {
+          "dark": "#a371f733",
+          "light": "#a371f726",
+          "highContrast": "#a371f74d"
+        }
+      },
+      {
+        "id": "ukemi.conflict.side4HeaderBackground",
+        "description": "Header of side 4 in a jj conflict. Later sides reuse sides 1 to 4.",
+        "defaults": {
+          "dark": "#d2992280",
+          "light": "#d2992266",
+          "highContrast": "#d29922"
+        }
+      },
+      {
+        "id": "ukemi.conflict.side4ContentBackground",
+        "description": "Lines of side 4 in a jj conflict.",
+        "defaults": {
+          "dark": "#d2992233",
+          "light": "#d2992226",
+          "highContrast": "#d299224d"
+        }
+      },
+      {
+        "id": "ukemi.conflict.baseHeaderBackground",
+        "description": "Header of the merge base in a jj conflict.",
+        "defaults": {
+          "dark": "merge.commonHeaderBackground",
+          "light": "merge.commonHeaderBackground",
+          "highContrast": "merge.commonHeaderBackground"
+        }
+      },
+      {
+        "id": "ukemi.conflict.baseContentBackground",
+        "description": "Lines of the merge base in a jj conflict.",
+        "defaults": {
+          "dark": "merge.commonContentBackground",
+          "light": "merge.commonContentBackground",
+          "highContrast": "merge.commonContentBackground"
+        }
+      },
+      {
+        "id": "ukemi.conflict.removedBackground",
+        "description": "Lines a jj diff section removes from the base.",
+        "defaults": {
+          "dark": "diffEditor.removedLineBackground",
+          "light": "diffEditor.removedLineBackground",
+          "highContrast": "diffEditor.removedLineBackground"
+        }
+      }
+    ],
     "configuration": {
       "title": "Ukemi",
       "properties": {
