@@ -7,6 +7,7 @@ import {
   classifyUndescribed,
   classifyWorkspaces,
   cleanupSteps,
+  forgottenWorkspaceRoots,
   type BookmarkRecord,
   type DivergentCommit,
   type UndescribedCommit,
@@ -586,5 +587,37 @@ describe('cleanupSteps', () => {
       { kind: 'forgetWorkspace', name: 'missing' },
       { kind: 'deleteWorkspaceFiles', root: '/tmp/removed' },
     ])
+  })
+})
+
+describe('forgottenWorkspaceRoots', () => {
+  const snapshot: CleanupSnapshot = {
+    bookmarks: [],
+    deletedBookmarks: [],
+    workspaces: [
+      { name: 'kept', detail: '', checked: true, root: '/tmp/kept', canDeleteFiles: true },
+      { name: 'removed', detail: '', checked: true, root: '/tmp/removed', canDeleteFiles: true },
+      { name: 'here', detail: '', checked: true, root: '/tmp/repo', canDeleteFiles: false },
+      { name: 'missing', detail: '', checked: true, root: null, canDeleteFiles: false },
+    ],
+    divergent: [],
+    undescribed: [],
+    undescribedTruncated: false,
+  }
+
+  test('returns selected workspace roots other than the active one', () => {
+    expect(
+      forgottenWorkspaceRoots(
+        snapshot,
+        selection({ workspaces: ['kept', 'removed', 'here', 'missing'] }),
+        '/tmp/repo',
+      ),
+    ).toEqual(['/tmp/kept', '/tmp/removed'])
+  })
+
+  test('skips a workspace that was not selected', () => {
+    expect(
+      forgottenWorkspaceRoots(snapshot, selection({ workspaces: ['removed'] }), '/tmp/repo'),
+    ).toEqual(['/tmp/removed'])
   })
 })

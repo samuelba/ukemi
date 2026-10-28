@@ -219,12 +219,16 @@ async function deleteWorkspace(env: CommandEnv, model: RepoModel, name: string):
   if (!choice) {
     return
   }
-  await env.operations.run('Delete workspace', model, async () => {
+  const forgotten = await env.operations.run('Delete workspace', model, async () => {
     await model.repo.forgetWorkspace(name)
     if (choice === 'Forget and Delete Files' && workspace.root) {
       await rm(workspace.root, { recursive: true, force: true })
     }
+    return true
   })
+  if (forgotten && workspace.root && !sameFolder(workspace.root, model.root)) {
+    await env.registry.remove(workspace.root)
+  }
 }
 
 async function refreshAll(env: CommandEnv, model: RepoModel): Promise<void> {
