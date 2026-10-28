@@ -1,7 +1,7 @@
 import { basename } from 'node:path'
 import * as vscode from 'vscode'
 import type { ChangedFilesView } from '../../../shared/protocol'
-import { JjRepo } from '../../jj/repo'
+import { InitIncompleteError, JjRepo, readInitFolder, type NewRepoOptions } from '../../jj/repo'
 import type { RepoModel } from '../../repo/repoModel'
 import {
   bookmarkGoToItems,
@@ -10,6 +10,7 @@ import {
 } from '../../repo/goToTargets'
 import { collectBookmarks, type BookmarkRef } from '../../repo/workspaceItems'
 import { errorMessage } from '../../util/logger'
+import { validateBookmarkName, validateRemoteName, validateRemoteUrl } from '../../util/text'
 import { openCommitDiff } from '../diff'
 import { GRAPH_VIEW_ID } from '../graphView'
 import { readConfig, updateUkemiSetting } from '../config'
@@ -63,18 +64,36 @@ async function selectRepository(env: CommandEnv): Promise<void> {
 }
 
 export async function initRepo(env: CommandEnv, root?: string): Promise<void> {
-  const folder =
-    root ??
-    (
-      await vscode.window.showOpenDialog({
-        canSelectFolders: true,
-        canSelectFiles: false,
-        openLabel: 'Initialize jj',
-      })
-    )?.[0]?.fsPath
+  const folder = root ?? (await pickInitFolder())
   if (!folder) {
     return
   }
+  const state = await readInitFolder(folder)
+  if (state === 'jj') {
+    void vscode.window.showErrorMessage(`Ukemi: ${basename(folder)} is already a jj repository.`)
+    return
+  }
+  if (state === 'git') {
+    await initColocatedRepo(env, folder)
+    return
+  }
+  const options = await askNewRepoOptions()
+  if (!options) {
+    return
+  }
+  await createNewRepo(env, folder, options)
+}
+
+async function pickInitFolder(): Promise<string | undefined> {
+  const picked = await vscode.window.showOpenDialog({
+    canSelectFolders: true,
+    canSelectFiles: false,
+    openLabel: 'Initialize jj',
+  })
+  return picked?.[0]?.fsPath
+}
+
+async function initColocatedRepo(env: CommandEnv, folder: string): Promise<void> {
   const proceed = await vscode.window.showInformationMessage(
     `Initialize a colocated jj repository in ${basename(folder)}?`,
     { modal: true, detail: 'The Git repository stays usable with Git tools.' },
@@ -88,6 +107,72 @@ export async function initRepo(env: CommandEnv, root?: string): Promise<void> {
     await env.registry.addRepo(folder)
   } catch (error: unknown) {
     void vscode.window.showErrorMessage(`Ukemi: jj init failed: ${errorMessage(error)}`)
+  }
+}
+
+async function askNewRepoOptions(): Promise<NewRepoOptions | undefined> {
+  const remoteUrl = await vscode.window.showInputBox({
+    title: 'Remote URL',
+    prompt: 'Git remote for this repository. Leave empty to skip.',
+    placeHolder: 'git@github.com:org/repo.git',
+    ignoreFocusOut: true,
+    validateInput: validateRemoteUrl,
+  })
+  if (remoteUrl === undefined) {
+    return undefined
+  }
+  const url = remoteUrl.trim()
+  const remoteName = url ? await askRemoteName() : 'origin'
+  if (!remoteName) {
+    return undefined
+  }
+  const branch = await vscode.window.showInputBox({
+    title: 'Main branch name',
+    value: 'main',
+    ignoreFocusOut: true,
+    validateInput: validateBookmarkName,
+  })
+  if (!branch) {
+    return undefined
+  }
+  return { branch: branch.trim(), remoteName, ...(url ? { remoteUrl: url } : {}) }
+}
+
+async function askRemoteName(): Promise<string | undefined> {
+  const name = await vscode.window.showInputBox({
+    title: 'Remote name',
+    value: 'origin',
+    ignoreFocusOut: true,
+    validateInput: validateRemoteName,
+  })
+  return name?.trim()
+}
+
+async function createNewRepo(
+  env: CommandEnv,
+  folder: string,
+  options: NewRepoOptions,
+): Promise<void> {
+  const cloning = Boolean(options.remoteUrl) && (await readInitFolder(folder)) === 'empty'
+  const run = () => JjRepo.initNew(env.runner, folder, options)
+  try {
+    const outcome = cloning
+      ? await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: 'Cloning repository' },
+          run,
+        )
+      : await run()
+    await env.registry.addRepo(folder)
+    if (outcome.kind === 'created' && outcome.historyNotDownloaded) {
+      void vscode.window.showInformationMessage(
+        `Ukemi: added the remote. Its commits were not downloaded because ${basename(folder)} already has files.`,
+      )
+    }
+  } catch (error: unknown) {
+    void vscode.window.showErrorMessage(`Ukemi: jj init failed: ${errorMessage(error)}`)
+    if (error instanceof InitIncompleteError) {
+      await env.registry.addRepo(folder)
+    }
   }
 }
 

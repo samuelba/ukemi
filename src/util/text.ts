@@ -1,3 +1,5 @@
+import { isAbsolute } from 'node:path'
+
 const MAX_BOOKMARK_SLUG = 40
 
 export function firstLine(description: string): string {
@@ -30,6 +32,27 @@ export function validateBookmarkName(name: string): string | null {
   }
   if (INVALID_BOOKMARK.test(name)) {
     return 'Not a valid Git branch name'
+  }
+  return null
+}
+
+const REMOTE_URL = /^(https?|ssh|file):\/\/\S+$/i
+const SCP_REMOTE = /^git@[^:\s]+:\S+$/
+
+export function validateRemoteUrl(url: string): string | null {
+  const value = url.trim()
+  if (value.length === 0 || REMOTE_URL.test(value) || SCP_REMOTE.test(value) || isAbsolute(value)) {
+    return null
+  }
+  return 'Enter a Git remote URL or an absolute path'
+}
+
+export function validateRemoteName(name: string): string | null {
+  if (name.trim().length === 0) {
+    return 'Enter a name'
+  }
+  if (/\s/.test(name) || name.includes('..')) {
+    return 'Not a valid remote name'
   }
   return null
 }
