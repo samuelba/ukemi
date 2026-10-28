@@ -45,13 +45,19 @@ export const MAX_LOG_ENTRIES = 2000
 export const MAX_EVOLUTION_ENTRIES = 200
 
 export type SplitDirection = 'below' | 'above'
-export type RebaseMode = 'source' | 'revision'
+export type RebaseMode = 'source' | 'revision' | 'branch'
 export type Placement = 'onto' | 'after' | 'before'
 
 const PLACEMENT_FLAGS: Record<Placement, string> = {
   onto: '--onto',
   after: '--insert-after',
   before: '--insert-before',
+}
+
+const REBASE_MODE_FLAGS: Record<RebaseMode, string> = {
+  source: '-s',
+  revision: '-r',
+  branch: '-b',
 }
 
 export class JjRepo {
@@ -355,7 +361,7 @@ export class JjRepo {
   rebase(source: string, destination: string, mode: RebaseMode, placement: Placement = 'onto') {
     return this.mutate([
       'rebase',
-      mode === 'source' ? '-s' : '-r',
+      REBASE_MODE_FLAGS[mode],
       source,
       PLACEMENT_FLAGS[placement],
       destination,
