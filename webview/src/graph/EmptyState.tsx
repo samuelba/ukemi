@@ -1,4 +1,5 @@
 import type { RepoSummary, ViewStatus } from '../../../shared/protocol'
+import { LoadingMark } from '../shared/LoadingMark'
 import { postMessage } from '../shared/vscodeApi'
 
 interface EmptyStateProps {
@@ -6,29 +7,39 @@ interface EmptyStateProps {
   repos: RepoSummary[]
   activeRepoId: string | null
   error: string | null
+  busy: string | null
 }
 
-function Panel({ heading, children }: { heading: string; children: React.ReactNode }) {
+function Panel({
+  heading,
+  spinning,
+  children,
+}: {
+  heading: string
+  spinning: boolean
+  children: React.ReactNode
+}) {
   return (
     <div className="empty">
-      <div className="empty-mark" aria-hidden="true" />
+      <LoadingMark spinning={spinning} />
       <div className="empty-heading">{heading}</div>
       {children}
     </div>
   )
 }
 
-export function EmptyState({ status, repos, activeRepoId, error }: EmptyStateProps) {
+export function EmptyState({ status, repos, activeRepoId, error, busy }: EmptyStateProps) {
+  const spinning = status === 'loading' || busy !== null
   switch (status) {
     case 'loading':
       return (
-        <Panel heading="Loading…">
+        <Panel heading="Loading…" spinning={spinning}>
           <p className="muted">Reading the repository.</p>
         </Panel>
       )
     case 'no-jj':
       return (
-        <Panel heading="Jujutsu (jj) not found">
+        <Panel heading="Jujutsu (jj) not found" spinning={spinning}>
           <p>
             Ukemi needs the jj command. Install the official release, or set the path in the
             settings.
@@ -48,7 +59,7 @@ export function EmptyState({ status, repos, activeRepoId, error }: EmptyStatePro
       )
     case 'no-folder':
       return (
-        <Panel heading="No folder open">
+        <Panel heading="No folder open" spinning={spinning}>
           <p>Open a folder that contains a jj or Git repository.</p>
           <button className="button" onClick={() => postMessage({ type: 'openFolder' })}>
             Open folder
@@ -60,7 +71,10 @@ export function EmptyState({ status, repos, activeRepoId, error }: EmptyStatePro
       const selected = gitRepos.find((r) => r.id === activeRepoId)
       const candidates = selected ? [selected] : gitRepos
       return (
-        <Panel heading={candidates.length > 0 ? 'Git repository found' : 'No repository found'}>
+        <Panel
+          heading={candidates.length > 0 ? 'Git repository found' : 'No repository found'}
+          spinning={spinning}
+        >
           {candidates.length > 0 ? (
             <>
               <p>Initialize jj next to Git. Git keeps working as before.</p>
@@ -92,7 +106,7 @@ export function EmptyState({ status, repos, activeRepoId, error }: EmptyStatePro
     }
     case 'error':
       return (
-        <Panel heading="Could not read the repository">
+        <Panel heading="Could not read the repository" spinning={spinning}>
           <p className="error-text">{error}</p>
           <button
             className="button"

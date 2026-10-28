@@ -50,6 +50,18 @@ export class Operations implements vscode.Disposable {
     }
   }
 
+  async indicate<T>(label: string, task: () => Promise<T>): Promise<T> {
+    this.busyLabel = label
+    this.lastError = null
+    this.emitter.fire()
+    try {
+      return await task()
+    } finally {
+      this.busyLabel = null
+      this.emitter.fire()
+    }
+  }
+
   dispose(): void {
     this.emitter.dispose()
   }

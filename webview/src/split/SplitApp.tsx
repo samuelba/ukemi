@@ -8,6 +8,7 @@ import type {
   SplitWebviewMessage,
 } from '../../../shared/split'
 import { changeIds } from '../../../shared/split'
+import { LoadingScreen } from '../shared/LoadingMark'
 import { postMessage } from '../shared/vscodeApi'
 
 const CONTEXT_LINES = 3
@@ -229,7 +230,7 @@ export function SplitApp() {
   )
 
   if (!request) {
-    return <div className="muted padded">Loading changes…</div>
+    return <LoadingScreen heading="Loading changes…" />
   }
 
   const update = (path: string, choice: FileChoice | undefined) =>
