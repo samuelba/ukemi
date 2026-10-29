@@ -4,6 +4,9 @@ import type { HttpFetch } from './types'
 
 const GLAB_TIMEOUT_MS = 30_000
 const MAX_OUTPUT = 10 * 1024 * 1024
+const DEFAULT_CONTENT_TYPE = 'application/json'
+const SAFE_MEDIA_TYPE =
+  /^[\w!#$&^.+-]+\/[\w!#$&^.+-]+(?:[ \t]*;[ \t]*[\w!#$&^.+-]+=[\w!#$&^.+-]+)*$/
 
 export interface GlabRunResult {
   stdout: string
@@ -12,6 +15,26 @@ export interface GlabRunResult {
 
 export type GlabRun = (args: readonly string[], stdin: string | undefined) => Promise<GlabRunResult>
 
+function glabContentType(headers: HeadersInit | undefined): string {
+  const value = contentTypeHeader(headers)?.trim()
+  return value && SAFE_MEDIA_TYPE.test(value) ? value : DEFAULT_CONTENT_TYPE
+}
+
+function contentTypeHeader(headers: HeadersInit | undefined): string | undefined {
+  if (!headers) {
+    return undefined
+  }
+  if (Array.isArray(headers)) {
+    const found = headers.find(([name]) => name.toLowerCase() === 'content-type')
+    return found?.[1]
+  }
+  if (headers instanceof Headers) {
+    return headers.get('content-type') ?? undefined
+  }
+  const name = Object.keys(headers).find((key) => key.toLowerCase() === 'content-type')
+  return name ? headers[name] : undefined
+}
+
 export function glabFetch(host: string, run: GlabRun = runGlab): HttpFetch {
   return async (url, init = {}) => {
     const endpoint = glabEndpoint(host, url)
@@ -19,7 +42,7 @@ export function glabFetch(host: string, run: GlabRun = runGlab): HttpFetch {
     const stdin = typeof init.body === 'string' ? init.body : undefined
     const args = ['api', '--hostname', host, '--include', '--method', method]
     if (stdin !== undefined) {
-      args.push('--input', '-')
+      args.push('--header', `Content-Type: ${glabContentType(init.headers)}`, '--input', '-')
     }
     args.push(endpoint)
     const result = await run(args, stdin)

@@ -89,8 +89,78 @@ describe('glab api', () => {
 
     expect(response.status).toBe(201)
     expect(seen).toBe(
-      'api --hostname gitlab.com --include --method POST --input - /projects/group%2Fname/merge_requests {"title":"x"}',
+      'api --hostname gitlab.com --include --method POST --header Content-Type: application/json --input - /projects/group%2Fname/merge_requests {"title":"x"}',
     )
+  })
+
+  test('sends Content-Type and keeps auth headers out of the command', async () => {
+    const calls: { args: readonly string[]; stdin: string | undefined }[] = []
+    const fetchImpl = glabFetch('gitlab.com', async (args, stdin) => {
+      calls.push({ args, stdin })
+      return { code: 0, stdout: 'HTTP/2.0 200 OK\n\n{}\n' }
+    })
+
+    await fetchImpl('https://gitlab.com/api/v4/projects/group%2Fname/merge_requests/1/merge', {
+      method: 'PUT',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'PRIVATE-TOKEN': 'secret',
+        Authorization: 'Bearer secret',
+        'User-Agent': 'ukemi-vscode',
+      },
+      body: '{"squash":false}',
+    })
+
+    expect(calls).toEqual([
+      {
+        args: [
+          'api',
+          '--hostname',
+          'gitlab.com',
+          '--include',
+          '--method',
+          'PUT',
+          '--header',
+          'Content-Type: application/json',
+          '--input',
+          '-',
+          '/projects/group%2Fname/merge_requests/1/merge',
+        ],
+        stdin: '{"squash":false}',
+      },
+    ])
+  })
+
+  test('forwards a safe content type and replaces an unsafe one', async () => {
+    const seen: string[] = []
+    const fetchImpl = glabFetch('gitlab.com', async (args) => {
+      seen.push(args.join('\n'))
+      return { code: 0, stdout: 'HTTP/2.0 200 OK\n\n{}\n' }
+    })
+    const url = 'https://gitlab.com/api/v4/projects/group%2Fname/merge_requests'
+
+    await fetchImpl(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: '{}',
+    })
+    await fetchImpl(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json\r\nPRIVATE-TOKEN: secret' },
+      body: '{}',
+    })
+    await fetchImpl(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json;\nPRIVATE-TOKEN=secret' },
+      body: '{}',
+    })
+
+    expect(seen[0]).toContain('Content-Type: application/json; charset=utf-8')
+    expect(seen[1]).toContain('Content-Type: application/json\n')
+    expect(seen[1]).not.toContain('secret')
+    expect(seen[2]).toContain('Content-Type: application/json\n')
+    expect(seen[2]).not.toContain('secret')
   })
 
   test('reads the status from an error response', () => {
