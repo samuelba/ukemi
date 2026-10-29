@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.6.0](https://github.com/samuelba/ukemi/compare/v0.5.1...v0.6.0) (2026-10-29)
+
+
+### Features
+
+* include author in release notes ([d5dee72](https://github.com/samuelba/ukemi/commit/d5dee72e74837e34c42568b219266a0c8392dc6e))
+* replace animation with real logo ([5dc9f03](https://github.com/samuelba/ukemi/commit/5dc9f03fc15fbb07d078f08304f061ce06a67e3a))
+
+
+### Bug Fixes
+
+* merge MR on GitLab ([8019d24](https://github.com/samuelba/ukemi/commit/8019d24129035bd9e210ed91118105feb541a905))
+
 ## [0.5.1](https://github.com/samuelba/ukemi/compare/v0.5.0...v0.5.1) (2026-10-28)
 
 
