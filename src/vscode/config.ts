@@ -35,6 +35,7 @@ export interface UkemiConfig {
   statusInterval: string
   autoFetchEnabled: boolean
   autoFetchInterval: string
+  nativeStacks: boolean
 }
 
 export async function updateUkemiSetting<T>(key: string, value: T): Promise<void> {
@@ -81,5 +82,6 @@ export function readConfig(): UkemiConfig {
     statusInterval: c.get<string>('forge.statusInterval', '60s'),
     autoFetchEnabled: c.get<boolean>('autoFetch.enabled', false),
     autoFetchInterval: c.get<string>('autoFetch.interval', '10m'),
+    nativeStacks: c.get<boolean>('forge.nativeStacks', true),
   }
 }

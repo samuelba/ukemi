@@ -10,6 +10,7 @@ import type {
   Workspace,
 } from '../../shared/model'
 import type { CommitView, ForgeState, GraphState, RequestBadge } from '../../shared/protocol'
+import { withStackInfo } from '../../shared/stack'
 import { graphFromAncestors } from '../graph/buildGraph'
 import { ElisionCache } from '../graph/elisionCache'
 import type { ParsedBookmark } from '../jj/parse'
@@ -138,7 +139,7 @@ export class RepoModel {
 
   setForge(forge: ForgeState | null, requests: readonly RequestBadge[]): void {
     this.forge = forge
-    this.requests = [...requests]
+    this.requests = withStackInfo(requests)
     if (this.current) {
       this.current = {
         ...this.current,

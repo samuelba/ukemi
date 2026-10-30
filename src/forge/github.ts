@@ -2,11 +2,14 @@ import { z } from 'zod'
 import type { CiCheck, CiState, RequestBadge, RequestState } from '../../shared/protocol'
 import { clampRequestLimit, DEFAULT_REQUEST_LIMIT, REQUEST_PAGE_SIZE } from './requestLimit'
 import {
+  ForgeError,
   requestJson,
   type CreateRequestInput,
   type ForgeClient,
   type HttpFetch,
   type MergeMethod,
+  type MergeOutcome,
+  type NativeStackResult,
 } from './types'
 
 const checkRunSchema = z.object({
@@ -85,7 +88,36 @@ const restPullSchema = z.object({
   base: z.object({ ref: z.string() }),
 })
 
+const stackListSchema = z.array(
+  z.object({
+    number: z.number(),
+    pull_requests: z.array(
+      z.object({
+        number: z.number(),
+        state: z.string().optional(),
+        merged_at: z.string().nullable().optional(),
+      }),
+    ),
+  }),
+)
+
 type GithubPull = z.infer<typeof pullSchema>
+
+const asyncMergeSchema = z.object({
+  status: z.string(),
+  details: z.object({ uuid: z.string().optional(), message: z.string().optional() }).nullish(),
+})
+
+const ASYNC_MERGE_POLL_MS = 2_000
+const ASYNC_MERGE_POLLS = 60
+
+function requiresAsyncMerge(error: ForgeError): boolean {
+  return error.status === 403 && /asynchronous merge/i.test(error.message)
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
 type GithubContext = z.infer<typeof contextNodeSchema>
 
 export function githubState(
@@ -181,6 +213,7 @@ export class GithubClient implements ForgeClient {
     projectPath: string,
     private readonly token: string,
     private readonly fetchImpl: HttpFetch = fetch,
+    private readonly sleep: (ms: number) => Promise<void> = delay,
   ) {
     const [owner = '', name = ''] = projectPath.split('/')
     this.owner = owner
@@ -288,11 +321,93 @@ export class GithubClient implements ForgeClient {
     }
   }
 
-  async mergeRequest(number: number, method: MergeMethod): Promise<void> {
-    await this.call(`${this.apiBase}/repos/${this.owner}/${this.name}/pulls/${number}/merge`, {
-      method: 'PUT',
-      body: JSON.stringify({ merge_method: method }),
+  async mergeRequest(number: number, method: MergeMethod): Promise<MergeOutcome> {
+    const base = `${this.apiBase}/repos/${this.owner}/${this.name}/pulls/${number}`
+    try {
+      await this.call(`${base}/merge`, {
+        method: 'PUT',
+        body: JSON.stringify({ merge_method: method }),
+      })
+      return 'merged'
+    } catch (error) {
+      if (!(error instanceof ForgeError) || !requiresAsyncMerge(error)) {
+        throw error
+      }
+    }
+    return this.mergeAsync(base, method)
+  }
+
+  // Stacked pull requests only merge through this endpoint, which merges every request below too.
+  private async mergeAsync(base: string, method: MergeMethod): Promise<MergeOutcome> {
+    let result = asyncMergeSchema.parse(
+      await this.call(`${base}/merge-async`, {
+        method: 'PUT',
+        body: JSON.stringify({ merge_method: method, merge_action: 'default' }),
+      }),
+    )
+    for (let attempt = 0; result.status === 'pending'; attempt++) {
+      const uuid = result.details?.uuid
+      if (!uuid || attempt >= ASYNC_MERGE_POLLS) {
+        throw new ForgeError(
+          'The stack merge is still running. Check the pull request on GitHub.',
+          0,
+        )
+      }
+      await this.sleep(ASYNC_MERGE_POLL_MS)
+      result = asyncMergeSchema.parse(await this.call(`${base}/merge-async/${uuid}`))
+    }
+    if (result.status === 'failed') {
+      throw new ForgeError(result.details?.message ?? 'The stack could not be merged.', 422)
+    }
+    return result.status === 'enqueued' ? 'enqueued' : 'merged'
+  }
+
+  async updateRequestBase(number: number, base: string): Promise<void> {
+    await this.call(`${this.apiBase}/repos/${this.owner}/${this.name}/pulls/${number}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ base }),
     })
+  }
+
+  // Native stacks are a GitHub preview feature, so a missing endpoint is reported, not thrown.
+  async syncNativeStack(numbers: readonly number[]): Promise<NativeStackResult> {
+    const first = numbers[0]
+    if (first === undefined || numbers.length < 2) {
+      return 'unchanged'
+    }
+    const stacksUrl = `${this.apiBase}/repos/${this.owner}/${this.name}/stacks`
+    let stacks: z.infer<typeof stackListSchema>
+    try {
+      stacks = stackListSchema.parse(await this.call(`${stacksUrl}?pull_request=${first}`))
+    } catch (error) {
+      if (error instanceof ForgeError && error.status === 404) {
+        return 'unavailable'
+      }
+      throw error
+    }
+    const existing = stacks[0]
+    if (!existing) {
+      await this.call(stacksUrl, {
+        method: 'POST',
+        body: JSON.stringify({ pull_requests: numbers }),
+      })
+      return 'created'
+    }
+    const current = existing.pull_requests
+      .filter((pull) => !pull.merged_at && pull.state !== 'closed')
+      .map((pull) => pull.number)
+    if (!current.every((number, index) => numbers[index] === number)) {
+      return 'diverged'
+    }
+    const added = numbers.slice(current.length)
+    if (added.length === 0) {
+      return 'unchanged'
+    }
+    await this.call(`${stacksUrl}/${existing.number}/add`, {
+      method: 'POST',
+      body: JSON.stringify({ pull_requests: added }),
+    })
+    return 'extended'
   }
 }
 

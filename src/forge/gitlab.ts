@@ -9,6 +9,7 @@ import {
   type ForgeClient,
   type HttpFetch,
   type MergeMethod,
+  type MergeOutcome,
 } from './types'
 
 const DETAIL_LIMIT = 10
@@ -403,10 +404,18 @@ export class GitlabClient implements ForgeClient {
     }
   }
 
-  async mergeRequest(number: number, method: MergeMethod): Promise<void> {
+  async mergeRequest(number: number, method: MergeMethod): Promise<MergeOutcome> {
     await this.call(this.projectUrl(`/merge_requests/${number}/merge`), {
       method: 'PUT',
       body: JSON.stringify({ squash: method === 'squash', should_remove_source_branch: true }),
+    })
+    return 'merged'
+  }
+
+  async updateRequestBase(number: number, base: string): Promise<void> {
+    await this.call(this.projectUrl(`/merge_requests/${number}`), {
+      method: 'PUT',
+      body: JSON.stringify({ target_branch: base }),
     })
   }
 }

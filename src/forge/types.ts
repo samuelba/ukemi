@@ -1,6 +1,7 @@
 import type { ForgeKind, RequestBadge } from '../../shared/protocol'
 
 export type MergeMethod = 'merge' | 'squash' | 'rebase'
+export type MergeOutcome = 'merged' | 'enqueued'
 
 export interface CreateRequestInput {
   head: string
@@ -10,12 +11,16 @@ export interface CreateRequestInput {
   isDraft: boolean
 }
 
+export type NativeStackResult = 'created' | 'extended' | 'unchanged' | 'unavailable' | 'diverged'
+
 export interface ForgeClient {
   readonly kind: ForgeKind
   readonly host: string
   listRequests(branches: readonly string[], limit?: number): Promise<RequestBadge[]>
   createRequest(input: CreateRequestInput): Promise<RequestBadge>
-  mergeRequest(number: number, method: MergeMethod): Promise<void>
+  mergeRequest(number: number, method: MergeMethod): Promise<MergeOutcome>
+  updateRequestBase(number: number, base: string): Promise<void>
+  syncNativeStack?(numbers: readonly number[]): Promise<NativeStackResult>
 }
 
 export type HttpFetch = (url: string, init: RequestInit) => Promise<Response>

@@ -12,6 +12,8 @@ import { quoteRevsetString } from '../../jj/revsets'
 import type { RepoModel } from '../../repo/repoModel'
 import { isBookmarkTreeElement } from '../../repo/bookmarkItems'
 import { bodyAfterTitle, bookmarkSlug, firstLine, validateBookmarkName } from '../../util/text'
+import { describeSync, syncStacks } from '../stackSync'
+import { errorMessage } from '../../util/logger'
 import { editOrNew } from './commitCommands'
 import { showForgeMissing } from '../forgeMissing'
 import {
@@ -227,6 +229,9 @@ async function createRequest(
     await env.operations.run('New change', model, () => model.repo.newChange([commit.commitId]))
   }
   await env.forge.refreshRequests(model, { force: true })
+  if (request.base !== (model.graph?.trunkName ?? 'main')) {
+    await autoSyncStack(env, model, created.number)
+  }
   const open = await vscode.window.showInformationMessage(
     `Created #${created.number}: ${created.title}`,
     'Open',
@@ -258,17 +263,109 @@ async function mergeRequest(
   }
   const methods: MergeMethod[] =
     client.kind === 'github' ? ['squash', 'merge', 'rebase'] : ['merge', 'squash']
+  const below = request.stack ? request.stack.position - 1 : 0
   const method = await vscode.window.showQuickPick(methods, {
     title: `Ship #${request.number} "${request.title}"`,
+    placeHolder:
+      client.kind === 'github' && below > 0
+        ? `Also merges the ${below} ${below === 1 ? 'request' : 'requests'} below it in the stack`
+        : undefined,
   })
   if (!method) {
     return
   }
-  await env.operations.run('Ship request', model, async () => {
-    await client.mergeRequest(request.number, method as MergeMethod)
+  const outcome = await env.operations.run('Ship request', model, async () => {
+    const result = await client.mergeRequest(request.number, method as MergeMethod)
     await model.repo.fetch()
+    return result
   })
   await env.forge.refreshRequests(model, { force: true })
+  if (outcome === 'enqueued') {
+    void vscode.window.showInformationMessage(
+      `Ukemi: #${request.number} was added to the merge queue.`,
+    )
+  }
+  if (request.stack) {
+    await autoSyncStack(env, model, undefined)
+  }
+}
+
+async function syncStackFor(
+  env: CommandEnv,
+  model: RepoModel,
+  request: RequestBadge,
+): Promise<void> {
+  const client = await env.forge.client(model, true)
+  if (!client) {
+    return
+  }
+  const result = await env.operations.run('Sync stack', model, () =>
+    syncStacks(model, client, env.logger, {
+      push: true,
+      seed: request.number,
+      reload: () => env.forge.refreshRequests(model, { force: true }),
+      confirmOverwrite: async (branches) =>
+        (await vscode.window.showWarningMessage(
+          `The remote branches ${branches.join(', ')} have different content than your local ones. Someone may have pushed to them. Overwrite them with your local versions?`,
+          { modal: true },
+          'Overwrite',
+        )) === 'Overwrite',
+    }),
+  )
+  await env.forge.refreshRequests(model, { force: true })
+  if (result) {
+    void vscode.window.showInformationMessage(`Ukemi: ${describeSync(result)}`)
+  }
+}
+
+// Keeps a stack in sync after another action. Never prompts and never fails the action.
+async function autoSyncStack(
+  env: CommandEnv,
+  model: RepoModel,
+  seed: number | undefined,
+): Promise<void> {
+  try {
+    const client = await env.forge.client(model, false)
+    if (!client) {
+      return
+    }
+    const result = await syncStacks(model, client, env.logger, { push: false, seed })
+    env.logger.info(describeSync(result))
+    if (result.retargeted.length > 0 || result.native.length > 0) {
+      await env.forge.refreshRequests(model, { force: true })
+    }
+  } catch (error: unknown) {
+    env.logger.warn(`stack sync failed: ${errorMessage(error)}`)
+  }
+}
+
+async function rebaseStack(
+  env: CommandEnv,
+  model: RepoModel,
+  request: RequestBadge,
+  commitId: string | undefined,
+): Promise<void> {
+  const head =
+    commitId ??
+    model.graph?.commits.find((c) => c.localBookmarks.some((b) => b.name === request.headBranch))
+      ?.commitId
+  if (!head) {
+    void vscode.window.showWarningMessage('Ukemi: the request change is not visible locally.')
+    return
+  }
+  const done = await env.operations.run('Rebase stack', model, () =>
+    model.repo.rebase(head, 'trunk()', 'branch'),
+  )
+  if (done === undefined) {
+    return
+  }
+  const sync = await vscode.window.showInformationMessage(
+    'Ukemi: stack rebased onto the trunk. Push it and update the requests?',
+    'Sync Stack',
+  )
+  if (sync) {
+    await syncStackFor(env, model, request)
+  }
 }
 
 async function cleanupRequest(
@@ -417,9 +514,23 @@ export function refCommands(env: CommandEnv): Record<string, Handler> {
     'ukemi.request.copyUrl': requestHandler(env, async (_model, request) =>
       vscode.env.clipboard.writeText(request.url),
     ),
-    'ukemi.request.pushUpdates': requestHandler(env, (model, request) =>
-      op('Push', model, () => model.repo.push(request.headBranch)),
+    'ukemi.request.pushUpdates': requestHandler(env, async (model, request) => {
+      await op('Push', model, () => model.repo.push(request.headBranch))
+      if (request.stack) {
+        await autoSyncStack(env, model, request.number)
+      }
+    }),
+    'ukemi.request.syncStack': requestHandler(env, (model, request) =>
+      syncStackFor(env, model, request),
     ),
+    'ukemi.request.rebaseStack': async (arg?: unknown) => {
+      const ctx = parseContext(arg)
+      const model = contextModel(env, ctx)
+      const request = model ? requestFor(model, ctx) : undefined
+      if (model && request) {
+        await rebaseStack(env, model, request, ctx.commitId)
+      }
+    },
     'ukemi.request.merge': requestHandler(env, (model, request) =>
       mergeRequest(env, model, request),
     ),
