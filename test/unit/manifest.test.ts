@@ -75,7 +75,9 @@ describe('package.json manifest', () => {
   })
 
   test('the webview only sends registered commands', () => {
-    const sent = [...webviewSource.matchAll(/'(ukemi\.[\w.]+)'/g)].map((m) => m[1])
+    const sent = [...webviewSource.matchAll(/command(?:\(|:\s*)'(ukemi\.[\w.]+)'/g)].map(
+      (m) => m[1],
+    )
     expect(sent.filter((c) => c && !registered.has(c))).toEqual([])
   })
 

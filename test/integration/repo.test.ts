@@ -550,6 +550,26 @@ describe('mutations', () => {
   })
 })
 
+describe('bookmark advance', () => {
+  test('advanceBookmark moves an ancestor bookmark onto the target commit', async () => {
+    writeFile(root, 'a.txt', 'a\n')
+    jj(root, 'describe', '-m', 'parent')
+    const parent = await current()
+    await repo.setBookmark('feature', parent.commitId)
+    jj(root, 'new')
+    writeFile(root, 'b.txt', 'b\n')
+    jj(root, 'describe', '-m', 'child')
+    const child = await current()
+
+    await repo.advanceBookmark(child.commitId)
+
+    const feature = (await repo.bookmarkList()).find(
+      (bookmark) => bookmark.name === 'feature' && bookmark.remote === null,
+    )
+    expect(feature?.commitId).toBe(child.commitId)
+  })
+})
+
 describe('bookmark rename and untrack', () => {
   test('renameBookmark keeps the target under the new name', async () => {
     writeFile(root, 'a.txt', 'a\n')

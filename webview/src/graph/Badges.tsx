@@ -70,7 +70,7 @@ export function Badges({ commit, repoId, hasForge, showGitTags }: BadgesProps) {
           draggable
           onDragStart={onBookmarkDrag(b.name)}
           data-vscode-context={vscodeContext({
-            webviewSection: 'bookmark',
+            webviewSection: 'ukemi.bookmark',
             repoId,
             commitId: commit.commitId,
             bookmark: b.name,
@@ -90,7 +90,7 @@ export function Badges({ commit, repoId, hasForge, showGitTags }: BadgesProps) {
           className="badge bookmark remote"
           title={`${b.name}@${b.remote}${b.tracked ? '' : ' (not tracked)'}`}
           data-vscode-context={vscodeContext({
-            webviewSection: 'bookmark',
+            webviewSection: 'ukemi.bookmark',
             repoId,
             commitId: commit.commitId,
             bookmark: b.name,
@@ -117,7 +117,7 @@ export function Badges({ commit, repoId, hasForge, showGitTags }: BadgesProps) {
             className="badge workspace"
             title={`workspace ${name}`}
             data-vscode-context={vscodeContext({
-              webviewSection: 'workspace',
+              webviewSection: 'ukemi.workspace',
               repoId,
               workspace: name,
               isDefault: name === 'default',
@@ -174,7 +174,7 @@ function RequestBadge({
           : `#${request.number} ${request.title} (${REQUEST_LABEL[request.state]})`
       }
       data-vscode-context={vscodeContext({
-        webviewSection: 'request',
+        webviewSection: 'ukemi.request',
         repoId,
         commitId,
         number: request.number,
