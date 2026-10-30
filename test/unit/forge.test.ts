@@ -284,6 +284,27 @@ describe('GithubClient', () => {
   })
 })
 
+function requestInput() {
+  return {
+    head: 'top',
+    base: 'parent',
+    title: 'Stack',
+    body: '',
+    isDraft: false,
+  }
+}
+
+function openedMergeRequest() {
+  return {
+    iid: 9,
+    title: 'Stack',
+    web_url: 'https://gitlab.com/a/b/-/merge_requests/9',
+    state: 'opened',
+    source_branch: 'top',
+    target_branch: 'parent',
+  }
+}
+
 describe('GitlabClient', () => {
   test('lists merge requests with jobs for the current author', async () => {
     const calls: string[] = []
@@ -529,6 +550,87 @@ describe('GitlabClient', () => {
 
     expect(body).toMatchObject({ source_branch: 'top', target_branch: 'parent' })
     expect(created.baseBranch).toBe('parent')
+  })
+
+  test('retries while GitLab has not seen the source branch', async () => {
+    let posts = 0
+    const delays: number[] = []
+    const client = new GitlabClient(
+      'gitlab.com',
+      'a/b',
+      't',
+      async () => {
+        posts += 1
+        if (posts === 1) {
+          return new Response(JSON.stringify({ message: { source_branch: ['does not exist'] } }), {
+            status: 400,
+          })
+        }
+        return new Response(JSON.stringify(openedMergeRequest()), { status: 200 })
+      },
+      'pat',
+      async (ms) => {
+        delays.push(ms)
+      },
+    )
+
+    const created = await client.createRequest(requestInput())
+
+    expect(posts).toBe(2)
+    expect(delays).toEqual([400])
+    expect(created.number).toBe(9)
+  })
+
+  test('does not retry a different validation error', async () => {
+    let posts = 0
+    const client = new GitlabClient(
+      'gitlab.com',
+      'a/b',
+      't',
+      async () => {
+        posts += 1
+        return new Response(JSON.stringify({ message: { title: ["can't be blank"] } }), {
+          status: 400,
+        })
+      },
+      'pat',
+      async () => {
+        throw new Error('sleep')
+      },
+    )
+
+    const error = await client.createRequest(requestInput()).catch((caught: unknown) => caught)
+
+    expect(posts).toBe(1)
+    expect(error).toBeInstanceOf(ForgeError)
+    expect((error as ForgeError).status).toBe(400)
+  })
+
+  test('stops after 10 retries when the source branch never appears', async () => {
+    let posts = 0
+    const delays: number[] = []
+    const client = new GitlabClient(
+      'gitlab.com',
+      'a/b',
+      't',
+      async () => {
+        posts += 1
+        return new Response(JSON.stringify({ message: { source_branch: ['does not exist'] } }), {
+          status: 400,
+        })
+      },
+      'pat',
+      async (ms) => {
+        delays.push(ms)
+      },
+    )
+
+    const error = await client.createRequest(requestInput()).catch((caught: unknown) => caught)
+
+    expect(posts).toBe(11)
+    expect(delays).toEqual([400, 800, 1600, 3200, 3200, 3200, 3200, 3200, 3200, 3200])
+    expect(error).toBeInstanceOf(ForgeError)
+    expect((error as ForgeError).message).toBe('HTTP 400: {"source_branch":["does not exist"]}')
   })
 
   test('sends a bearer token for an OAuth session', async () => {

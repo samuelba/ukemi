@@ -3,6 +3,7 @@ import type { CiCheck, CiState, RequestBadge, RequestState } from '../../shared/
 import { isSafeHttpsHost } from './hostName'
 import { clampRequestLimit, DEFAULT_REQUEST_LIMIT, REQUEST_PAGE_SIZE } from './requestLimit'
 import {
+  ForgeError,
   requestJson,
   type CreateRequestInput,
   type ForgeClient,
@@ -13,6 +14,35 @@ import {
 const DETAIL_LIMIT = 10
 const JOB_LIMIT = 100
 const MAX_JOB_PAGES = 3
+const MISSING_BRANCH_RETRIES = 10
+const MISSING_BRANCH_MAX_DELAY_MS = 3200
+const MISSING_BRANCH_DELAYS_MS = [400, 800, 1600, MISSING_BRANCH_MAX_DELAY_MS]
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
+
+function missingBranchDelay(retry: number): number {
+  const last = MISSING_BRANCH_DELAYS_MS.length - 1
+  return MISSING_BRANCH_DELAYS_MS[Math.min(retry, last)] ?? MISSING_BRANCH_MAX_DELAY_MS
+}
+
+function field(value: unknown, key: string): unknown {
+  if (!value || typeof value !== 'object') {
+    return undefined
+  }
+  return (value as Record<string, unknown>)[key]
+}
+
+function isMissingSourceBranch(error: unknown): boolean {
+  if (!(error instanceof ForgeError) || error.status !== 400) {
+    return false
+  }
+  const source = field(field(error.body, 'message'), 'source_branch')
+  return Array.isArray(source) && source.includes('does not exist')
+}
 
 function byCreated<T extends { id?: number }>(items: readonly T[]): T[] {
   return [...items].sort((left, right) => (left.id ?? 0) - (right.id ?? 0))
@@ -154,6 +184,7 @@ export class GitlabClient implements ForgeClient {
     private readonly token: string,
     private readonly fetchImpl: HttpFetch = fetch,
     private readonly tokenKind: GitlabTokenKind = 'pat',
+    private readonly sleep: (ms: number) => Promise<void> = delay,
   ) {
     this.projectId = encodeURIComponent(projectPath)
   }
@@ -337,7 +368,7 @@ export class GitlabClient implements ForgeClient {
   }
 
   async createRequest(input: CreateRequestInput): Promise<RequestBadge> {
-    const body = await this.call(this.projectUrl('/merge_requests'), {
+    const init: RequestInit = {
       method: 'POST',
       body: JSON.stringify({
         source_branch: input.head,
@@ -346,18 +377,29 @@ export class GitlabClient implements ForgeClient {
         description: input.body,
         remove_source_branch: true,
       }),
-    })
-    const mr = mergeRequestSchema.parse(body)
-    return {
-      number: mr.iid,
-      title: mr.title,
-      url: mr.web_url,
-      state: gitlabState(mr, null),
-      ci: 'none',
-      isMine: true,
-      checks: [],
-      headBranch: mr.source_branch,
-      baseBranch: mr.target_branch,
+    }
+    const url = this.projectUrl('/merge_requests')
+    // GitLab can reject the branch for a few seconds after a successful push.
+    for (let retry = 0; ; retry += 1) {
+      try {
+        const mr = mergeRequestSchema.parse(await this.call(url, init))
+        return {
+          number: mr.iid,
+          title: mr.title,
+          url: mr.web_url,
+          state: gitlabState(mr, null),
+          ci: 'none',
+          isMine: true,
+          checks: [],
+          headBranch: mr.source_branch,
+          baseBranch: mr.target_branch,
+        }
+      } catch (error) {
+        if (retry >= MISSING_BRANCH_RETRIES || !isMissingSourceBranch(error)) {
+          throw error
+        }
+        await this.sleep(missingBranchDelay(retry))
+      }
     }
   }
 
