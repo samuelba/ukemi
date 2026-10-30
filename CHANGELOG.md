@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.1](https://github.com/samuelba/ukemi/compare/v0.7.0...v0.7.1) (2026-10-30)
+
+
+### Bug Fixes
+
+* menu bleading from other extensions, add Advance Bookmark ([3df7244](https://github.com/samuelba/ukemi/commit/3df72447d3a4e56a662c92fc4c4f770f5958808d))
+* menu bleading from other extensions, add Advance Bookmark ([61933df](https://github.com/samuelba/ukemi/commit/61933dfdd7cd493a9fcf2c33d3307b39706172d9))
+
 ## [0.7.0](https://github.com/samuelba/ukemi/compare/v0.6.0...v0.7.0) (2026-10-30)
 
 
