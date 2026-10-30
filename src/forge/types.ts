@@ -24,6 +24,7 @@ export class ForgeError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly body?: unknown,
   ) {
     super(message)
     this.name = 'ForgeError'
@@ -58,7 +59,7 @@ export async function requestJson(
   const text = await response.text()
   const body: unknown = text ? safeJson(text) : null
   if (!response.ok) {
-    throw new ForgeError(apiErrorMessage(body, response.status), response.status)
+    throw new ForgeError(apiErrorMessage(body, response.status), response.status, body)
   }
   return body
 }
