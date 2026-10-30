@@ -32,7 +32,7 @@ Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/item
 
 ## Requirements
 
-- Linux (tested on Ubuntu 24.04 and Fedora 41).
+- Linux (tested on Ubuntu 24.04 and Fedora 44).
 - jj 0.40 or later. Ukemi downloads jj 0.46 when you agree.
 
 ## Settings

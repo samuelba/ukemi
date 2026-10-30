@@ -6,6 +6,7 @@
     "type": "git",
     "url": "https://github.com/samuelba/ukemi.git"
   },
+  "homepage": "https://samuelba.dev/ukemi",
   "engines": {
     "vscode": "^1.90.0"
   },
