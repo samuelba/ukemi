@@ -394,6 +394,10 @@ export class JjRepo {
     return this.mutate(['bookmark', 'set', name, '-r', commitId, '--allow-backwards'])
   }
 
+  advanceBookmark(commitId: string) {
+    return this.mutate(['bookmark', 'advance', '--to', commitId])
+  }
+
   deleteBookmark(name: string) {
     return this.mutate(['bookmark', 'delete', `exact:${name}`])
   }

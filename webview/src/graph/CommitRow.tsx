@@ -168,7 +168,7 @@ export function CommitRow(props: CommitRowProps) {
         }
       }}
       data-vscode-context={vscodeContext({
-        webviewSection: 'commit',
+        webviewSection: 'ukemi.commit',
         repoId,
         commitId: commit.commitId,
         isWorkingCopy: commit.isWorkingCopy,

@@ -436,6 +436,12 @@
         "icon": "$(bookmark)"
       },
       {
+        "command": "ukemi.commit.advanceBookmark",
+        "title": "Advance Bookmark",
+        "category": "Ukemi",
+        "icon": "$(bookmark)"
+      },
+      {
         "command": "ukemi.commit.createRequest",
         "title": "Create Pull/Merge Request…",
         "category": "Ukemi",
@@ -748,226 +754,231 @@
         {
           "command": "ukemi.commit.new",
           "group": "1_new@1",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit'"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit'"
         },
         {
           "command": "ukemi.commit.newBefore",
           "group": "1_new@2",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isImmutable"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit' && !isImmutable"
         },
         {
           "command": "ukemi.commit.edit",
           "group": "1_new@3",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isWorkingCopy && !isImmutable"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit' && !isWorkingCopy && !isImmutable"
         },
         {
           "command": "ukemi.commit.makeEditable",
           "group": "1_new@4",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && isImmutable"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit' && isImmutable"
         },
         {
           "command": "ukemi.commit.describe",
           "group": "2_describe@1",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isImmutable"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit' && !isImmutable"
         },
         {
           "command": "ukemi.commit.viewDiff",
           "group": "2_describe@2",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isEmpty"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit' && !isEmpty"
         },
         {
           "command": "ukemi.commit.squash",
           "group": "3_rewrite@1",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isImmutable && !(isWorkingCopy && isEmpty)"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit' && !isImmutable && !(isWorkingCopy && isEmpty)"
         },
         {
           "command": "ukemi.commit.split",
           "group": "3_rewrite@2",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isImmutable && !isEmpty",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit' && !isImmutable && !isEmpty",
           "alt": "ukemi.commit.splitByFiles"
         },
         {
           "submenu": "ukemi.rebase",
           "group": "3_rewrite@3",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isImmutable"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit' && !isImmutable"
         },
         {
           "submenu": "ukemi.duplicate",
           "group": "3_rewrite@4",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit'"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit'"
         },
         {
           "command": "ukemi.commit.revert",
           "group": "3_rewrite@5",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isEmpty"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit' && !isEmpty"
         },
         {
           "command": "ukemi.commit.abandon",
           "group": "3_rewrite@6",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && !isImmutable",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit' && !isImmutable",
           "alt": "ukemi.commit.abandonSubtree"
         },
         {
           "command": "ukemi.commit.setBookmark",
           "group": "4_share@1",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit'"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit'"
+        },
+        {
+          "command": "ukemi.commit.advanceBookmark",
+          "group": "4_share@2",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit'"
         },
         {
           "command": "ukemi.commit.createRequest",
-          "group": "4_share@2",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && hasForge && !isImmutable && !hasRequest",
+          "group": "4_share@3",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit' && hasForge && !isImmutable && !hasRequest",
           "alt": "ukemi.commit.createRequestNamed"
         },
         {
           "command": "ukemi.commit.shipNow",
-          "group": "4_share@3",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit' && hasRemotes && !isImmutable"
+          "group": "4_share@4",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit' && hasRemotes && !isImmutable"
         },
         {
           "command": "ukemi.commit.newWorkspace",
-          "group": "4_share@4",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit'"
+          "group": "4_share@5",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit'"
         },
         {
           "command": "ukemi.commit.copyChangeId",
           "group": "9_copy@1",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'commit'",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit'",
           "alt": "ukemi.commit.copyCommitId"
         },
         {
           "command": "ukemi.bookmark.push",
           "group": "1_bookmark@1",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'bookmark' && !isRemoteOnly && !isSynced"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.bookmark' && !isRemoteOnly && !isSynced"
         },
         {
           "command": "ukemi.bookmark.createRequest",
           "group": "1_bookmark@2",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'bookmark' && hasForge && !isRemoteOnly && !isTrunk"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.bookmark' && hasForge && !isRemoteOnly && !isTrunk"
         },
         {
           "command": "ukemi.bookmark.track",
           "group": "1_bookmark@3",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'bookmark' && isRemoteOnly && !isTracked"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.bookmark' && isRemoteOnly && !isTracked"
         },
         {
           "command": "ukemi.bookmark.delete",
           "group": "2_remove@1",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'bookmark' && !isRemoteOnly"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.bookmark' && !isRemoteOnly"
         },
         {
           "command": "ukemi.bookmark.forget",
           "group": "2_remove@2",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'bookmark'"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.bookmark'"
         },
         {
           "command": "ukemi.bookmark.newWorkspace",
           "group": "3_workspace@1",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'bookmark'"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.bookmark'"
         },
         {
           "command": "ukemi.request.open",
           "group": "1_request@1",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'request'"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.request'"
         },
         {
           "command": "ukemi.request.pushUpdates",
           "group": "1_request@2",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'request' && isOpen"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.request' && isOpen"
         },
         {
           "command": "ukemi.request.merge",
           "group": "1_request@3",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'request' && isOpen"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.request' && isOpen"
         },
         {
           "command": "ukemi.request.cleanup",
           "group": "1_request@4",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'request' && isMerged"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.request' && isMerged"
         },
         {
           "command": "ukemi.request.copyUrl",
           "group": "9_copy@1",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'request'"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.request'"
         },
         {
           "command": "ukemi.workspace.openHere",
           "group": "1_workspace@1",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'workspace'"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.workspace'"
         },
         {
           "command": "ukemi.workspace.open",
           "group": "1_workspace@2",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'workspace'"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.workspace'"
         },
         {
           "command": "ukemi.workspace.openTerminal",
           "group": "1_workspace@3",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'workspace'"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.workspace'"
         },
         {
           "command": "ukemi.workspace.snapshot",
           "group": "1_workspace@4",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'workspace'"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.workspace'"
         },
         {
           "command": "ukemi.workspace.reveal",
           "group": "1_workspace@5",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'workspace'"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.workspace'"
         },
         {
           "command": "ukemi.workspace.newChange",
           "group": "1_workspace@6",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'workspace'"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.workspace'"
         },
         {
           "command": "ukemi.workspace.copyPath",
           "group": "9_copy@1",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'workspace'"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.workspace'"
         },
         {
           "command": "ukemi.workspace.delete",
           "group": "2_remove@1",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'workspace' && !isDefault"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.workspace' && !isDefault"
         },
         {
           "command": "ukemi.file.openDiff",
           "group": "1_open@1",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'file'"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.file'"
         },
         {
           "command": "ukemi.file.open",
           "group": "1_open@2",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'file'"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.file'"
         },
         {
           "command": "ukemi.file.addToChat",
           "group": "1_open@3",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'file' && !isRemoved"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.file' && !isRemoved"
         },
         {
           "command": "ukemi.file.splitBelow",
           "group": "2_split@1",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'file' && canSplit"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.file' && canSplit"
         },
         {
           "command": "ukemi.file.splitAbove",
           "group": "2_split@2",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'file' && canSplit"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.file' && canSplit"
         },
         {
           "command": "ukemi.file.discard",
           "group": "3_discard@1",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'file' && !isImmutable"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.file' && !isImmutable"
         },
         {
           "command": "ukemi.file.discardDirectory",
           "group": "3_discard@1",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'directory' && !isImmutable"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.directory' && !isImmutable"
         },
         {
           "command": "ukemi.file.copyPath",
           "group": "9_copy@1",
-          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'file'"
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.file'"
         }
       ],
       "view/title": [
@@ -1398,6 +1409,10 @@
         },
         {
           "command": "ukemi.commit.setBookmark",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.advanceBookmark",
           "when": "false"
         },
         {

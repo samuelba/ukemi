@@ -367,6 +367,11 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
         })
       }
     }),
+    'ukemi.commit.advanceBookmark': withTarget(env, async ({ model, commit }) => {
+      await env.operations.run('Advance bookmark', model, () =>
+        model.repo.advanceBookmark(commit.commitId),
+      )
+    }),
     'ukemi.commit.copyChangeId': withTarget(env, async ({ commit }) => {
       await vscode.env.clipboard.writeText(commit.changeId)
     }),

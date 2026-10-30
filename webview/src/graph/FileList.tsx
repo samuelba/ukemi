@@ -93,7 +93,7 @@ function FileRow({
         open('file')
       }}
       data-vscode-context={vscodeContext({
-        webviewSection: 'file',
+        webviewSection: 'ukemi.file',
         repoId,
         commitId: commit.commitId,
         path: file.path,
@@ -177,7 +177,7 @@ function FileTreeItems({
     }
     const isCollapsed = collapsed.has(node.path)
     const directoryContext = vscodeContext({
-      webviewSection: 'directory',
+      webviewSection: 'ukemi.directory',
       repoId,
       commitId: commit.commitId,
       path: node.path,
