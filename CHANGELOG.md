@@ -5,17 +5,13 @@
 
 ### Features
 
-* rebase stack onto... ([16bb798](https://github.com/samuelba/ukemi/commit/16bb798ff86f5dfc18d2caa31ce764344f53da80))
 * rebase stack onto... ([e911638](https://github.com/samuelba/ukemi/commit/e9116383083b382e4189ae89865c3eceb8849e85))
 
 
 ### Bug Fixes
 
-* create MR on slower GitLab ([db65f5f](https://github.com/samuelba/ukemi/commit/db65f5f44e0ace1ebc5913bfbad604386632d8cf))
 * create MR on slower GitLab ([5eda21e](https://github.com/samuelba/ukemi/commit/5eda21ea228ce032033dc23f34ab34b33d7347a8))
-* homepage, readme ([90ef77b](https://github.com/samuelba/ukemi/commit/90ef77ba3d1c737c683a39a62f19778ae7bc90c2))
 * homepage, readme ([5b50d57](https://github.com/samuelba/ukemi/commit/5b50d57202879200b768de737fcae82a29ed0adb))
-* performance for larger repos ([6b83f38](https://github.com/samuelba/ukemi/commit/6b83f381fb287e5805a877d9ba4c4198f7af40b7))
 * performance for larger repos ([70b73a9](https://github.com/samuelba/ukemi/commit/70b73a91cb16acafbaf18b410803ee4c32c2b8de))
 
 ## [0.6.0](https://github.com/samuelba/ukemi/compare/v0.5.1...v0.6.0) (2026-10-29)
