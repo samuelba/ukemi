@@ -364,6 +364,7 @@ export function globalCommands(env: CommandEnv): Record<string, Handler> {
       env.operations.run('Undo', model, () => model.repo.undo()),
     ),
     'ukemi.redo': withModel(env, async (model) => {
+      await model.settled()
       if (model.graph?.canRedo === false) {
         void vscode.window.showInformationMessage('Ukemi: nothing to redo.')
         return

@@ -337,9 +337,10 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
     'ukemi.commit.setBookmark': withTarget(env, async ({ model, commit }) => {
       const name = await pickBookmarkName(model, commit)
       if (name) {
-        await env.operations.run('Set bookmark', model, () =>
-          model.repo.setBookmark(name, commit.commitId),
-        )
+        await env.operations.run('Set bookmark', model, async () => {
+          await model.repo.setBookmark(name, commit.commitId)
+          model.placeBookmark(name, commit.commitId)
+        })
       }
     }),
     'ukemi.commit.copyChangeId': withTarget(env, async ({ commit }) => {

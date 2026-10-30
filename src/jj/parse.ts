@@ -39,7 +39,6 @@ const logEntrySchema = z.object({
   is_divergent: z.boolean(),
   is_hidden: z.boolean(),
   is_mine: z.boolean(),
-  is_pushed: z.boolean(),
 })
 
 const fileStatusSchema = z.enum(['added', 'modified', 'removed', 'renamed', 'copied'])
@@ -149,7 +148,6 @@ export function parseLog(output: string): Commit[] {
     isDivergent: entry.is_divergent,
     isHidden: entry.is_hidden,
     isMine: entry.is_mine,
-    isPushed: entry.is_pushed,
   }))
 }
 

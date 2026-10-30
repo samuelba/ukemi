@@ -23,15 +23,13 @@ export class Operations implements vscode.Disposable {
     this.emitter.fire()
   }
 
-  run<T>(label: string, model: RepoModel, task: () => Promise<T>): Promise<T | undefined> {
-    return this.track(label, async () => {
-      try {
-        return await task()
-      } finally {
-        model.markDirty()
-        await model.refresh()
-      }
-    })
+  async run<T>(label: string, model: RepoModel, task: () => Promise<T>): Promise<T | undefined> {
+    try {
+      return await this.track(label, task)
+    } finally {
+      model.markDirty()
+      void model.refresh()
+    }
   }
 
   async track<T>(label: string, task: () => Promise<T>): Promise<T | undefined> {

@@ -435,7 +435,6 @@ describe('mutations', () => {
     await repo.fetch()
 
     const [pushed] = await repo.log('@-')
-    expect(pushed?.isPushed).toBe(true)
     expect(pushed?.isImmutable).toBe(true)
     expect(pushed?.remoteBookmarks).toEqual([{ name: 'main', remote: 'origin', tracked: true }])
     expect(await repo.trunkBookmark()).toBe('main')

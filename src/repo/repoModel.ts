@@ -1,13 +1,23 @@
 import { resolve } from 'node:path'
-import { layoutGraph, type GraphRow } from '../../shared/graphLayout'
-import type { ChangedFile, Commit, GraphFilter, HistoryDepth, Workspace } from '../../shared/model'
+import { layoutGraph, type GraphNodeInput, type GraphRow } from '../../shared/graphLayout'
+import type {
+  ChangedFile,
+  Commit,
+  GraphFilter,
+  HistoryDepth,
+  Operation,
+  Remote,
+  Workspace,
+} from '../../shared/model'
 import type { CommitView, ForgeState, GraphState, RequestBadge } from '../../shared/protocol'
-import { buildGraphNodes } from '../graph/buildGraph'
+import { graphFromAncestors } from '../graph/buildGraph'
+import { ElisionCache } from '../graph/elisionCache'
 import type { ParsedBookmark } from '../jj/parse'
-import { JjRepo } from '../jj/repo'
+import { JjRepo, type TrunkRef } from '../jj/repo'
 import { CURRENT_BOOKMARKS_REVSET, graphRevset } from '../jj/revsets'
 import type { Logger } from '../util/logger'
 import { errorMessage } from '../util/logger'
+import { placeBookmark as moveLocalBookmark } from './placeBookmark'
 import { resolveSelectedCommit } from './selection'
 import { canRedo, UNDO_HISTORY_LIMIT } from './undoState'
 
@@ -25,6 +35,9 @@ export class RepoModel {
   private lastOperationId: string | null = null
   private tail: Promise<void> | null = null
   private isRefreshQueued = false
+  private opEventDuringLoad = false
+  private viewGeneration = 0
+  private readonly elisionCache = new ElisionCache()
   private requests: RequestBadge[] = []
   private forge: ForgeState | null = null
   private snapshotOtherWorkspaces = false
@@ -57,6 +70,7 @@ export class RepoModel {
     return this.current
   }
 
+  // Rows come from the graph load, which skips in_trunk (always false); use repo.bookmarkList() when it matters.
   get bookmarks(): readonly ParsedBookmark[] {
     return this.listedBookmarks
   }
@@ -96,7 +110,30 @@ export class RepoModel {
   setView(filter: GraphFilter, depth: HistoryDepth): Promise<void> {
     this.filter = filter
     this.depth = depth
+    this.elisionCache.clear()
     return this.refresh()
+  }
+
+  placeBookmark(name: string, commitId: string): void {
+    const current = this.current
+    if (!current) {
+      return
+    }
+    const placed = moveLocalBookmark(
+      current.commits,
+      this.listedBookmarks,
+      name,
+      commitId,
+      current.hasRemotes,
+    )
+    this.viewGeneration += 1
+    this.listedBookmarks = placed.bookmarks
+    this.current = {
+      ...current,
+      commits: placed.commits,
+      hasUnpushed: placed.hasUnpushed,
+    }
+    this.emit()
   }
 
   setForge(forge: ForgeState | null, requests: readonly RequestBadge[]): void {
@@ -125,6 +162,10 @@ export class RepoModel {
   }
 
   async refreshIfOperationChanged(): Promise<void> {
+    if (this.tail) {
+      this.opEventDuringLoad = true
+      return
+    }
     try {
       const [head] = await this.repo.operations(1)
       if (head && head.id !== this.lastOperationId) {
@@ -132,6 +173,13 @@ export class RepoModel {
       }
     } catch (error: unknown) {
       this.logger.warn(`operation check failed: ${errorMessage(error)}`)
+    }
+  }
+
+  // Resolves once any in-flight refresh has finished, without starting a new one.
+  async settled(): Promise<void> {
+    while (this.tail) {
+      await this.tail
     }
   }
 
@@ -158,6 +206,8 @@ export class RepoModel {
   }
 
   private async load(): Promise<void> {
+    const generation = this.viewGeneration
+    this.opEventDuringLoad = false
     try {
       if (this.isDirty) {
         this.isDirty = false
@@ -166,60 +216,146 @@ export class RepoModel {
       if (this.snapshotOtherWorkspaces) {
         await this.snapshotOthers()
       }
-      this.current = await this.buildState()
       this.lastError = null
+      await this.buildState(generation)
     } catch (error: unknown) {
       this.lastError = errorMessage(error)
       this.logger.error(`refresh failed: ${this.lastError}`)
+      this.emit()
+      return
     }
-    this.emit()
+    if (generation !== this.viewGeneration) {
+      this.emit()
+    }
+    await this.noteExternalOperation()
   }
 
-  private async buildState(): Promise<GraphState> {
+  private async buildState(generation: number): Promise<void> {
     const revset = graphRevset(this.filter, this.depth)
-    const [logged, trunkIds, operations, workspaces, remotes, trunkName, listed, currentBookmarks] =
+    const loaded = await this.loadRevisionData(revset)
+    if (generation !== this.viewGeneration) {
+      return
+    }
+    const bookmarks = loaded.bookmarks.filter((row) => row.remote !== 'git')
+    const commits =
+      loaded.remotes.length > 0
+        ? markNeverPushed(loaded.logged, remoteBookmarkNames(bookmarks))
+        : loaded.logged
+    const workingCopyFiles = await this.workingCopyFiles(commits)
+    const shared = sharedGraph(loaded, workingCopyFiles)
+    const first = graphFromAncestors(commits, (parent) => this.elisionCache.get(revset, parent))
+    const trunkId = loaded.trunk.commitId ?? undefined
+    if (
+      !this.showGraph(generation, this.assemble(commits, first.nodes, trunkId, shared), bookmarks)
+    ) {
+      return
+    }
+    if (first.missing.length === 0) {
+      return
+    }
+    const nodes = await this.resolveMissingParents(commits, revset, first.missing)
+    this.showGraph(generation, this.assemble(commits, nodes, trunkId, shared), bookmarks)
+  }
+
+  private async loadRevisionData(revset: string): Promise<LoadedRepo> {
+    const operationsPromise = this.repo.operations(UNDO_HISTORY_LIMIT).then((operations) => {
+      this.lastOperationId = operations[0]?.id ?? null
+      return operations
+    })
+    const [logged, trunk, operations, workspaces, remotes, listed, currentBookmarks] =
       await Promise.all([
         this.repo.log(revset),
-        this.repo.commitIds('present(trunk())'),
-        this.repo.operations(UNDO_HISTORY_LIMIT),
+        this.repo.trunk(),
+        operationsPromise,
         this.repo.workspaces(),
         this.repo.remotes(),
-        this.repo.trunkBookmark(),
-        this.repo.bookmarkList(),
+        this.repo.bookmarkList({ withTrunk: false }),
         this.repo.bookmarkNames(CURRENT_BOOKMARKS_REVSET),
       ])
-    const bookmarks = listed.filter((row) => row.remote !== 'git')
-    const commits =
-      remotes.length > 0 ? markNeverPushed(logged, remoteBookmarkNames(bookmarks)) : logged
-    const nodes = await buildGraphNodes(commits, (parent) =>
-      this.repo.commitIds(`heads(::${parent} & (${revset}))`),
+    return { logged, trunk, operations, workspaces, remotes, bookmarks: listed, currentBookmarks }
+  }
+
+  private workingCopyFiles(commits: readonly Commit[]): Promise<ChangedFile[]> {
+    const workingCopy = commits.find((commit) => commit.isWorkingCopy)
+    if (!workingCopy) {
+      return Promise.resolve([])
+    }
+    return this.repo.files(workingCopy.commitId, this.showLineStats)
+  }
+
+  private async resolveMissingParents(
+    commits: readonly Commit[],
+    revset: string,
+    missing: readonly string[],
+  ): Promise<GraphNodeInput[]> {
+    const found = new Map<string, readonly string[]>()
+    await Promise.all(
+      missing.map(async (parent) => {
+        try {
+          const ancestors = await this.repo.commitIds(`heads(::${parent} & (${revset}))`)
+          this.elisionCache.remember(revset, parent, ancestors)
+          found.set(parent, ancestors)
+        } catch {
+          found.set(parent, [])
+        }
+      }),
     )
+    return graphFromAncestors(commits, (parent) => {
+      return found.get(parent) ?? this.elisionCache.get(revset, parent)
+    }).nodes
+  }
+
+  private assemble(
+    commits: readonly Commit[],
+    nodes: readonly GraphNodeInput[],
+    trunkId: string | undefined,
+    shared: SharedGraph,
+  ): GraphState {
     const rows = layoutGraph(nodes)
-    const trunkId = trunkIds[0]
-    const workingCopy = commits.find((c) => c.isWorkingCopy)
-    const workingCopyFiles = workingCopy
-      ? await this.repo.files(workingCopy.commitId, this.showLineStats)
-      : []
-    const head = operations[0]
-    this.lastOperationId = head?.id ?? null
-
     const views = commits.map((commit, index) => toCommitView(commit, rows[index], trunkId))
-    this.listedBookmarks = bookmarks
-
     return {
       repoId: this.root,
       commits: this.attachRequests(views),
-      workingCopyFiles,
-      workspaces,
+      workingCopyFiles: shared.workingCopyFiles,
+      workspaces: shared.workspaces,
       filter: this.filter,
       depth: this.depth,
-      hasRemotes: remotes.length > 0,
-      hasUnpushed: remotes.length > 0 && hasUnsyncedBookmarks(commits),
-      canUndo: head !== undefined && !NETWORK_OPERATION.test(head.description),
-      canRedo: canRedo(operations.map((op) => op.description)),
-      currentBookmarks,
-      trunkName,
+      hasRemotes: shared.hasRemotes,
+      hasUnpushed: shared.hasRemotes && hasUnsyncedBookmarks(commits),
+      canUndo: shared.head !== undefined && !NETWORK_OPERATION.test(shared.head.description),
+      canRedo: canRedo(shared.operations.map((op) => op.description)),
+      currentBookmarks: shared.currentBookmarks,
+      trunkName: shared.trunkName,
       forge: this.forge,
+    }
+  }
+
+  private showGraph(
+    generation: number,
+    state: GraphState,
+    bookmarks: readonly ParsedBookmark[],
+  ): boolean {
+    if (generation !== this.viewGeneration) {
+      return false
+    }
+    this.listedBookmarks = [...bookmarks]
+    this.current = state
+    this.emit()
+    return true
+  }
+
+  private async noteExternalOperation(): Promise<void> {
+    if (!this.opEventDuringLoad) {
+      return
+    }
+    this.opEventDuringLoad = false
+    try {
+      const [head] = await this.repo.operations(1)
+      if (head && head.id !== this.lastOperationId) {
+        this.isRefreshQueued = true
+      }
+    } catch (error: unknown) {
+      this.logger.warn(`operation check failed: ${errorMessage(error)}`)
     }
   }
 
@@ -273,6 +409,38 @@ export class RepoModel {
     }
     this.fileCache.set(key, files)
     return files
+  }
+}
+
+interface LoadedRepo {
+  logged: Commit[]
+  trunk: TrunkRef
+  operations: Operation[]
+  workspaces: Workspace[]
+  remotes: Remote[]
+  bookmarks: ParsedBookmark[]
+  currentBookmarks: string[]
+}
+
+interface SharedGraph {
+  workingCopyFiles: ChangedFile[]
+  workspaces: Workspace[]
+  hasRemotes: boolean
+  head: Operation | undefined
+  operations: Operation[]
+  currentBookmarks: string[]
+  trunkName: string | null
+}
+
+function sharedGraph(loaded: LoadedRepo, workingCopyFiles: ChangedFile[]): SharedGraph {
+  return {
+    workingCopyFiles,
+    workspaces: loaded.workspaces,
+    hasRemotes: loaded.remotes.length > 0,
+    head: loaded.operations[0],
+    operations: loaded.operations,
+    currentBookmarks: loaded.currentBookmarks,
+    trunkName: loaded.trunk.bookmark,
   }
 }
 
