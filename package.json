@@ -410,6 +410,11 @@
         "category": "Ukemi"
       },
       {
+        "command": "ukemi.commit.rebaseStackOnto",
+        "title": "Rebase Stack onto…",
+        "category": "Ukemi"
+      },
+      {
         "command": "ukemi.commit.rebaseOnto",
         "title": "Rebase onto…",
         "category": "Ukemi"
@@ -1198,20 +1203,24 @@
           "group": "1_place@1"
         },
         {
-          "command": "ukemi.commit.rebaseTrunk",
+          "command": "ukemi.commit.rebaseStackOnto",
           "group": "1_place@2"
         },
         {
-          "command": "ukemi.commit.rebaseOnto",
+          "command": "ukemi.commit.rebaseTrunk",
           "group": "1_place@3"
         },
         {
-          "command": "ukemi.commit.rebaseInsertAfter",
+          "command": "ukemi.commit.rebaseOnto",
           "group": "1_place@4"
         },
         {
-          "command": "ukemi.commit.rebaseInsertBefore",
+          "command": "ukemi.commit.rebaseInsertAfter",
           "group": "1_place@5"
+        },
+        {
+          "command": "ukemi.commit.rebaseInsertBefore",
+          "group": "1_place@6"
         }
       ],
       "ukemi.viewMode": [
@@ -1369,6 +1378,10 @@
         },
         {
           "command": "ukemi.commit.rebaseStackTrunk",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.rebaseStackOnto",
           "when": "false"
         },
         {

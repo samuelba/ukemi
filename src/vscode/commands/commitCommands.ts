@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
 import type { CommitView } from '../../../shared/protocol'
-import type { Placement } from '../../jj/repo'
+import type { Placement, RebaseMode } from '../../jj/repo'
 import type { RepoModel } from '../../repo/repoModel'
 import { combineDescriptions, validateBookmarkName } from '../../util/text'
 import { openCommitDiff } from '../diff'
@@ -66,18 +66,36 @@ export async function editOrNew(
   await env.operations.run('Edit', model, () => model.repo.edit(commit.commitId))
 }
 
-async function pickDestination(model: RepoModel, title: string): Promise<string | undefined> {
-  const bookmarks = [
-    ...new Set((model.graph?.commits ?? []).flatMap((c) => c.localBookmarks.map((b) => b.name))),
-  ]
-  const items: vscode.QuickPickItem[] = [
+interface DestinationCommit {
+  localBookmarks: readonly { name: string }[]
+  remoteBookmarks: readonly { name: string; remote: string }[]
+}
+
+export function destinationItems(commits: readonly DestinationCommit[]): vscode.QuickPickItem[] {
+  const local = unique(
+    commits.flatMap((commit) => commit.localBookmarks.map((bookmark) => bookmark.name)),
+  )
+  const remote = unique(
+    commits.flatMap((commit) =>
+      commit.remoteBookmarks.map((bookmark) => `${bookmark.name}@${bookmark.remote}`),
+    ),
+  )
+  return [
     { label: 'trunk()', description: 'Main line' },
-    ...bookmarks.map((name) => ({ label: name, description: 'bookmark' })),
+    ...local.map((name) => ({ label: name, description: 'bookmark' })),
+    ...remote.map((name) => ({ label: name, description: 'remote bookmark' })),
   ]
+}
+
+function unique(names: readonly string[]): string[] {
+  return [...new Set(names)]
+}
+
+async function pickDestination(model: RepoModel, title: string): Promise<string | undefined> {
   const pick = vscode.window.createQuickPick()
   pick.title = title
   pick.placeholder = 'Pick a bookmark or type a change id, commit hash or revset'
-  pick.items = items
+  pick.items = destinationItems(model.graph?.commits ?? [])
   return new Promise((resolve) => {
     pick.onDidAccept(() => {
       resolve(pick.selectedItems[0]?.label ?? (pick.value.trim() || undefined))
@@ -200,12 +218,17 @@ function duplicateAt(
   })
 }
 
-function rebaseAt(env: CommandEnv, placement: Placement, title: string): Handler {
+function rebaseAt(
+  env: CommandEnv,
+  placement: Placement,
+  title: string,
+  mode: Extract<RebaseMode, 'source' | 'branch'> = 'source',
+): Handler {
   return withTarget(env, async ({ model, commit }) => {
     const destination = mutable(commit) ? await pickDestination(model, title) : undefined
     if (destination) {
-      await env.operations.run('Rebase', model, () =>
-        model.repo.rebase(commit.commitId, destination, 'source', placement),
+      await env.operations.run(mode === 'branch' ? 'Rebase stack' : 'Rebase', model, () =>
+        model.repo.rebase(commit.commitId, destination, mode, placement),
       )
     }
   })
@@ -331,6 +354,7 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
       ({ model, commit }) => model.repo.rebase(commit.commitId, 'trunk()', 'branch'),
       true,
     ),
+    'ukemi.commit.rebaseStackOnto': rebaseAt(env, 'onto', 'Rebase stack onto', 'branch'),
     'ukemi.commit.rebaseOnto': rebaseAt(env, 'onto', 'Rebase onto'),
     'ukemi.commit.rebaseInsertAfter': rebaseAt(env, 'after', 'Rebase insert after'),
     'ukemi.commit.rebaseInsertBefore': rebaseAt(env, 'before', 'Rebase insert before'),
