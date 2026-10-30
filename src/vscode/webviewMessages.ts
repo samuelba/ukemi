@@ -137,9 +137,10 @@ export function createMessageHandler(env: CommandEnv) {
         return
       }
       case 'dropBookmark':
-        await env.operations.run('Move bookmark', model, () =>
-          model.repo.setBookmark(message.name, message.targetId),
-        )
+        await env.operations.run('Move bookmark', model, async () => {
+          await model.repo.setBookmark(message.name, message.targetId)
+          model.placeBookmark(message.name, message.targetId)
+        })
         return
       case 'openUrl': {
         const host = model.graph?.forge?.host

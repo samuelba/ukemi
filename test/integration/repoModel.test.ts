@@ -1,9 +1,19 @@
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { JjRepo } from '../../src/jj/repo'
+import { JjRunner } from '../../src/jj/runner'
 import { RepoModel } from '../../src/repo/repoModel'
-import { NULL_LOGGER } from '../../src/util/logger'
-import { initRepo, jj, makeRepo, makeTempDir, writeFile, type Fixture } from '../helpers/jjFixture'
+import { NULL_LOGGER, type Logger } from '../../src/util/logger'
+import {
+  initRepo,
+  JJ_BINARY,
+  jj,
+  makeRepo,
+  makeTempDir,
+  writeFile,
+  type Fixture,
+} from '../helpers/jjFixture'
 
 let fixture: Fixture
 let root: string
@@ -89,6 +99,26 @@ describe('RepoModel', () => {
     await model.refresh()
 
     expect(model.error).not.toBeNull()
+  })
+
+  test('does not reload the graph when the operation is unchanged', async () => {
+    const lines: string[] = []
+    const logger: Logger = {
+      info: (message) => {
+        lines.push(message)
+      },
+      warn: () => undefined,
+      error: () => undefined,
+    }
+    const watched = new RepoModel(new JjRepo(root, new JjRunner(JJ_BINARY, logger)), logger)
+    await watched.refresh()
+    const graphLoads = () => lines.filter((line) => line.includes('--limit=2000')).length
+    const before = graphLoads()
+
+    await watched.refreshIfOperationChanged()
+
+    expect(graphLoads()).toBe(before)
+    expect(watched.error).toBeNull()
   })
 
   test('refreshes after an external jj command', async () => {

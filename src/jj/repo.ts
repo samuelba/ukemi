@@ -28,6 +28,7 @@ import { rootFileset } from './revsets'
 import { JjError, JjRunner, NETWORK_TIMEOUT_MS, type RunResult } from './runner'
 import { jjString } from './templates'
 import {
+  BOOKMARK_LIST_GRAPH_TEMPLATE,
   BOOKMARK_LIST_TEMPLATE,
   COMMIT_ID_TEMPLATE,
   DIFF_FILES_TEMPLATE,
@@ -37,7 +38,7 @@ import {
   LOG_TEMPLATE,
   OP_LOG_TEMPLATE,
   PUSHED_BOOKMARK_TEMPLATE,
-  TRUNK_BOOKMARK_TEMPLATE,
+  TRUNK_TEMPLATE,
   WORKSPACE_TEMPLATE,
 } from './templates'
 
@@ -47,6 +48,11 @@ export const MAX_EVOLUTION_ENTRIES = 200
 export type SplitDirection = 'below' | 'above'
 export type RebaseMode = 'source' | 'revision' | 'branch'
 export type Placement = 'onto' | 'after' | 'before'
+
+export interface TrunkRef {
+  commitId: string | null
+  bookmark: string | null
+}
 
 const PLACEMENT_FLAGS: Record<Placement, string> = {
   onto: '--onto',
@@ -182,14 +188,10 @@ export class JjRepo {
     return stdout.split('\n').filter((line) => line.length > 0)
   }
 
-  async bookmarkList() {
-    const { stdout } = await this.read([
-      'bookmark',
-      'list',
-      '--all-remotes',
-      '-T',
-      BOOKMARK_LIST_TEMPLATE,
-    ])
+  async bookmarkList(options: { withTrunk?: boolean } = {}) {
+    const template =
+      options.withTrunk === false ? BOOKMARK_LIST_GRAPH_TEMPLATE : BOOKMARK_LIST_TEMPLATE
+    const { stdout } = await this.read(['bookmark', 'list', '--all-remotes', '-T', template])
     return parseBookmarks(stdout)
   }
 
@@ -216,16 +218,20 @@ export class JjRepo {
     return parseOperations(stdout)
   }
 
-  async trunkBookmark(): Promise<string | null> {
+  async trunk(): Promise<TrunkRef> {
     const { stdout } = await this.read([
       'log',
       '--no-graph',
       '-r',
       'present(trunk())',
       '-T',
-      TRUNK_BOOKMARK_TEMPLATE,
+      TRUNK_TEMPLATE,
     ])
-    return stdout.split('\n').find((line) => line.trim().length > 0) ?? null
+    return parseTrunk(stdout)
+  }
+
+  async trunkBookmark(): Promise<string | null> {
+    return (await this.trunk()).bookmark
   }
 
   fileContent(commitId: string, path: string): Promise<Buffer> {
@@ -646,6 +652,19 @@ async function isDirectory(path: string): Promise<boolean> {
     return (await stat(path)).isDirectory()
   } catch {
     return false
+  }
+}
+
+function parseTrunk(stdout: string): TrunkRef {
+  const lines = stdout.split('\n')
+  const commitId = lines[0]?.trim() ?? ''
+  const bookmark = lines
+    .slice(1)
+    .map((line) => line.trim())
+    .find((line) => line.length > 0)
+  return {
+    commitId: commitId.length > 0 ? commitId : null,
+    bookmark: bookmark ?? null,
   }
 }
 

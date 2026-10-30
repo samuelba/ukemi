@@ -37,7 +37,6 @@ export interface Commit {
   isDivergent: boolean
   isHidden: boolean
   isMine: boolean
-  isPushed: boolean
 }
 
 export type FileStatus = 'added' | 'modified' | 'removed' | 'renamed' | 'copied'

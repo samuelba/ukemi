@@ -10,22 +10,53 @@ export async function buildGraphNodes(
   commits: readonly Commit[],
   resolveAncestors: AncestorResolver,
 ): Promise<GraphNodeInput[]> {
-  const displayed = new Set(commits.map((c) => c.commitId))
-  const missing = [
+  const resolved = new Map<string, readonly string[]>()
+  await Promise.all(
+    hiddenParents(commits).map(async (parent) => {
+      const ancestors = await resolveAncestors(parent).catch(() => [] as string[])
+      resolved.set(parent, ancestors)
+    }),
+  )
+  return graphFromAncestors(commits, (parent) => resolved.get(parent) ?? []).nodes
+}
+
+export function graphFromAncestors(
+  commits: readonly Commit[],
+  ancestorsOf: (parentId: string) => readonly string[] | undefined,
+): { nodes: GraphNodeInput[]; missing: string[] } {
+  const displayed = new Set(commits.map((commit) => commit.commitId))
+  const resolved = new Map<string, readonly string[]>()
+  const missing: string[] = []
+  for (const parent of hiddenParents(commits)) {
+    const ancestors = ancestorsOf(parent)
+    if (ancestors === undefined) {
+      missing.push(parent)
+      continue
+    }
+    resolved.set(
+      parent,
+      ancestors.filter((id) => displayed.has(id)),
+    )
+  }
+  return { nodes: nodesFor(commits, displayed, resolved), missing }
+}
+
+function hiddenParents(commits: readonly Commit[]): string[] {
+  const displayed = new Set(commits.map((commit) => commit.commitId))
+  return [
     ...new Set(
-      commits.flatMap((c) => c.parents).filter((p) => !displayed.has(p) && p !== ROOT_COMMIT_ID),
+      commits
+        .flatMap((commit) => commit.parents)
+        .filter((parent) => !displayed.has(parent) && parent !== ROOT_COMMIT_ID),
     ),
   ].slice(0, MAX_ELIDED_LOOKUPS)
+}
 
-  const resolved = new Map(
-    await Promise.all(
-      missing.map(async (parent) => {
-        const ancestors = await resolveAncestors(parent).catch(() => [])
-        return [parent, ancestors.filter((id) => displayed.has(id))] as const
-      }),
-    ),
-  )
-
+function nodesFor(
+  commits: readonly Commit[],
+  displayed: ReadonlySet<string>,
+  resolved: ReadonlyMap<string, readonly string[]>,
+): GraphNodeInput[] {
   return commits.map((commit) => ({
     id: commit.commitId,
     parents: edgesFor(commit, displayed, resolved),

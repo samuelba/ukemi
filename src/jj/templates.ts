@@ -52,7 +52,6 @@ export const LOG_TEMPLATE =
     is_divergent: 'json(divergent)',
     is_hidden: 'json(hidden)',
     is_mine: 'json(self.mine())',
-    is_pushed: 'json(self.contained_in("::remote_bookmarks()"))',
   }) + LINE_END
 
 const FILE_LIST_FIELDS = {
@@ -100,23 +99,35 @@ export const PUSHED_BOOKMARK_TEMPLATE = 'if(remote && remote != "git", name ++ "
 
 const TRUNK_NAME = 'b.name() == "main" || b.name() == "master" || b.name() == "trunk"'
 
-export const TRUNK_BOOKMARK_TEMPLATE =
+const TRUNK_BOOKMARK_NAMES =
   'separate("\\n", ' +
   `remote_bookmarks.filter(|b| b.remote() != "git" && (${TRUNK_NAME})).map(|b| b.name()), ` +
   `bookmarks.filter(|b| ${TRUNK_NAME}).map(|b| b.name()), ` +
   'remote_bookmarks.filter(|b| b.remote() != "git").map(|b| b.name())' +
-  ') ++ "\\n"'
+  ')'
+
+export const TRUNK_TEMPLATE = `commit_id ++ "\\n" ++ ${TRUNK_BOOKMARK_NAMES} ++ "\\n"`
+
+const BOOKMARK_LIST_FIELDS = {
+  name: 'json(name)',
+  remote: 'json(remote)',
+  present: 'json(present)',
+  conflict: 'json(conflict)',
+  tracked: 'json(tracked)',
+  commit_id: 'if(normal_target, json(normal_target.commit_id()), "null")',
+  description: 'if(normal_target, json(normal_target.description().first_line()), json(""))',
+}
 
 export const BOOKMARK_LIST_TEMPLATE =
   jsonObject({
-    name: 'json(name)',
-    remote: 'json(remote)',
-    present: 'json(present)',
-    conflict: 'json(conflict)',
-    tracked: 'json(tracked)',
-    commit_id: 'if(normal_target, json(normal_target.commit_id()), "null")',
-    description: 'if(normal_target, json(normal_target.description().first_line()), json(""))',
+    ...BOOKMARK_LIST_FIELDS,
     in_trunk: 'if(normal_target, json(normal_target.contained_in("::trunk()")), "false")',
+  }) + LINE_END
+
+export const BOOKMARK_LIST_GRAPH_TEMPLATE =
+  jsonObject({
+    ...BOOKMARK_LIST_FIELDS,
+    in_trunk: 'json(false)',
   }) + LINE_END
 
 export const OP_LOG_TEMPLATE =

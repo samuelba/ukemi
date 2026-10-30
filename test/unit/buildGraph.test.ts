@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { buildGraphNodes, ROOT_COMMIT_ID } from '../../src/graph/buildGraph'
+import { cachingResolver, ElisionCache } from '../../src/graph/elisionCache'
 import type { Commit } from '../../shared/model'
 
 function commit(commitId: string, parents: string[]): Commit {
@@ -24,7 +25,6 @@ function commit(commitId: string, parents: string[]): Commit {
     isDivergent: false,
     isHidden: false,
     isMine: true,
-    isPushed: false,
   }
 }
 
@@ -55,6 +55,21 @@ describe('buildGraphNodes', () => {
     })
 
     expect(nodes[0]?.parents).toEqual([])
+  })
+
+  test('does not resolve a parent again when the cache is warm', async () => {
+    const cache = new ElisionCache()
+    let calls = 0
+    const resolve = cachingResolver(cache, 'revset', async () => {
+      calls += 1
+      return ['trunk']
+    })
+    const commits = [commit('top', ['hidden']), commit('trunk', [])]
+
+    await buildGraphNodes(commits, resolve)
+    await buildGraphNodes(commits, resolve)
+
+    expect(calls).toBe(1)
   })
 
   test('deduplicates edges that resolve to the same ancestor', async () => {
