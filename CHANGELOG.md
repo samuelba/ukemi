@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.7.0](https://github.com/samuelba/ukemi/compare/v0.6.0...v0.7.0) (2026-10-30)
+
+
+### Features
+
+* rebase stack onto... ([e911638](https://github.com/samuelba/ukemi/commit/e9116383083b382e4189ae89865c3eceb8849e85))
+
+
+### Bug Fixes
+
+* create MR on slower GitLab ([5eda21e](https://github.com/samuelba/ukemi/commit/5eda21ea228ce032033dc23f34ab34b33d7347a8))
+* homepage, readme ([5b50d57](https://github.com/samuelba/ukemi/commit/5b50d57202879200b768de737fcae82a29ed0adb))
+* performance for larger repos ([70b73a9](https://github.com/samuelba/ukemi/commit/70b73a91cb16acafbaf18b410803ee4c32c2b8de))
+
 ## [0.6.0](https://github.com/samuelba/ukemi/compare/v0.5.1...v0.6.0) (2026-10-29)
 
 
