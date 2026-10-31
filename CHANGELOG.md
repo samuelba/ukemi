@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.8.0](https://github.com/samuelba/ukemi/compare/v0.7.1...v0.8.0) (2026-10-31)
+
+
+### Features
+
+* stacked MRs/PRs ([6d68091](https://github.com/samuelba/ukemi/commit/6d680918835caf0c1ad3d8c4c66bbde200226f4f))
+* support gh cli ([eb12445](https://github.com/samuelba/ukemi/commit/eb1244523f6e7b7f332869e003104c40d35e9541))
+
+
+### Bug Fixes
+
+* extension title, update images ([0e85a18](https://github.com/samuelba/ukemi/commit/0e85a18aaf2a7bce893f812d4754699e25e179e1))
+* improve secrets handling ([38c7b2a](https://github.com/samuelba/ukemi/commit/38c7b2a30d51ad3ab0d98ce5597770cd43ffa097))
+* opening panel layout ([6324625](https://github.com/samuelba/ukemi/commit/6324625e0142b9c98b9ae7249935bf3ad649a12a))
+* update icons ([8483919](https://github.com/samuelba/ukemi/commit/8483919e1c66a1fedfc28ab86c7c5c96a449d553))
+
 ## [0.7.1](https://github.com/samuelba/ukemi/compare/v0.7.0...v0.7.1) (2026-10-30)
 
 
