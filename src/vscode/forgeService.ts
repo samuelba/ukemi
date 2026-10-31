@@ -2,6 +2,9 @@ import * as vscode from 'vscode'
 import type { ForgeState, RequestBadge } from '../../shared/protocol'
 import type { CredentialRequest } from '../askpass/prompt'
 import { detectForge, forgeKindForHost, type ForgeTarget } from '../forge/detect'
+import { cliAvailable } from '../forge/cli'
+import { ghGitCredential, ghFetch } from '../forge/ghApi'
+import { ghKnowsHost } from '../forge/ghConfig'
 import { GithubClient } from '../forge/github'
 import {
   GithubCredentials,
@@ -16,7 +19,7 @@ import { ForgeError, type ForgeClient } from '../forge/types'
 import type { RepoModel } from '../repo/repoModel'
 import { parseDuration } from '../util/duration'
 import { errorMessage, type Logger } from '../util/logger'
-import { readConfig } from './config'
+import { readConfig, readHostLists } from './config'
 import { githubTokenUi } from './githubTokenUi'
 import { GitlabAuth } from './gitlabAuth'
 import type { RepoRegistry } from './registry'
@@ -27,7 +30,7 @@ type ForgeHost = Pick<ForgeTarget, 'kind' | 'host'>
 
 type ForgeCredential = {
   token: string
-  kind: 'github' | 'oauth' | GitlabTokenKind | 'glab'
+  kind: 'github' | 'gh' | 'oauth' | GitlabTokenKind | 'glab'
 }
 
 function patKey(host: string): string {
@@ -37,6 +40,12 @@ function patKey(host: string): string {
 function glabIgnoredKey(host: string): string {
   return `ukemi.gitlab.glabIgnored.${host}`
 }
+
+function ghIgnoredKey(host: string): string {
+  return `ukemi.github.ghIgnored.${host}`
+}
+
+type GithubSource = { kind: 'stored'; credential: GithubCredential } | { kind: 'gh' }
 
 // Workspace settings come from the repository, so only the user's own value is trusted.
 function enterpriseUri(): string | undefined {
@@ -62,7 +71,9 @@ async function githubSession(host: string, interactive: boolean): Promise<Github
 
 function makeClient(target: ForgeTarget, credential: ForgeCredential): ForgeClient {
   if (target.kind === 'github') {
-    return new GithubClient(target.host, target.projectPath, credential.token)
+    return credential.kind === 'gh'
+      ? new GithubClient(target.host, target.projectPath, '', ghFetch(target.host))
+      : new GithubClient(target.host, target.projectPath, credential.token)
   }
   if (credential.kind === 'glab') {
     return new GitlabClient(target.host, target.projectPath, '', glabFetch(target.host), 'pat')
@@ -137,7 +148,7 @@ export class ForgeService implements vscode.Disposable {
   }
 
   async target(model: RepoModel): Promise<ForgeTarget | null> {
-    return detectForge(await model.repo.remotes(), readConfig())
+    return detectForge(await model.repo.remotes(), readHostLists())
   }
 
   private isTrusted(announce: boolean): boolean {
@@ -157,11 +168,13 @@ export class ForgeService implements vscode.Disposable {
       return null
     }
     if (target.kind === 'github') {
-      const githubCredential = await this.github.get(
-        target.host,
-        interactive ? 'ask-if-missing' : 'silent',
-      )
-      return githubCredential ? { token: githubCredential.token, kind: 'github' } : null
+      const source = await this.githubSource(target.host, interactive)
+      if (!source) {
+        return null
+      }
+      return source.kind === 'gh'
+        ? { token: '', kind: 'gh' }
+        : { token: source.credential.token, kind: 'github' }
     }
     const oauth = await this.gitlabAuth.accessToken(target.host)
     if (oauth) {
@@ -185,11 +198,34 @@ export class ForgeService implements vscode.Disposable {
     return prompted ? { token: prompted, kind: 'pat' } : null
   }
 
+  // Order: stored token, editor account, `gh`, then a prompt when interactive.
+  private async githubSource(host: string, interactive: boolean): Promise<GithubSource | null> {
+    const known = await this.github.get(host, 'silent')
+    if (known) {
+      return { kind: 'stored', credential: known }
+    }
+    if (await this.ghCredential(host)) {
+      return { kind: 'gh' }
+    }
+    if (!interactive) {
+      return null
+    }
+    const asked = await this.github.get(host, 'ask-if-missing')
+    return asked ? { kind: 'stored', credential: asked } : null
+  }
+
+  private async ghCredential(host: string): Promise<boolean> {
+    if ((await this.secrets.get(ghIgnoredKey(host))) === '1') {
+      return false
+    }
+    return ghKnowsHost(host) && (await cliAvailable('gh'))
+  }
+
   private async glabCredential(host: string): Promise<boolean> {
     if ((await this.secrets.get(glabIgnoredKey(host))) === '1') {
       return false
     }
-    return glabKnowsHost(host)
+    return glabKnowsHost(host) && (await cliAvailable('glab'))
   }
 
   private async promptGitlabToken(host: string): Promise<string | null> {
@@ -230,14 +266,16 @@ export class ForgeService implements vscode.Disposable {
     if (!this.isTrusted(false)) {
       return null
     }
-    const kind = forgeKindForHost(request.host, readConfig())
+    const kind = forgeKindForHost(request.host, readHostLists())
     if (kind === 'github') {
-      const mode = request.interactive ? 'ask-if-missing' : 'silent'
-      const credential = await this.github.get(request.host, mode)
-      if (!credential) {
+      const source = await this.githubSource(request.host, request.interactive)
+      if (!source) {
         return null
       }
-      return request.field === 'username' ? credential.username : credential.token
+      if (source.kind === 'gh') {
+        return ghGitCredential(request.host, request.field)
+      }
+      return request.field === 'username' ? source.credential.username : source.credential.token
     }
     if (kind === 'gitlab') {
       const credential = await this.credential({ kind, host: request.host }, request.interactive)
@@ -258,6 +296,13 @@ export class ForgeService implements vscode.Disposable {
       return null
     }
     if (target.kind === 'github') {
+      await this.secrets.delete(ghIgnoredKey(target.host))
+      if (
+        !(await this.github.get(target.host, 'silent')) &&
+        (await this.ghCredential(target.host))
+      ) {
+        return makeClient(target, { token: '', kind: 'gh' })
+      }
       const credential = await this.github.get(target.host, 'always-ask')
       return credential ? makeClient(target, { token: credential.token, kind: 'github' }) : null
     }
@@ -272,9 +317,12 @@ export class ForgeService implements vscode.Disposable {
       await this.gitlabAuth.forget(target.host)
       await this.secrets.store(glabIgnoredKey(target.host), '1')
     }
+    if (target?.kind === 'github') {
+      await this.secrets.store(ghIgnoredKey(target.host), '1')
+    }
     if (target?.kind === 'github' && !(await this.github.forget(target.host))) {
       void vscode.window.showInformationMessage(
-        'Ukemi uses the GitHub account of the editor. Sign out of it in the Accounts menu.',
+        'Ukemi stopped using the GitHub CLI for this host. It may still use the GitHub account of the editor; sign out of it in the Accounts menu.',
       )
     }
     model.setForge(target ? { kind: target.kind, host: target.host, isSignedIn: false } : null, [])

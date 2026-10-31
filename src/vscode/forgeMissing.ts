@@ -3,7 +3,7 @@ import { unknownHosts } from '../forge/detect'
 import { isSafeHttpsHost } from '../forge/hostName'
 import type { RepoModel } from '../repo/repoModel'
 import type { CommandEnv } from './commands/context'
-import { readConfig } from './config'
+import { readHostLists } from './config'
 import { openSettings } from './openSettings'
 
 const UNKNOWN_HOST_DETAIL =
@@ -18,7 +18,7 @@ const SETTINGS_CHOICE = 'Open Settings'
 type HostKind = 'gitlab' | 'github'
 
 export async function showForgeMissing(model: RepoModel, env: CommandEnv): Promise<void> {
-  const hosts = unknownHosts(await model.repo.remotes(), readConfig())
+  const hosts = unknownHosts(await model.repo.remotes(), readHostLists())
   const host = hosts[0]
   if (!host) {
     await vscode.window.showWarningMessage(

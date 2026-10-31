@@ -6,6 +6,8 @@ import {
   type HistoryDepth,
 } from '../../shared/model'
 import type { ChangedFilesView } from '../../shared/protocol'
+import type { HostLists } from '../forge/detect'
+import { ghHosts } from '../forge/ghConfig'
 import { clampRequestLimit } from '../forge/requestLimit'
 import { DEFAULT_EXCLUDES } from '../repo/discovery'
 
@@ -54,6 +56,12 @@ const CHANGED_FILES_VIEWS = ['list', 'tree'] as const satisfies readonly Changed
 
 function oneOf<T extends string>(value: string, allowed: readonly T[], fallback: T): T {
   return (allowed as readonly string[]).includes(value) ? (value as T) : fallback
+}
+
+// Hosts that the user logged in to with `gh` count as GitHub hosts. That file is user-level, not workspace-level.
+export function readHostLists(): HostLists {
+  const config = readConfig()
+  return { gitlabHosts: config.gitlabHosts, githubHosts: [...config.githubHosts, ...ghHosts()] }
 }
 
 export function readConfig(): UkemiConfig {
