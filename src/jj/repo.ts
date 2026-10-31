@@ -422,9 +422,15 @@ export class JjRepo {
     return this.mutate(['bookmark', 'rename', oldName, newName])
   }
 
-  fetch(options: { interactive?: boolean } = {}) {
+  // A clone made with `-b` limits plain fetches to those bookmarks, so branches can be named here.
+  fetch(options: { interactive?: boolean; branches?: readonly string[] } = {}) {
     const env = options.interactive === false ? { UKEMI_ASKPASS_INTERACTIVE: '0' } : undefined
-    return this.mutate(['git', 'fetch', '--all-remotes'], { timeoutMs: NETWORK_TIMEOUT_MS, env })
+    const branches = [...new Set(options.branches ?? [])]
+    const args =
+      branches.length > 0
+        ? ['git', 'fetch', ...branches.flatMap((name) => ['--branch', `exact:${name}`])]
+        : ['git', 'fetch', '--all-remotes']
+    return this.mutate(args, { timeoutMs: NETWORK_TIMEOUT_MS, env })
   }
 
   push(bookmarks?: string | readonly string[]) {

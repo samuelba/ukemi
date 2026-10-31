@@ -13,6 +13,11 @@ export interface CiCheck {
   url: string
 }
 
+export interface StackInfo {
+  position: number
+  size: number
+}
+
 export interface RequestBadge {
   number: number
   title: string
@@ -24,6 +29,7 @@ export interface RequestBadge {
   checks: CiCheck[]
   headBranch: string
   baseBranch: string
+  stack?: StackInfo
 }
 
 export interface CommitView extends Commit {

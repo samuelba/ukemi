@@ -387,6 +387,12 @@
   opacity: 0.8;
 }
 
+.request-stack {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
 .request-merged {
   color: var(--fuji);
 }

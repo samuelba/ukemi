@@ -1,10 +1,17 @@
 import type { DragEvent } from 'react'
 import type { CommitView, RequestBadge } from '../../../shared/protocol'
+import { stackLabel } from '../../../shared/stack'
 import { postMessage, vscodeContext } from '../shared/vscodeApi'
 import { RequestHover } from './RequestHover'
 import { CiStatusIcon, REQUEST_LABEL } from './requestMeta'
 
 export const BOOKMARK_MIME = 'application/x-ukemi-bookmark'
+
+function stackTitle(request: RequestBadge): string {
+  return request.stack
+    ? ` — request ${request.stack.position} of ${request.stack.size} in the stack`
+    : ''
+}
 
 function openExternal(url: string): void {
   postMessage({ type: 'openUrl', url })
@@ -171,7 +178,7 @@ function RequestBadge({
       title={
         details
           ? undefined
-          : `#${request.number} ${request.title} (${REQUEST_LABEL[request.state]})`
+          : `#${request.number} ${request.title} (${REQUEST_LABEL[request.state]})${stackTitle(request)}`
       }
       data-vscode-context={vscodeContext({
         webviewSection: 'ukemi.request',
@@ -180,9 +187,15 @@ function RequestBadge({
         number: request.number,
         isOpen: request.state !== 'merged' && request.state !== 'closed',
         isMerged: request.state === 'merged',
+        isStacked: request.stack !== undefined,
       })}
     >
       <i className="codicon codicon-git-pull-request" />#{request.number}
+      {request.stack && (
+        <span className="request-stack" title={stackTitle(request).trim()}>
+          {stackLabel(request.stack)}
+        </span>
+      )}
       <span className="request-state">{REQUEST_LABEL[request.state]}</span>
       {details && <CiStatusIcon state={request.ci} />}
       <button

@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { CiCheck, RequestBadge } from '../../../shared/protocol'
+import { stackLabel } from '../../../shared/stack'
 import { postMessage } from '../shared/vscodeApi'
 import { CiStatusIcon, REQUEST_LABEL } from './requestMeta'
 
@@ -42,6 +43,7 @@ function RequestPopoverBody({ request }: { request: RequestBadge }) {
       <div className="request-popover-meta">
         {REQUEST_LABEL[request.state]}
         {request.ci === 'none' ? '' : ` · CI ${request.ci}`}
+        {request.stack ? ` · ${stackLabel(request.stack)} in stack` : ''}
       </div>
       {pipelineUrl && (
         <button type="button" className="request-check" onClick={() => openExternal(pipelineUrl)}>

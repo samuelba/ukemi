@@ -613,6 +613,17 @@
         "icon": "$(cloud-upload)"
       },
       {
+        "command": "ukemi.request.syncStack",
+        "title": "Sync Stack",
+        "category": "Ukemi",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "ukemi.request.rebaseStack",
+        "title": "Rebase Stack onto Trunk",
+        "category": "Ukemi"
+      },
+      {
         "command": "ukemi.request.merge",
         "title": "Merge…",
         "category": "Ukemi",
@@ -886,13 +897,23 @@
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.request' && isOpen"
         },
         {
-          "command": "ukemi.request.merge",
+          "command": "ukemi.request.syncStack",
           "group": "1_request@3",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.request' && isOpen && isStacked"
+        },
+        {
+          "command": "ukemi.request.rebaseStack",
+          "group": "1_request@4",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.request' && isOpen && isStacked"
+        },
+        {
+          "command": "ukemi.request.merge",
+          "group": "1_request@5",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.request' && isOpen"
         },
         {
           "command": "ukemi.request.cleanup",
-          "group": "1_request@4",
+          "group": "1_request@6",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.request' && isMerged"
         },
         {
@@ -1536,6 +1557,14 @@
           "when": "false"
         },
         {
+          "command": "ukemi.request.syncStack",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.request.rebaseStack",
+          "when": "false"
+        },
+        {
           "command": "ukemi.request.merge",
           "when": "false"
         },
@@ -1907,6 +1936,11 @@
           "minimum": 1,
           "maximum": 500,
           "description": "How many of the most recently updated merge and pull requests to load. Each request returns at most 100, so a higher value loads more pages."
+        },
+        "ukemi.forge.nativeStacks": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "When you sync a stack of pull requests on GitHub, also group them into GitHub's native stack view. This uses GitHub's stacked pull requests API, which is a preview feature. Ukemi skips it when the API is not available for the repository."
         },
         "ukemi.forge.statusInterval": {
           "type": "string",
