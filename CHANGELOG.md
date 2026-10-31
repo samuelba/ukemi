@@ -5,21 +5,15 @@
 
 ### Features
 
-* stacked MRs/PRs ([2440daf](https://github.com/samuelba/ukemi/commit/2440daf6dfe4dfe12e2cd2f938be7d13691d31a6))
 * stacked MRs/PRs ([6d68091](https://github.com/samuelba/ukemi/commit/6d680918835caf0c1ad3d8c4c66bbde200226f4f))
-* support gh cli ([2cdab8e](https://github.com/samuelba/ukemi/commit/2cdab8ef79cc625107b86f487304c0f8d61c8a60))
 * support gh cli ([eb12445](https://github.com/samuelba/ukemi/commit/eb1244523f6e7b7f332869e003104c40d35e9541))
 
 
 ### Bug Fixes
 
-* extension title, update images ([cda83c8](https://github.com/samuelba/ukemi/commit/cda83c8b21aa231e161df43e4a636cb80749db81))
 * extension title, update images ([0e85a18](https://github.com/samuelba/ukemi/commit/0e85a18aaf2a7bce893f812d4754699e25e179e1))
-* improve secrets handling ([ba74f53](https://github.com/samuelba/ukemi/commit/ba74f53fc6a8dad9804a015c4d1e04223dbd9f10))
 * improve secrets handling ([38c7b2a](https://github.com/samuelba/ukemi/commit/38c7b2a30d51ad3ab0d98ce5597770cd43ffa097))
-* opening panel layout ([17ab7aa](https://github.com/samuelba/ukemi/commit/17ab7aaa4a9c156e3de9aace0dfe75e496444b3f))
 * opening panel layout ([6324625](https://github.com/samuelba/ukemi/commit/6324625e0142b9c98b9ae7249935bf3ad649a12a))
-* update icons ([acb82e5](https://github.com/samuelba/ukemi/commit/acb82e57ab216deb7d7cfaac5532dc689a44739c))
 * update icons ([8483919](https://github.com/samuelba/ukemi/commit/8483919e1c66a1fedfc28ab86c7c5c96a449d553))
 
 ## [0.7.1](https://github.com/samuelba/ukemi/compare/v0.7.0...v0.7.1) (2026-10-30)
