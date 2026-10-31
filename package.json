@@ -104,21 +104,25 @@
           "id": "ukemi.graph",
           "name": "Graph",
           "icon": "resources/activity.svg",
-          "contextualTitle": "Ukemi"
+          "contextualTitle": "Ukemi",
+          "initialSize": 55
         },
         {
           "id": "ukemi.bookmarks",
           "name": "Bookmarks",
-          "icon": "$(bookmark)"
+          "icon": "$(bookmark)",
+          "initialSize": 15
         },
         {
           "id": "ukemi.workspaces",
-          "name": "Workspaces"
+          "name": "Workspaces",
+          "initialSize": 15
         },
         {
           "id": "ukemi.evolution",
           "name": "Evolution",
-          "icon": "$(versions)"
+          "icon": "$(versions)",
+          "initialSize": 15
         }
       ]
     },
