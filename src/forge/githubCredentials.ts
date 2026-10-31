@@ -20,6 +20,31 @@ export type SessionSource = (host: string, interactive: boolean) => Promise<Gith
 
 export type CredentialMode = 'silent' | 'ask-if-missing' | 'always-ask'
 
+export type SessionProvider = 'github' | 'github-enterprise'
+
+// The editor's enterprise session belongs to the one server in `github-enterprise.uri`. Handing it
+// out for any other host would send that token to a host an untrusted repository may have chosen.
+export function sessionProviderFor(
+  host: string,
+  enterpriseUri: string | undefined,
+): SessionProvider | null {
+  const normalized = host.toLowerCase()
+  if (normalized === 'github.com') {
+    return 'github'
+  }
+  if (!enterpriseUri) {
+    return null
+  }
+  try {
+    const url = new URL(enterpriseUri)
+    return url.protocol === 'https:' && url.hostname.toLowerCase() === normalized
+      ? 'github-enterprise'
+      : null
+  } catch {
+    return null
+  }
+}
+
 const storedSchema = z.object({ username: z.string().min(1), token: z.string().min(1) })
 
 function secretKey(host: string): string {

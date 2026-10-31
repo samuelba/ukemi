@@ -42,6 +42,37 @@ export class ForgeError extends Error {
 
 const REQUEST_TIMEOUT_MS = 30_000
 
+const MAX_REDIRECTS = 3
+
+// Custom auth headers such as PRIVATE-TOKEN survive cross-origin redirects, so redirects are
+// followed by hand and only within the original origin.
+async function fetchSameOrigin(
+  fetchImpl: HttpFetch,
+  url: string,
+  init: RequestInit,
+): Promise<Response> {
+  const origin = new URL(url).origin
+  let target = url
+  let current = init
+  for (let hops = 0; ; hops++) {
+    const response = await fetchImpl(target, { ...current, redirect: 'manual' })
+    const location = response.headers.get('location')
+    if (response.status < 300 || response.status >= 400 || !location) {
+      return response
+    }
+    const next = new URL(location, target)
+    if (next.origin !== origin || hops >= MAX_REDIRECTS) {
+      throw new ForgeError(`Refused to follow a redirect to ${next.origin}`, response.status)
+    }
+    target = next.toString()
+    const keepsMethod = response.status === 307 || response.status === 308
+    const method = (current.method ?? 'GET').toUpperCase()
+    if (!keepsMethod && method !== 'GET' && method !== 'HEAD') {
+      current = { ...current, method: 'GET', body: null }
+    }
+  }
+}
+
 export async function requestJson(
   fetchImpl: HttpFetch,
   url: string,
@@ -50,7 +81,7 @@ export async function requestJson(
   const { token, authScheme, ...rest } = init
   const auth: Record<string, string> =
     authScheme === 'Bearer' ? { Authorization: `Bearer ${token}` } : { 'PRIVATE-TOKEN': token }
-  const response = await fetchImpl(url, {
+  const response = await fetchSameOrigin(fetchImpl, url, {
     ...rest,
     headers: {
       Accept: 'application/json',

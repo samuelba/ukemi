@@ -81,6 +81,12 @@
   "activationEvents": [
     "onStartupFinished"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "In Restricted Mode Ukemi does not sign in to GitHub or GitLab and does not hand stored credentials to git."
+    }
+  },
   "contributes": {
     "viewsContainers": {
       "activitybar": [
@@ -1907,7 +1913,8 @@
             "type": "string"
           },
           "default": [],
-          "description": "Additional GitHub Enterprise hosts, for example github.example.com."
+          "scope": "machine",
+          "description": "Additional GitHub Enterprise hosts, for example github.example.com. Credentials are only used for hosts you list here, so this cannot be set per workspace."
         },
         "ukemi.gitlab.hosts": {
           "type": "array",
@@ -1915,7 +1922,8 @@
             "type": "string"
           },
           "default": [],
-          "description": "Additional self-hosted GitLab hosts, for example git.example.com."
+          "scope": "machine",
+          "description": "Additional self-hosted GitLab hosts, for example git.example.com. Credentials are only used for hosts you list here, so this cannot be set per workspace."
         },
         "ukemi.gitlab.oauthApplications": {
           "type": "object",
@@ -1923,6 +1931,7 @@
             "type": "string"
           },
           "default": {},
+          "scope": "machine",
           "markdownDescription": "GitLab OAuth application client IDs, keyed by host. The client ID is not a secret. Example: `{ \"git.example.com\": \"abc123\" }`. Create a non-confidential application with the `api` scope and redirect URIs `vscode://samuelba.ukemi-jj/gitlab-auth` and `cursor://samuelba.ukemi-jj/gitlab-auth`."
         },
         "ukemi.forge.ciOnlyMine": {

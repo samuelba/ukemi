@@ -3,7 +3,11 @@ import type { ForgeState, RequestBadge } from '../../shared/protocol'
 import type { CredentialRequest } from '../askpass/prompt'
 import { detectForge, forgeKindForHost, type ForgeTarget } from '../forge/detect'
 import { GithubClient } from '../forge/github'
-import { GithubCredentials, type GithubCredential } from '../forge/githubCredentials'
+import {
+  GithubCredentials,
+  sessionProviderFor,
+  type GithubCredential,
+} from '../forge/githubCredentials'
 import { glabFetch } from '../forge/glabApi'
 import { glabKnowsHost } from '../forge/glabConfig'
 import { GitlabClient, type GitlabTokenKind } from '../forge/gitlab'
@@ -34,8 +38,21 @@ function glabIgnoredKey(host: string): string {
   return `ukemi.gitlab.glabIgnored.${host}`
 }
 
+// Workspace settings come from the repository, so only the user's own value is trusted.
+function enterpriseUri(): string | undefined {
+  const inspected = vscode.workspace.getConfiguration('github-enterprise').inspect<string>('uri')
+  const hasOverride =
+    inspected?.workspaceValue !== undefined || inspected?.workspaceFolderValue !== undefined
+  return hasOverride
+    ? inspected?.globalValue
+    : vscode.workspace.getConfiguration('github-enterprise').get<string>('uri')
+}
+
 async function githubSession(host: string, interactive: boolean): Promise<GithubCredential | null> {
-  const provider = host === 'github.com' ? 'github' : 'github-enterprise'
+  const provider = sessionProviderFor(host, enterpriseUri())
+  if (!provider) {
+    return null
+  }
   const session = await vscode.authentication.getSession(provider, ['repo'], {
     createIfNone: interactive,
     silent: !interactive,
@@ -101,6 +118,12 @@ export class ForgeService implements vscode.Disposable {
           void this.refreshRequests(model)
         }
       }),
+      vscode.workspace.onDidGrantWorkspaceTrust(() => {
+        const model = this.registry.activeModel
+        if (model) {
+          void this.refreshRequests(model, { force: true })
+        }
+      }),
       vscode.workspace.onDidChangeConfiguration((event) => {
         if (!event.affectsConfiguration('ukemi.forge.statusInterval')) {
           return
@@ -117,10 +140,22 @@ export class ForgeService implements vscode.Disposable {
     return detectForge(await model.repo.remotes(), readConfig())
   }
 
+  private isTrusted(announce: boolean): boolean {
+    if (!vscode.workspace.isTrusted && announce) {
+      void vscode.window.showWarningMessage(
+        'Ukemi: trust this workspace to sign in to a forge. Restricted Mode blocks stored credentials.',
+      )
+    }
+    return vscode.workspace.isTrusted
+  }
+
   private async credential(
     target: ForgeHost,
     interactive: boolean,
   ): Promise<ForgeCredential | null> {
+    if (!this.isTrusted(interactive)) {
+      return null
+    }
     if (target.kind === 'github') {
       const githubCredential = await this.github.get(
         target.host,
@@ -192,6 +227,9 @@ export class ForgeService implements vscode.Disposable {
   }
 
   async gitCredential(request: CredentialRequest): Promise<string | null> {
+    if (!this.isTrusted(false)) {
+      return null
+    }
     const kind = forgeKindForHost(request.host, readConfig())
     if (kind === 'github') {
       const mode = request.interactive ? 'ask-if-missing' : 'silent'
@@ -214,6 +252,9 @@ export class ForgeService implements vscode.Disposable {
   async signIn(model: RepoModel): Promise<ForgeClient | null> {
     const target = await this.target(model)
     if (!target) {
+      return null
+    }
+    if (!this.isTrusted(true)) {
       return null
     }
     if (target.kind === 'github') {

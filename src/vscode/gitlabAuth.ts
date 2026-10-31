@@ -9,6 +9,7 @@ import {
   gitlabAuthorizeUrl,
   gitlabClientId,
   refreshGitlabToken,
+  revokeGitlabToken,
   sessionNeedsRefresh,
   type GitlabOAuthSession,
 } from '../forge/gitlabOAuth'
@@ -102,7 +103,19 @@ export class GitlabAuth implements vscode.Disposable {
 
   async forget(host: string): Promise<void> {
     this.cancelHost(host)
+    const session = await this.read(host)
     await this.secrets.delete(oauthKey(host))
+    if (session) {
+      try {
+        await revokeGitlabToken(fetch, {
+          host,
+          clientId: session.clientId,
+          token: session.refreshToken,
+        })
+      } catch (error: unknown) {
+        this.logger.warn(`GitLab token revocation failed: ${errorMessage(error)}`)
+      }
+    }
   }
 
   dispose(): void {
