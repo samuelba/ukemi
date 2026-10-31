@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process'
 import type { Logger } from '../util/logger'
+import { redactUrlCredentials } from '../util/text'
 
 export const DEFAULT_TIMEOUT_MS = 60_000
 export const NETWORK_TIMEOUT_MS = 120_000
@@ -50,7 +51,7 @@ export function summarizeStderr(stderr: string): string {
   const errorIndex = lines.findIndex((line) => line.startsWith('Error:'))
   const relevant = errorIndex >= 0 ? lines.slice(errorIndex) : lines
   const withoutHints = relevant.filter((line) => !line.startsWith('Hint:'))
-  return (withoutHints.join('\n') || 'jj failed').replace(/^Error:\s*/, '')
+  return redactUrlCredentials((withoutHints.join('\n') || 'jj failed').replace(/^Error:\s*/, ''))
 }
 
 const MAX_LOGGED_ARG = 120
@@ -65,7 +66,8 @@ export function describeArgs(args: readonly string[]): string {
       if (configValue >= 0) {
         return `${arg.slice(0, configValue)}=…`
       }
-      return arg.length > MAX_LOGGED_ARG ? `${arg.slice(0, MAX_LOGGED_ARG)}…` : arg
+      const safe = redactUrlCredentials(arg)
+      return safe.length > MAX_LOGGED_ARG ? `${safe.slice(0, MAX_LOGGED_ARG)}…` : safe
     })
     .join(' ')
 }
@@ -168,7 +170,7 @@ export class JjRunner {
         }
         if (code !== 0) {
           if (err.trim()) {
-            this.logger.error(err.trim())
+            this.logger.error(redactUrlCredentials(err.trim()))
           }
           reject(new JjError(summarizeStderr(err), args, err, code))
           return

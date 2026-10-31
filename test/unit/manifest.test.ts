@@ -10,8 +10,9 @@ const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
       string,
       Array<{ command?: string; alt?: string; submenu?: string; when?: string }>
     >
-    configuration: { properties: Record<string, unknown> }
+    configuration: { properties: Record<string, { scope?: string }> }
   }
+  capabilities?: { untrustedWorkspaces?: { supported?: unknown } }
 }
 
 function sources(dir: string): string[] {
@@ -79,6 +80,19 @@ describe('package.json manifest', () => {
       (m) => m[1],
     )
     expect(sent.filter((c) => c && !registered.has(c))).toEqual([])
+  })
+
+  test('host and OAuth application settings cannot come from a workspace', () => {
+    const keys = ['ukemi.github.hosts', 'ukemi.gitlab.hosts', 'ukemi.gitlab.oauthApplications']
+    expect(keys.map((key) => pkg.contributes.configuration.properties[key]?.scope)).toEqual([
+      'machine',
+      'machine',
+      'machine',
+    ])
+  })
+
+  test('declares limited support for untrusted workspaces', () => {
+    expect(pkg.capabilities?.untrustedWorkspaces?.supported).toBe('limited')
   })
 
   test('declares every setting the host reads', () => {

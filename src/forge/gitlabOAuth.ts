@@ -5,6 +5,7 @@ import type { HttpFetch } from './types'
 
 export const OAUTH_REFRESH_SKEW_MS = 60_000
 const DEFAULT_EXPIRES_IN_SECONDS = 7200
+const REVOKE_TIMEOUT_MS = 10_000
 
 export class GitlabOAuthError extends Error {
   constructor(readonly status: number) {
@@ -104,6 +105,25 @@ export async function exchangeGitlabCode(
   )
 }
 
+export async function revokeGitlabToken(
+  fetchImpl: HttpFetch,
+  input: { host: string; clientId: string; token: string },
+): Promise<void> {
+  if (!isSafeHttpsHost(input.host)) {
+    throw new Error('Invalid GitLab host')
+  }
+  const response = await fetchImpl(`https://${input.host}/oauth/revoke`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ client_id: input.clientId, token: input.token }).toString(),
+    redirect: 'error',
+    signal: AbortSignal.timeout(REVOKE_TIMEOUT_MS),
+  })
+  if (!response.ok) {
+    throw new GitlabOAuthError(response.status)
+  }
+}
+
 export async function refreshGitlabToken(
   fetchImpl: HttpFetch,
   input: {
@@ -148,6 +168,7 @@ async function requestToken(
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams(body).toString(),
+    redirect: 'error',
   })
   const text = await response.text()
   if (!response.ok) {

@@ -39,8 +39,22 @@ export function validateBookmarkName(name: string): string | null {
 const REMOTE_URL = /^(https?|ssh|file):\/\/\S+$/i
 const SCP_REMOTE = /^git@[^:\s]+:\S+$/
 
+const URL_PASSWORD = /(\b[a-z][a-z0-9+.-]*:\/\/)[^\s/@:]*:[^\s/@]*@/gi
+const TOKEN_USERNAME = /^[a-z][a-z0-9+.-]*:\/\/(?:gh[pousr]_|github_pat_|glpat-)[^\s/@:]*@/i
+
+export function redactUrlCredentials(text: string): string {
+  return text.replace(URL_PASSWORD, '$1***@')
+}
+
+function embedsCredentials(value: string): boolean {
+  return redactUrlCredentials(value) !== value || TOKEN_USERNAME.test(value)
+}
+
 export function validateRemoteUrl(url: string): string | null {
   const value = url.trim()
+  if (embedsCredentials(value)) {
+    return 'Do not put a password or token in the URL. Ukemi asks for credentials when needed.'
+  }
   if (value.length === 0 || REMOTE_URL.test(value) || SCP_REMOTE.test(value) || isAbsolute(value)) {
     return null
   }

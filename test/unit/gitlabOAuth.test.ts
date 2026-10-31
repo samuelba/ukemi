@@ -7,6 +7,7 @@ import {
   gitlabAuthorizeUrl,
   gitlabClientId,
   refreshGitlabToken,
+  revokeGitlabToken,
   sessionNeedsRefresh,
   OAUTH_REFRESH_SKEW_MS,
 } from '../../src/forge/gitlabOAuth'
@@ -102,5 +103,31 @@ describe('GitLab OAuth', () => {
     expect((error as GitlabOAuthError).isRejected).toBe(true)
     expect((error as GitlabOAuthError).message).toBe('GitLab OAuth failed: HTTP 401')
     expect(new GitlabOAuthError(500).isRejected).toBe(false)
+  })
+})
+
+describe('revokeGitlabToken', () => {
+  test('posts the token and client id to the revoke endpoint', async () => {
+    const calls: Array<{ url: string; body: string }> = []
+    const fetchImpl: HttpFetch = async (url, init) => {
+      calls.push({ url, body: String(init.body) })
+      return new Response('{}', { status: 200 })
+    }
+
+    await revokeGitlabToken(fetchImpl, { host: 'git.example.com', clientId: 'app', token: 'r1' })
+
+    expect(calls).toEqual([
+      { url: 'https://git.example.com/oauth/revoke', body: 'client_id=app&token=r1' },
+    ])
+  })
+
+  test('rejects an unsafe host and a failed response', async () => {
+    const failing: HttpFetch = async () => new Response('{}', { status: 400 })
+    await expect(
+      revokeGitlabToken(failing, { host: 'bad host', clientId: 'a', token: 't' }),
+    ).rejects.toThrow('Invalid GitLab host')
+    await expect(
+      revokeGitlabToken(failing, { host: 'git.example.com', clientId: 'a', token: 't' }),
+    ).rejects.toBeInstanceOf(GitlabOAuthError)
   })
 })

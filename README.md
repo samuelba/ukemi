@@ -70,9 +70,32 @@ Select the gear in the title bar of the Ukemi view to open the Ukemi settings.
 
 ## Sign in
 
-- **GitHub** uses the GitHub account of the editor, or a personal access token with the `repo` scope.
-- **GitLab** tries, in order: an OAuth session, a personal access token, then the `glab` CLI. For `glab`, Ukemi runs `glab api --hostname <host>` and does not read the token. `glab` sends its own `Bearer` header and refreshes a web login.
-- OAuth and personal access tokens are stored in VS Code secret storage. On Linux that is the OS keyring (libsecret), not a clear-text file. **Sign Out** removes both and stops using `glab` until the next sign-in. The `glab` login itself stays in `glab`.
+Ukemi uses the same credentials for the forge API (pull and merge requests, CI status) and for `git` over HTTPS when jj fetches or pushes. Nothing here needs a CLI. `gh` is never used.
+
+### GitHub
+
+1. **Editor account (OAuth).** The GitHub sign-in of the editor, with the `repo` scope. It works for `github.com` and for one GitHub Enterprise server.
+2. **Personal access token.** A user name and a token with the `repo` scope, stored in VS Code secret storage. Use this for any other host.
+
+VS Code keeps a single GitHub Enterprise server in the setting `github-enterprise.uri`. Ukemi uses the enterprise account only for that server, and always uses the `github.com` account for `github.com`. So you can sign in with OAuth for `github.com` and one enterprise server at the same time. A second enterprise server needs a personal access token. List enterprise hosts in `ukemi.github.hosts`.
+
+### GitLab
+
+Ukemi picks the first of these that is available for the host:
+
+1. **OAuth session.** Present after you sign in with OAuth. This needs a client ID for the host, see [GitLab OAuth application](#gitlab-oauth-application). Tokens refresh on their own.
+2. **Personal access token.** A token with the `api` scope, stored in VS Code secret storage.
+3. **[`glab`](https://docs.gitlab.com/cli/).** Optional. It is used only if the `glab` config file (`~/.config/glab-cli/config.yml`, or `GLAB_CONFIG_DIR`) lists the host, which means you ran `glab auth login` for it. Ukemi then sends its API calls through `glab api --hostname <host>`, and `glab` supplies and refreshes its own token. Ukemi never reads that token. `glab` is not used for `git` fetch and push; those use your usual git credentials, or the token from steps 1 and 2.
+
+If none is available and you start an action that needs the forge, Ukemi first tries an OAuth sign-in when the host has a client ID, and otherwise asks for a personal access token.
+
+`glab` is not required. If it is not installed or has no login for the host, step 3 is skipped. If its config lists the host but the `glab` binary is missing, requests for that host fail with an entry in the Ukemi log. Install `glab`, or use **Sign Out** and sign in with OAuth or a token.
+
+### Storage and safety
+
+- OAuth sessions and personal access tokens are stored in VS Code secret storage. On Linux that is the OS keyring (libsecret), not a clear-text file. **Sign Out** removes both, revokes the GitLab OAuth token, and stops using `glab` for that host until the next sign-in. The `glab` login itself stays in `glab`.
+- The three host and OAuth settings above apply to your user and machine only, not to a workspace. In Restricted Mode (untrusted workspace) Ukemi does not sign in and does not give stored credentials to git.
+- Do not put a password or token in a remote URL. Ukemi rejects such URLs in the new repository prompt and hides URL passwords in its log.
 
 ### GitLab OAuth application
 

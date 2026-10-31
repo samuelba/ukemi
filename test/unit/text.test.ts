@@ -6,6 +6,7 @@ import {
   firstLine,
   validateBookmarkName,
   validateRemoteName,
+  redactUrlCredentials,
   validateRemoteUrl,
 } from '../../src/util/text'
 
@@ -64,6 +65,32 @@ describe('validateRemoteUrl', () => {
 
   test('rejects a value that is not a url', () => {
     expect(validateRemoteUrl('not a url')).not.toBeNull()
+  })
+
+  test.each([
+    'https://sam:secret@github.com/org/repo.git',
+    'https://ghp_abc123@github.com/org/repo.git',
+    'https://glpat-abc123@gitlab.com/org/repo.git',
+  ])('rejects credentials in %j', (url) => {
+    expect(validateRemoteUrl(url)).toContain('password or token')
+  })
+
+  test('accepts a user name without a password', () => {
+    expect(validateRemoteUrl('https://sam@github.com/org/repo.git')).toBeNull()
+    expect(validateRemoteUrl('ssh://git@github.com/org/repo.git')).toBeNull()
+  })
+})
+
+describe('redactUrlCredentials', () => {
+  test('hides the password of a url', () => {
+    expect(redactUrlCredentials('clone https://sam:secret@host/x.git now')).toBe(
+      'clone https://***@host/x.git now',
+    )
+  })
+
+  test('keeps urls without a password', () => {
+    const text = 'ssh://git@host/x.git https://host:8443/x.git'
+    expect(redactUrlCredentials(text)).toBe(text)
   })
 })
 

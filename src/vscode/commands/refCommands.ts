@@ -7,6 +7,7 @@ import {
   shouldPushBase,
   stackDetail,
 } from '../../forge/requestBase'
+import { isAllowedForgeUrl } from '../../forge/hostName'
 import type { MergeMethod } from '../../forge/types'
 import { quoteRevsetString } from '../../jj/revsets'
 import type { RepoModel } from '../../repo/repoModel'
@@ -237,7 +238,15 @@ async function createRequest(
     'Open',
   )
   if (open) {
-    await vscode.env.openExternal(vscode.Uri.parse(created.url))
+    await openForgeUrl(client.host, created.url)
+  }
+}
+
+async function openForgeUrl(host: string | undefined, url: string): Promise<void> {
+  if (host && isAllowedForgeUrl(url, host)) {
+    await vscode.env.openExternal(vscode.Uri.parse(url))
+  } else {
+    void vscode.window.showWarningMessage('Ukemi: refusing to open a link outside the forge host.')
   }
 }
 
@@ -508,8 +517,8 @@ export function refCommands(env: CommandEnv): Record<string, Handler> {
       createRequestFromContext(env, arg, false),
     'ukemi.commit.createRequestNamed': async (arg?: unknown) =>
       createRequestFromContext(env, arg, true),
-    'ukemi.request.open': requestHandler(env, async (_model, request) =>
-      vscode.env.openExternal(vscode.Uri.parse(request.url)),
+    'ukemi.request.open': requestHandler(env, async (model, request) =>
+      openForgeUrl(model.graph?.forge?.host, request.url),
     ),
     'ukemi.request.copyUrl': requestHandler(env, async (_model, request) =>
       vscode.env.clipboard.writeText(request.url),

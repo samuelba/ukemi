@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import {
   GithubCredentials,
+  sessionProviderFor,
   type CredentialUi,
   type GithubCredential,
   type SecretStore,
@@ -115,4 +116,27 @@ describe('GithubCredentials', () => {
     expect(await credentials.forget(HOST)).toBe(false)
     expect(secrets.size).toBe(0)
   })
+})
+
+describe('sessionProviderFor', () => {
+  test('uses the github provider for github.com', () => {
+    expect(sessionProviderFor('github.com', undefined)).toBe('github')
+    expect(sessionProviderFor('GitHub.com', 'https://ghe.example.com')).toBe('github')
+  })
+
+  test('uses the enterprise provider only for the configured server', () => {
+    expect(sessionProviderFor('ghe.example.com', 'https://ghe.example.com')).toBe(
+      'github-enterprise',
+    )
+    expect(sessionProviderFor('GHE.example.com', 'https://ghe.example.com/')).toBe(
+      'github-enterprise',
+    )
+  })
+
+  test.each([undefined, '', 'not a url', 'http://ghe.example.com', 'https://other.example.com'])(
+    'gives no session to another host when the enterprise uri is %j',
+    (uri) => {
+      expect(sessionProviderFor('ghe.example.com', uri)).toBeNull()
+    },
+  )
 })

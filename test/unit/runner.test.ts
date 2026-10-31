@@ -34,6 +34,12 @@ describe('describeArgs', () => {
     ).toBe('log -r @ -T <template> --config=merge-tools.ukemi-split.program=…')
   })
 
+  test('hides the password of a remote url', () => {
+    expect(describeArgs(['git', 'clone', 'https://sam:secret@host/x.git', 'dir'])).toBe(
+      'git clone https://***@host/x.git dir',
+    )
+  })
+
   test('truncates long arguments', () => {
     const revset = 'a'.repeat(200)
     expect(describeArgs(['log', '-r', revset])).toBe(`log -r ${'a'.repeat(120)}…`)
@@ -44,6 +50,12 @@ describe('summarizeStderr', () => {
   test('keeps the error and drops hints', () => {
     const stderr = 'Warning: x\nError: Commit abc is immutable\nHint: Pass --ignore-immutable\n'
     expect(summarizeStderr(stderr)).toBe('Commit abc is immutable')
+  })
+
+  test('hides a url password', () => {
+    expect(summarizeStderr('Error: failed to fetch https://sam:secret@host/x.git\n')).toBe(
+      'failed to fetch https://***@host/x.git',
+    )
   })
 
   test('falls back to a generic message', () => {
