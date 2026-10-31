@@ -1,7 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff">
-  <path d="M 20.5 9.1 A 9 9 0 1 1 15.1 3.5" stroke-width="2" stroke-linecap="round"/>
-  <path d="M 9.5 16.5 L 9.5 12 C 9.5 10 14 11 14 9.5" stroke-width="1.5" stroke-linecap="round"/>
-  <circle cx="9.5" cy="16.5" r="1.8" fill="#ffffff" stroke="none"/>
-  <circle cx="9.5" cy="12" r="1.8" fill="#ffffff" stroke="none"/>
-  <rect x="12.2" y="5.6" width="3.8" height="3.8" rx="0.6" fill="#ffffff" stroke="none" transform="rotate(-8 14.1 7.5)"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <mask id="mask-1" maskUnits="userSpaceOnUse" color-interpolation="sRGB" x="-100000" y="-100000" width="200000" height="200000">
+    <g>
+      <rect x="-50.087" y="-44.522" width="356.174" height="356.174" fill="#ffffff"/>
+      <polygon points="128,128 194.783,-55.652 304.696,45.913" fill="#000000"/>
+    </g>
+    </mask>
+  </defs>
+  <title>activity-dark.svg</title>
+  <g id="Layer_1" data-name="Layer 1">
+    <g mask="url(#mask-1)">
+      <g>
+        <path d="M0 128 C0 198.692 57.308 256 128 256 C198.692 256 256 198.692 256 128 C256 57.308 198.692 0 128 0 C57.308 0 0 57.308 0 128 Z M37.565 122.435 C37.565 176.991 81.792 221.217 136.348 221.217 C190.904 221.217 235.13 176.991 235.13 122.435 C235.13 67.879 190.904 23.652 136.348 23.652 C81.792 23.652 37.565 67.879 37.565 122.435 Z" fill="#ffffff" fill-rule="evenodd"/>
+      </g>
+    </g>
+    <path d="M104 197.565 L104 133.565 C104 115.166 122.587 111.974 139.278 108.162 L139.278 108.162 C149.167 105.903 158.39 103.426 162.687 97.439" fill="none" stroke="#ffffff" stroke-width="16" stroke-linecap="round"/>
+    <circle cx="104" cy="200" r="24" fill="#ffffff"/>
+    <circle cx="104" cy="136" r="24" fill="#ffffff"/>
+    <path d="M182.829 40.213 C188.085 39.474 192.944 43.136 193.682 48.391 L199.923 92.798 C200.662 98.054 197 102.913 191.745 103.652 L147.338 109.893 C142.083 110.631 137.223 106.97 136.485 101.714 L130.244 57.307 C129.505 52.052 133.167 47.193 138.422 46.454 Z" fill="#ffffff"/>
+  </g>
 </svg>
