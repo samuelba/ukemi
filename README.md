@@ -10,9 +10,9 @@ Ukemi is a visual interface for [Jujutsu (jj)](https://jj-vcs.github.io/jj/) in 
 
 Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=samuelba.ukemi-jj) or [Open VSX](https://open-vsx.org/extension/samuelba/ukemi-jj) (Cursor).
 
-<p align="center">
-  <img src="images/overview.png" alt="Ukemi sidebar: change graph, bookmarks, workspaces and evolution" width="324">
-</p>
+| Extension overview                         | Stacked pull request hover                                     |
+| ------------------------------------------ | -------------------------------------------------------------- |
+| ![Extension overview](images/overview.png) | ![Stacked pull request hover](images/pr-stacked-ci-status.png) |
 
 ## Features
 
