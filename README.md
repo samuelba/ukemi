@@ -40,44 +40,51 @@ Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/item
 
 Select the gear in the title bar of the Ukemi view to open the Ukemi settings.
 
-| Setting                              | Purpose                                                                                           |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| `ukemi.jjPath`                       | Path to jj. Empty means search `PATH` and common folders.                                         |
-| `ukemi.addJjToTerminalPath`          | Add the jj binary that Ukemi downloaded to `PATH` in integrated terminals. Default: on.           |
-| `ukemi.showSourceControl`            | When to show the working copy in Source Control: `auto`, `always` or `never`.                     |
-| `ukemi.showInPanel`                  | Open the change graph in an editor tab. Default: off.                                             |
-| `ukemi.showEditorTitleDiff`          | Show **Open Changes (jj)** in the editor title. Default: off.                                     |
-| `ukemi.followActiveEditor`           | Switch to the repository of the active editor. Default: on.                                       |
-| `ukemi.repoScanDepth`                | Folder levels to search for repositories. Default: 4.                                             |
-| `ukemi.repoScanExclude`              | Folder names to skip during the repository search.                                                |
-| `ukemi.defaultFilter`                | Filter that the graph shows first.                                                                |
-| `ukemi.historyDepth`                 | Default history depth: `7d`, `14d`, `30d`, `1y` or `all`.                                         |
-| `ukemi.changeIdLength`               | Minimum number of change ID characters to show. Default: 4.                                       |
-| `ukemi.showFullPaths`                | Show full file paths in the graph. Default: off.                                                  |
-| `ukemi.showLineStats`                | Show added and removed line counts. This reads those file contents on each refresh. Default: off. |
-| `ukemi.showGitTags`                  | Show git tags on changes. Default: on.                                                            |
-| `ukemi.changedFilesView`             | Show changed files as a `list` or a `tree`.                                                       |
-| `ukemi.workspaces.snapshotOnRefresh` | Snapshot every other workspace on each refresh. Default: off. Each snapshot is a jj operation.    |
-| `ukemi.autoFetch.enabled`            | Fetch the active repository on a timer. Default: off.                                             |
-| `ukemi.autoFetch.interval`           | How often to fetch when auto fetch is on. Example: `10m`. Minimum: 10 seconds.                    |
-| `ukemi.github.hosts`                 | GitHub Enterprise hosts, for example `github.example.com`.                                        |
-| `ukemi.gitlab.hosts`                 | Self-hosted GitLab hosts, for example `git.example.com`.                                          |
-| `ukemi.gitlab.oauthApplications`     | GitLab OAuth client IDs by host. The client ID is not a secret.                                   |
-| `ukemi.forge.ciOnlyMine`             | Show CI status only on open requests that you authored. Default: on.                              |
-| `ukemi.forge.requestLimit`           | How many recently updated merge and pull requests to load. Default: 50. Maximum: 500.             |
-| `ukemi.forge.nativeStacks`           | Group synced GitHub pull request stacks into GitHub's native stack view. Default: on.             |
-| `ukemi.forge.statusInterval`         | How often to reload CI status. Default: `60s`, or 15s while your pipeline runs.                   |
+| Setting                              | Purpose                                                                                            |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `ukemi.jjPath`                       | Path to jj. Empty means search `PATH` and common folders.                                          |
+| `ukemi.addJjToTerminalPath`          | Add the jj binary that Ukemi downloaded to `PATH` in integrated terminals. Default: on.            |
+| `ukemi.showSourceControl`            | When to show the working copy in Source Control: `auto`, `always` or `never`.                      |
+| `ukemi.showInPanel`                  | Open the change graph in an editor tab. Default: off.                                              |
+| `ukemi.showEditorTitleDiff`          | Show **Open Changes (jj)** in the editor title. Default: off.                                      |
+| `ukemi.followActiveEditor`           | Switch to the repository of the active editor. Default: on.                                        |
+| `ukemi.repoScanDepth`                | Folder levels to search for repositories. Default: 4.                                              |
+| `ukemi.repoScanExclude`              | Folder names to skip during the repository search.                                                 |
+| `ukemi.defaultFilter`                | Filter that the graph shows first.                                                                 |
+| `ukemi.historyDepth`                 | Default history depth: `7d`, `14d`, `30d`, `1y` or `all`.                                          |
+| `ukemi.changeIdLength`               | Minimum number of change ID characters to show. Default: 4.                                        |
+| `ukemi.showFullPaths`                | Show full file paths in the graph. Default: off.                                                   |
+| `ukemi.showLineStats`                | Show added and removed line counts. This reads those file contents on each refresh. Default: off.  |
+| `ukemi.showGitTags`                  | Show git tags on changes. Default: on.                                                             |
+| `ukemi.changedFilesView`             | Show changed files as a `list` or a `tree`.                                                        |
+| `ukemi.workspaces.snapshotOnRefresh` | Snapshot every other workspace on each refresh. Default: off. Each snapshot is a jj operation.     |
+| `ukemi.autoFetch.enabled`            | Fetch the active repository on a timer. Default: off.                                              |
+| `ukemi.autoFetch.interval`           | How often to fetch when auto fetch is on. Example: `10m`. Minimum: 10 seconds.                     |
+| `ukemi.github.hosts`                 | GitHub Enterprise hosts, for example `github.example.com`. Hosts from `gh` are added on their own. |
+| `ukemi.gitlab.hosts`                 | Self-hosted GitLab hosts, for example `git.example.com`.                                           |
+| `ukemi.gitlab.oauthApplications`     | GitLab OAuth client IDs by host. The client ID is not a secret.                                    |
+| `ukemi.forge.ciOnlyMine`             | Show CI status only on open requests that you authored. Default: on.                               |
+| `ukemi.forge.requestLimit`           | How many recently updated merge and pull requests to load. Default: 50. Maximum: 500.              |
+| `ukemi.forge.nativeStacks`           | Group synced GitHub pull request stacks into GitHub's native stack view. Default: on.              |
+| `ukemi.forge.statusInterval`         | How often to reload CI status. Default: `60s`, or 15s while your pipeline runs.                    |
 
 ## Sign in
 
-Ukemi uses the same credentials for the forge API (pull and merge requests, CI status) and for `git` over HTTPS when jj fetches or pushes. Nothing here needs a CLI. `gh` is never used.
+Ukemi uses the same credentials for the forge API (pull and merge requests, CI status) and for `git` over HTTPS when jj fetches or pushes. No CLI is required.
 
 ### GitHub
 
-1. **Editor account (OAuth).** The GitHub sign-in of the editor, with the `repo` scope. It works for `github.com` and for one GitHub Enterprise server.
-2. **Personal access token.** A user name and a token with the `repo` scope, stored in VS Code secret storage. Use this for any other host.
+Ukemi picks the first of these that is available for the host:
 
-VS Code keeps a single GitHub Enterprise server in the setting `github-enterprise.uri`. Ukemi uses the enterprise account only for that server, and always uses the `github.com` account for `github.com`. So you can sign in with OAuth for `github.com` and one enterprise server at the same time. A second enterprise server needs a personal access token. List enterprise hosts in `ukemi.github.hosts`.
+1. **Personal access token.** A user name and a token with the `repo` scope, stored in VS Code secret storage.
+2. **Editor account (OAuth).** The GitHub sign-in of the editor, with the `repo` scope. It works for `github.com` and for the one GitHub Enterprise server in the setting `github-enterprise.uri`. It is never used for any other host. Editors without GitHub accounts, such as VSCodium, skip this step.
+3. **[GitHub CLI (`gh`)](https://cli.github.com/manual).** Optional. It is used only if `gh` lists the host in its `hosts.yml` (`~/.config/gh/`, or `GH_CONFIG_DIR`), which means you ran `gh auth login` for it. API calls go through `gh api --hostname <host>`, and `gh` supplies and refreshes its own token. Ukemi never reads that token for API calls. For `git` fetch and push, Ukemi asks `gh auth git-credential get`, the same helper that `gh auth setup-git` installs, so you do not need to run that command.
+
+If none is available and you start an action that needs GitHub, Ukemi asks you to sign in with the editor account or to enter a token.
+
+`gh` can be logged in to any number of hosts (`gh auth login --hostname <host>`), so it is the way to use OAuth with several GitHub Enterprise servers. Hosts that are in `hosts.yml` are treated as GitHub hosts, so you do not need to list them in `ukemi.github.hosts`. `gh` uses the active account for a host; change it with `gh auth switch`. Tokens that you only provide through `GH_TOKEN` or `GH_ENTERPRISE_TOKEN` are not detected.
+
+`gh` is not required. If it is not installed or has no login for the host, step 3 is skipped.
 
 ### GitLab
 
@@ -89,11 +96,11 @@ Ukemi picks the first of these that is available for the host:
 
 If none is available and you start an action that needs the forge, Ukemi first tries an OAuth sign-in when the host has a client ID, and otherwise asks for a personal access token.
 
-`glab` is not required. If it is not installed or has no login for the host, step 3 is skipped. If its config lists the host but the `glab` binary is missing, requests for that host fail with an entry in the Ukemi log. Install `glab`, or use **Sign Out** and sign in with OAuth or a token.
+`glab` is not required. If it is not installed or has no login for the host, step 3 is skipped, and Ukemi asks for an OAuth sign-in or a token instead.
 
 ### Storage and safety
 
-- OAuth sessions and personal access tokens are stored in VS Code secret storage. On Linux that is the OS keyring (libsecret), not a clear-text file. **Sign Out** removes both, revokes the GitLab OAuth token, and stops using `glab` for that host until the next sign-in. The `glab` login itself stays in `glab`.
+- OAuth sessions and personal access tokens are stored in VS Code secret storage. On Linux that is the OS keyring (libsecret), not a clear-text file. **Sign Out** removes both, revokes the GitLab OAuth token, and stops using `gh` or `glab` for that host until the next sign-in. The `gh` and `glab` logins themselves stay in those tools. The editor's own GitHub account is signed out from the Accounts menu.
 - The three host and OAuth settings above apply to your user and machine only, not to a workspace. In Restricted Mode (untrusted workspace) Ukemi does not sign in and does not give stored credentials to git.
 - Do not put a password or token in a remote URL. Ukemi rejects such URLs in the new repository prompt and hides URL passwords in its log.
 
