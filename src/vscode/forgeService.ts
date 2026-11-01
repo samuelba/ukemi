@@ -2,7 +2,7 @@ import * as vscode from 'vscode'
 import type { ForgeState, RequestBadge } from '../../shared/protocol'
 import type { CredentialRequest } from '../askpass/prompt'
 import { detectForge, forgeKindForHost, type ForgeTarget } from '../forge/detect'
-import { cliAvailable } from '../forge/cli'
+import { cliAvailable, type CliBinary } from '../forge/cli'
 import { ghGitCredential, ghFetch } from '../forge/ghApi'
 import { ghKnowsHost } from '../forge/ghConfig'
 import { GithubClient } from '../forge/github'
@@ -17,7 +17,7 @@ import { GitlabClient, type GitlabTokenKind } from '../forge/gitlab'
 import { FORGE_REFRESH_IDLE_MS, forgeRefreshInterval } from '../forge/refreshInterval'
 import { ForgeError, type ForgeClient } from '../forge/types'
 import type { RepoModel } from '../repo/repoModel'
-import { parseDuration } from '../util/duration'
+import { durationSetting } from '../util/duration'
 import { errorMessage, type Logger } from '../util/logger'
 import { readConfig, readHostLists } from './config'
 import { githubTokenUi } from './githubTokenUi'
@@ -106,7 +106,7 @@ export class ForgeService implements vscode.Disposable {
   private timer: ReturnType<typeof setTimeout> | null = null
   private refreshing = false
   private disposed = false
-  private warnedInterval: string | null = null
+  private readonly readIdleInterval: (text: string) => number
 
   constructor(
     private readonly registry: RepoRegistry,
@@ -116,6 +116,12 @@ export class ForgeService implements vscode.Disposable {
   ) {
     this.github = new GithubCredentials(secrets, githubSession, githubTokenUi)
     this.gitlabAuth = new GitlabAuth(secrets, logger, extensionId)
+    this.readIdleInterval = durationSetting(
+      'status interval',
+      FORGE_REFRESH_IDLE_MS,
+      '60s',
+      (message) => logger.warn(message),
+    )
     this.disposables.push(
       this.gitlabAuth,
       registry.onDidChangeModel((model) => {
@@ -214,18 +220,24 @@ export class ForgeService implements vscode.Disposable {
     return asked ? { kind: 'stored', credential: asked } : null
   }
 
-  private async ghCredential(host: string): Promise<boolean> {
-    if ((await this.secrets.get(ghIgnoredKey(host))) === '1') {
-      return false
-    }
-    return ghKnowsHost(host) && (await cliAvailable('gh'))
+  private ghCredential(host: string): Promise<boolean> {
+    return this.cliCredential(ghIgnoredKey(host), 'gh', () => ghKnowsHost(host))
   }
 
-  private async glabCredential(host: string): Promise<boolean> {
-    if ((await this.secrets.get(glabIgnoredKey(host))) === '1') {
+  private glabCredential(host: string): Promise<boolean> {
+    return this.cliCredential(glabIgnoredKey(host), 'glab', () => glabKnowsHost(host))
+  }
+
+  // A CLI login counts unless the user signed out of it for this host.
+  private async cliCredential(
+    ignoredKey: string,
+    binary: CliBinary,
+    knowsHost: () => boolean,
+  ): Promise<boolean> {
+    if ((await this.secrets.get(ignoredKey)) === '1') {
       return false
     }
-    return glabKnowsHost(host) && (await cliAvailable('glab'))
+    return knowsHost() && (await cliAvailable(binary))
   }
 
   private async promptGitlabToken(host: string): Promise<string | null> {
@@ -393,17 +405,7 @@ export class ForgeService implements vscode.Disposable {
   }
 
   private idleIntervalMs(): number {
-    const text = readConfig().statusInterval
-    const parsed = parseDuration(text)
-    if (parsed !== null) {
-      this.warnedInterval = null
-      return parsed
-    }
-    if (this.warnedInterval !== text) {
-      this.warnedInterval = text
-      this.logger.warn(`status interval "${text.slice(0, 40)}" is not valid, using 60s`)
-    }
-    return FORGE_REFRESH_IDLE_MS
+    return this.readIdleInterval(readConfig().statusInterval)
   }
 
   private async loadRequests(model: RepoModel): Promise<void> {

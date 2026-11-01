@@ -5,7 +5,7 @@ import { SplitSession, wrapperScript } from '../split/splitSession'
 import { errorMessage } from '../util/logger'
 import type { CommandEnv, Target } from './commands/context'
 import { shortId } from './commands/context'
-import { webviewHtml } from './graphView'
+import { createUkemiPanel, webviewHtml } from './webviewPanel'
 
 async function ensureWrapper(env: CommandEnv): Promise<{ wrapperPath: string; workDir: string }> {
   const workDir = env.storageUri.fsPath
@@ -18,19 +18,7 @@ async function ensureWrapper(env: CommandEnv): Promise<{ wrapperPath: string; wo
 }
 
 export async function openSplitPanel(env: CommandEnv, { model, commit }: Target): Promise<void> {
-  const panel = vscode.window.createWebviewPanel(
-    'ukemi.split',
-    `Split ${shortId(commit)}`,
-    vscode.ViewColumn.Active,
-    {
-      enableScripts: true,
-      localResourceRoots: [vscode.Uri.joinPath(env.extensionUri, 'dist', 'webview')],
-    },
-  )
-  panel.iconPath = {
-    light: vscode.Uri.joinPath(env.extensionUri, 'resources', 'activity-light.svg'),
-    dark: vscode.Uri.joinPath(env.extensionUri, 'resources', 'activity-dark.svg'),
-  }
+  const panel = createUkemiPanel(env.extensionUri, 'ukemi.split', `Split ${shortId(commit)}`)
   panel.webview.html = webviewHtml(panel.webview, env.extensionUri, 'split')
 
   let disposed = false

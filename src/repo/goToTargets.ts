@@ -1,4 +1,4 @@
-import type { BookmarkRef } from './workspaceItems'
+import { uniqueBookmarkRefs, type BookmarkRef, type BookmarkRefs } from './workspaceItems'
 
 const GIT_REMOTE = 'git'
 
@@ -51,34 +51,17 @@ function listedBookmarks(
   return [...locals, ...remotes]
 }
 
-export function bookmarkRefsFromList(rows: readonly BookmarkListRow[]): {
-  local: BookmarkRef[]
-  remote: BookmarkRef[]
-} {
-  const localSeen = new Set<string>()
-  const remoteSeen = new Set<string>()
-  const local: BookmarkRef[] = []
-  const remote: BookmarkRef[] = []
-  for (const row of rows) {
-    if (!row.present || !row.commitId || row.remote === GIT_REMOTE) {
-      continue
-    }
-    if (row.remote === null) {
-      if (localSeen.has(row.name)) {
-        continue
+export function bookmarkRefsFromList(rows: readonly BookmarkListRow[]): BookmarkRefs {
+  return uniqueBookmarkRefs(
+    rows.flatMap((row) => {
+      if (!row.present || !row.commitId || row.remote === GIT_REMOTE) {
+        return []
       }
-      localSeen.add(row.name)
-      local.push({ name: row.name, commitId: row.commitId })
-      continue
-    }
-    const key = `${row.name}@${row.remote}`
-    if (remoteSeen.has(key)) {
-      continue
-    }
-    remoteSeen.add(key)
-    remote.push({ name: row.name, remote: row.remote, commitId: row.commitId })
-  }
-  return { local, remote }
+      return row.remote === null
+        ? [{ name: row.name, commitId: row.commitId }]
+        : [{ name: row.name, remote: row.remote, commitId: row.commitId }]
+    }),
+  )
 }
 
 export function bookmarkVariants(

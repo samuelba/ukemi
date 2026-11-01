@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { fetchDelay, parseDuration } from '../../src/util/duration'
+import { durationSetting, fetchDelay, parseDuration } from '../../src/util/duration'
 
 describe('parseDuration', () => {
   test('reads a number and a unit', () => {
@@ -48,5 +48,33 @@ describe('fetchDelay', () => {
   test('returns the remaining time when the last fetch is still fresh', () => {
     expect(fetchDelay(1_000, 1_000, 600_000)).toBe(600_000)
     expect(fetchDelay(1_000, 61_000, 600_000)).toBe(540_000)
+  })
+})
+
+describe('durationSetting', () => {
+  test('falls back and warns once for each invalid value', () => {
+    const warnings: string[] = []
+    const read = durationSetting('poll interval', 60_000, '60s', (message) =>
+      warnings.push(message),
+    )
+    expect(read('5m')).toBe(300_000)
+    expect(read('soon')).toBe(60_000)
+    expect(read('soon')).toBe(60_000)
+    expect(read('later')).toBe(60_000)
+    expect(warnings).toEqual([
+      'poll interval "soon" is not valid, using 60s',
+      'poll interval "later" is not valid, using 60s',
+    ])
+  })
+
+  test('warns again after a valid value', () => {
+    const warnings: string[] = []
+    const read = durationSetting('poll interval', 60_000, '60s', (message) =>
+      warnings.push(message),
+    )
+    read('soon')
+    read('1m')
+    read('soon')
+    expect(warnings).toHaveLength(2)
   })
 })

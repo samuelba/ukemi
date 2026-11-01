@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process'
 import { homedir } from 'node:os'
+import type { HttpFetch } from './types'
 
 const CLI_TIMEOUT_MS = 30_000
 const MAX_OUTPUT = 10 * 1024 * 1024
@@ -88,6 +89,27 @@ export function responseFromCli(stdout: string, code: number, name: string): Res
   const separator = /\r?\n\r?\n/.exec(stdout)
   const body = separator ? stdout.slice(separator.index + separator[0].length) : ''
   return new Response(body, { status: Number(statusLine[1]) })
+}
+
+// Sends an HttpFetch request through `gh api` or `glab api`; `endpoint` maps and checks the URL.
+export function cliFetch(
+  binary: CliBinary,
+  host: string,
+  endpoint: (url: string) => string,
+  run: CliRun,
+): HttpFetch {
+  return async (url, init = {}) => {
+    const path = endpoint(url)
+    const method = (init.method ?? 'GET').toUpperCase()
+    const stdin = typeof init.body === 'string' ? init.body : undefined
+    const args = ['api', '--hostname', host, '--include', '--method', method]
+    if (stdin !== undefined) {
+      args.push('--header', `Content-Type: ${cliContentType(init.headers)}`, '--input', '-')
+    }
+    args.push(path)
+    const result = await run(args, stdin)
+    return responseFromCli(result.stdout, result.code, binary)
+  }
 }
 
 const DEFAULT_CONTENT_TYPE = 'application/json'

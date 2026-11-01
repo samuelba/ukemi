@@ -7,6 +7,7 @@ import {
   type IconVariant,
   type LanguageAssociations,
 } from '../../shared/fileIconTheme'
+import { webviewRoot } from './webviewPanel'
 
 interface IconThemeContribution {
   extensionUri: vscode.Uri
@@ -20,7 +21,7 @@ interface LanguageContribution {
 }
 
 export function iconThemeResourceRoots(extensionUri: vscode.Uri): vscode.Uri[] {
-  const roots = [vscode.Uri.joinPath(extensionUri, 'dist', 'webview')]
+  const roots = [webviewRoot(extensionUri)]
   const seen = new Set(roots.map((root) => root.toString()))
   for (const extension of vscode.extensions.all) {
     const themes = extension.packageJSON?.contributes?.iconThemes

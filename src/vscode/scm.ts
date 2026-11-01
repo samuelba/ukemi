@@ -1,18 +1,10 @@
 import { join, relative, sep } from 'node:path'
 import * as vscode from 'vscode'
-import type { ChangedFile } from '../../shared/model'
+import { FILE_STATUS_LETTER, type ChangedFile } from '../../shared/model'
 import type { RepoModel } from '../repo/repoModel'
 import { readConfig } from './config'
 import { revisionUri } from './diff'
 import type { RepoRegistry } from './registry'
-
-const STATUS_LETTER: Record<ChangedFile['status'], string> = {
-  added: 'A',
-  modified: 'M',
-  removed: 'D',
-  renamed: 'R',
-  copied: 'C',
-}
 
 const STATUS_COLOR: Record<ChangedFile['status'], string> = {
   added: 'gitDecoration.addedResourceForeground',
@@ -87,7 +79,7 @@ class RepoSourceControl implements vscode.Disposable {
         contextValue: file.status,
         decorations: {
           strikeThrough: file.status === 'removed',
-          tooltip: STATUS_LETTER[file.status],
+          tooltip: FILE_STATUS_LETTER[file.status],
           color: new vscode.ThemeColor(STATUS_COLOR[file.status]),
         } as vscode.SourceControlResourceDecorations,
         command: {

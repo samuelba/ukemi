@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
 import type { RepoModel } from '../repo/repoModel'
-import { DEFAULT_INTERVAL_MS, fetchDelay, parseDuration } from '../util/duration'
+import { DEFAULT_INTERVAL_MS, durationSetting, fetchDelay } from '../util/duration'
 import { errorMessage, type Logger } from '../util/logger'
 import { readConfig } from './config'
 import type { ForgeService } from './forgeService'
@@ -12,7 +12,7 @@ const IDLE_RETRY_MS = 5_000
 
 export class AutoFetcher implements vscode.Disposable {
   private readonly lastFetch = new Map<string, number>()
-  private warnedInterval: string | null = null
+  private readonly readInterval: (text: string) => number
   private timer: ReturnType<typeof setTimeout> | null = null
   private isRunning = false
   private isDisposed = false
@@ -24,6 +24,12 @@ export class AutoFetcher implements vscode.Disposable {
     private readonly operations: Operations,
     private readonly logger: Logger,
   ) {
+    this.readInterval = durationSetting(
+      'auto fetch interval',
+      DEFAULT_INTERVAL_MS,
+      '10m',
+      (message) => logger.warn(message),
+    )
     this.disposables.push(
       registry.onDidChange(() => this.schedule()),
       this.operations.onDidChange(() => this.schedule()),
@@ -87,17 +93,7 @@ export class AutoFetcher implements vscode.Disposable {
   }
 
   private intervalMs(): number {
-    const text = readConfig().autoFetchInterval
-    const parsed = parseDuration(text)
-    if (parsed !== null) {
-      this.warnedInterval = null
-      return parsed
-    }
-    if (this.warnedInterval !== text) {
-      this.warnedInterval = text
-      this.logger.warn(`auto fetch interval "${text.slice(0, 40)}" is not valid, using 10m`)
-    }
-    return DEFAULT_INTERVAL_MS
+    return this.readInterval(readConfig().autoFetchInterval)
   }
 
   private async fetchNow(model: RepoModel): Promise<void> {

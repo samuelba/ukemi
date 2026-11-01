@@ -1,4 +1,4 @@
-import { cliContentType, isSafeEndpoint, responseFromCli, runCli, type CliRun } from './cli'
+import { cliFetch, isSafeEndpoint, runCli, type CliRun } from './cli'
 import { isSafeHttpsHost } from './hostName'
 import type { HttpFetch } from './types'
 
@@ -44,18 +44,7 @@ export function ghEndpoint(host: string, url: string): string {
 }
 
 export function ghFetch(host: string, run: GhRun = runGh): HttpFetch {
-  return async (url, init = {}) => {
-    const endpoint = ghEndpoint(host, url)
-    const method = (init.method ?? 'GET').toUpperCase()
-    const stdin = typeof init.body === 'string' ? init.body : undefined
-    const args = ['api', '--hostname', host, '--include', '--method', method]
-    if (stdin !== undefined) {
-      args.push('--header', `Content-Type: ${cliContentType(init.headers)}`, '--input', '-')
-    }
-    args.push(endpoint)
-    const result = await run(args, stdin)
-    return responseFromCli(result.stdout, result.code, 'gh')
-  }
+  return cliFetch('gh', host, (url) => ghEndpoint(host, url), run)
 }
 
 export type GitField = 'username' | 'password'

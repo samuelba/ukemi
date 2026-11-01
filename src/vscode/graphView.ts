@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto'
 import * as vscode from 'vscode'
 import type { FileIconTheme } from '../../shared/fileIconTheme'
 import type { HostMessage, ViewState, ViewStatus, WebviewMessage } from '../../shared/protocol'
@@ -7,6 +6,7 @@ import { readConfig } from './config'
 import { iconThemeResourceRoots, loadFileIconTheme } from './fileIconTheme'
 import type { Operations } from './operations'
 import type { RepoRegistry } from './registry'
+import { createUkemiPanel, webviewHtml } from './webviewPanel'
 
 export const GRAPH_VIEW_ID = 'ukemi.graph'
 const PANEL_VIEW_TYPE = 'ukemi.graphPanel'
@@ -19,38 +19,6 @@ export type MessageHandler = (message: WebviewMessage) => Promise<void>
 
 export interface JjAvailability {
   isAvailable: boolean
-}
-
-export function webviewHtml(
-  webview: vscode.Webview,
-  extensionUri: vscode.Uri,
-  entry: string,
-  bodyAttributes = '',
-): string {
-  const base = vscode.Uri.joinPath(extensionUri, 'dist', 'webview')
-  const script = webview.asWebviewUri(vscode.Uri.joinPath(base, `${entry}.js`))
-  const style = webview.asWebviewUri(vscode.Uri.joinPath(base, `${entry}.css`))
-  const nonce = randomBytes(16).toString('base64')
-  const csp = [
-    "default-src 'none'",
-    `style-src ${webview.cspSource} 'unsafe-inline'`,
-    `font-src ${webview.cspSource}`,
-    `img-src ${webview.cspSource} data:`,
-    `script-src 'nonce-${nonce}'`,
-  ].join('; ')
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="${csp}">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="${style}">
-</head>
-<body${bodyAttributes}>
-  <div id="root"></div>
-  <script nonce="${nonce}" src="${script}"></script>
-</body>
-</html>`
 }
 
 export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable {
@@ -132,21 +100,11 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable 
       this.panel.reveal()
       return
     }
-    const panel = vscode.window.createWebviewPanel(
-      PANEL_VIEW_TYPE,
-      'Ukemi',
-      vscode.ViewColumn.Active,
-      {
-        enableScripts: true,
-        enableCommandUris: [...SETTINGS_COMMAND_URIS],
-        retainContextWhenHidden: true,
-        localResourceRoots: iconThemeResourceRoots(this.extensionUri),
-      },
-    )
-    panel.iconPath = {
-      light: vscode.Uri.joinPath(this.extensionUri, 'resources', 'activity-light.svg'),
-      dark: vscode.Uri.joinPath(this.extensionUri, 'resources', 'activity-dark.svg'),
-    }
+    const panel = createUkemiPanel(this.extensionUri, PANEL_VIEW_TYPE, 'Ukemi', {
+      enableCommandUris: [...SETTINGS_COMMAND_URIS],
+      retainContextWhenHidden: true,
+      localResourceRoots: iconThemeResourceRoots(this.extensionUri),
+    })
     this.panel = panel
     this.attach(panel.webview)
     panel.onDidDispose(() => {

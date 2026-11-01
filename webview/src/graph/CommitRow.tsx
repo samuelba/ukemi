@@ -60,6 +60,22 @@ function runCommand(command: string, repoId: string, commitId: string) {
   postMessage({ type: 'command', command, context: { repoId, commitId } })
 }
 
+// The row selects on click, so an action must not let the click reach it.
+function RowAction({ title, icon, onClick }: { title: string; icon: string; onClick: () => void }) {
+  return (
+    <button
+      className="icon-button"
+      title={title}
+      onClick={(event) => {
+        event.stopPropagation()
+        onClick()
+      }}
+    >
+      <i className={`codicon codicon-${icon}`} />
+    </button>
+  )
+}
+
 export function CommitRow(props: CommitRowProps) {
   const { commit, repoId, settings, isExpanded } = props
   const [dropTarget, setDropTarget] = useState<DropKind | null>(null)
@@ -213,51 +229,31 @@ export function CommitRow(props: CommitRowProps) {
           </span>
           <span className="actions">
             {!commit.isWorkingCopy && !commit.isImmutable && (
-              <button
-                className="icon-button"
+              <RowAction
                 title="Edit this change"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  runCommand('ukemi.commit.edit', repoId, commit.commitId)
-                }}
-              >
-                <i className="codicon codicon-edit" />
-              </button>
+                icon="edit"
+                onClick={() => runCommand('ukemi.commit.edit', repoId, commit.commitId)}
+              />
             )}
             {!commit.isImmutable && (
-              <button
-                className="icon-button"
+              <RowAction
                 title="Describe"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  props.onDescribe(commit)
-                }}
-              >
-                <i className="codicon codicon-comment-discussion-quote" />
-              </button>
+                icon="comment-discussion-quote"
+                onClick={() => props.onDescribe(commit)}
+              />
             )}
             {canSquashIntoParent(commit, props.commitsById) && (
-              <button
-                className="icon-button"
+              <RowAction
                 title="Squash into parent"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  runCommand('ukemi.commit.squash', repoId, commit.commitId)
-                }}
-              >
-                <i className="codicon codicon-fold-down" />
-              </button>
+                icon="fold-down"
+                onClick={() => runCommand('ukemi.commit.squash', repoId, commit.commitId)}
+              />
             )}
-            <button
-              className="icon-button"
+            <RowAction
               title="New change on top"
-              onClick={(e) => {
-                e.stopPropagation()
-                runCommand('ukemi.commit.new', repoId, commit.commitId)
-              }}
-            >
-              <i className="codicon codicon-add" />
-            </button>
+              icon="add"
+              onClick={() => runCommand('ukemi.commit.new', repoId, commit.commitId)}
+            />
           </span>
         </div>
         <RequestRow

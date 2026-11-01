@@ -1,14 +1,9 @@
 import { z } from 'zod'
+import { readSecretJson, type SecretStore } from './secretStore'
 
 export interface GithubCredential {
   username: string
   token: string
-}
-
-export interface SecretStore {
-  get(key: string): PromiseLike<string | undefined>
-  store(key: string, value: string): PromiseLike<void>
-  delete(key: string): PromiseLike<void>
 }
 
 export interface CredentialUi {
@@ -89,16 +84,7 @@ export class GithubCredentials {
     return hadToken
   }
 
-  private async stored(host: string): Promise<GithubCredential | null> {
-    const raw = await this.secrets.get(secretKey(host))
-    if (!raw) {
-      return null
-    }
-    try {
-      const result = storedSchema.safeParse(JSON.parse(raw))
-      return result.success ? result.data : null
-    } catch {
-      return null
-    }
+  private stored(host: string): Promise<GithubCredential | null> {
+    return readSecretJson(this.secrets, secretKey(host), storedSchema)
   }
 }

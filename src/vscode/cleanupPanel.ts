@@ -12,22 +12,10 @@ import type { RepoModel } from '../repo/repoModel'
 import { errorMessage } from '../util/logger'
 import type { CommandEnv } from './commands/context'
 import { openCommitDiff, openFileDiff } from './diff'
-import { webviewHtml } from './graphView'
+import { createUkemiPanel, webviewHtml } from './webviewPanel'
 
 export function openCleanupPanel(env: CommandEnv, model: RepoModel): void {
-  const panel = vscode.window.createWebviewPanel(
-    'ukemi.cleanup',
-    'Clean up',
-    vscode.ViewColumn.Active,
-    {
-      enableScripts: true,
-      localResourceRoots: [vscode.Uri.joinPath(env.extensionUri, 'dist', 'webview')],
-    },
-  )
-  panel.iconPath = {
-    light: vscode.Uri.joinPath(env.extensionUri, 'resources', 'activity-light.svg'),
-    dark: vscode.Uri.joinPath(env.extensionUri, 'resources', 'activity-dark.svg'),
-  }
+  const panel = createUkemiPanel(env.extensionUri, 'ukemi.cleanup', 'Clean up')
   panel.webview.html = webviewHtml(panel.webview, env.extensionUri, 'cleanup')
   let snapshot: CleanupSnapshot | null = null
   let applied = false
@@ -111,35 +99,38 @@ async function postFiles(
   }
 }
 
-async function openCleanupDiff(model: RepoModel, commitId: string): Promise<void> {
+async function withViewedCommit(
+  model: RepoModel,
+  commitId: string,
+  open: (commit: CommitView) => Promise<void>,
+): Promise<void> {
   try {
     const commit = await viewedCommit(model, commitId)
     if (!commit) {
       void vscode.window.showWarningMessage('Clean up could not find that change.')
       return
     }
-    await openCommitDiff(model, commit, await model.repo.files(commitId))
+    await open(commit)
   } catch (error: unknown) {
     void vscode.window.showErrorMessage(`Clean up failed to open the diff: ${errorMessage(error)}`)
   }
 }
 
-async function openCleanupFile(model: RepoModel, commitId: string, path: string): Promise<void> {
-  try {
-    const commit = await viewedCommit(model, commitId)
-    if (!commit) {
-      void vscode.window.showWarningMessage('Clean up could not find that change.')
-      return
-    }
+function openCleanupDiff(model: RepoModel, commitId: string): Promise<void> {
+  return withViewedCommit(model, commitId, async (commit) =>
+    openCommitDiff(model, commit, await model.repo.files(commitId)),
+  )
+}
+
+function openCleanupFile(model: RepoModel, commitId: string, path: string): Promise<void> {
+  return withViewedCommit(model, commitId, async (commit) => {
     const file = (await model.repo.files(commitId)).find((item) => item.path === path)
     if (!file) {
       void vscode.window.showWarningMessage('Clean up could not find that file.')
       return
     }
     await openFileDiff(model, commit, file)
-  } catch (error: unknown) {
-    void vscode.window.showErrorMessage(`Clean up failed to open the diff: ${errorMessage(error)}`)
-  }
+  })
 }
 
 async function postSnapshot(
