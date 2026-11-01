@@ -118,6 +118,7 @@ function FileRow({
         path: file.path,
         isImmutable: commit.isImmutable,
         isRemoved: file.status === 'removed',
+        isConflicted: file.isConflicted,
         canSplit,
       })}
     >

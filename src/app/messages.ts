@@ -40,15 +40,15 @@ export function createMessageHandler(env: CommandEnv, dispatch: CommandDispatche
     const graph = model.graph
     switch (message.type) {
       case 'setFilter':
-        await env.operations.track('Loading', () =>
-          model.setView(message.filter, graph?.depth ?? '7d'),
-        )
+      case 'setDepth': {
+        const view = {
+          filter: message.type === 'setFilter' ? message.filter : (graph?.filter ?? 'recent'),
+          depth: message.type === 'setDepth' ? message.depth : (graph?.depth ?? '7d'),
+        }
+        await env.operations.track('Loading', () => model.setView(view.filter, view.depth))
+        await env.registry.rememberView(model.root, view)
         return
-      case 'setDepth':
-        await env.operations.track('Loading', () =>
-          model.setView(graph?.filter ?? 'recent', message.depth),
-        )
-        return
+      }
       case 'loadFiles': {
         const files = await model.filesFor(message.commitId)
         env.graphView.post({ type: 'files', repoId: model.root, commitId: message.commitId, files })
@@ -87,7 +87,9 @@ export function createMessageHandler(env: CommandEnv, dispatch: CommandDispatche
           ? (graph?.workingCopyFiles ?? [])
           : await model.filesFor(commit.commitId)
         const file = files.find((f) => f.path === message.path)
-        if (message.mode === 'file' || !file) {
+        if (file?.isConflicted && message.mode === 'file') {
+          await env.workbench.openEditor(model, commit, file.path)
+        } else if (message.mode === 'file' || !file) {
           await env.workbench.openFileAtRevision(model, commit, message.path)
         } else {
           await env.workbench.openFileDiff(model, commit, file)

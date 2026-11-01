@@ -1,7 +1,7 @@
 import type { RepoModel } from '../repo/repoModel'
 import { DEFAULT_INTERVAL_MS, durationSetting, fetchDelay } from '../util/duration'
 import { errorMessage, type Logger } from '../util/logger'
-import { disposeAll, type Disposable } from './events'
+import { disposeAll, Emitter, type Disposable } from './events'
 import type { ForgeService } from './forgeService'
 import type { Host } from './host'
 import type { Operations } from './operations'
@@ -10,11 +10,21 @@ import type { RepoRegistry } from './registry'
 const MAX_TIMER_MS = 2_147_483_647
 const IDLE_RETRY_MS = 5_000
 
+export interface AutoFetchStatus {
+  isRunning: boolean
+  lastFetch: number | null
+}
+
 export class AutoFetcher implements Disposable {
+  // The last attempt sets the schedule. Only a fetch that worked is shown to the user.
   private readonly lastFetch = new Map<string, number>()
+  private readonly lastSuccess = new Map<string, number>()
+  private readonly emitter = new Emitter<void>()
+  // Fires when a background fetch starts or ends.
+  readonly onDidChange = this.emitter.event
   private readonly readInterval: (text: string) => number
   private timer: ReturnType<typeof setTimeout> | null = null
-  private isRunning = false
+  private runningRoot: string | null = null
   private isDisposed = false
   private readonly disposables: Disposable[] = []
 
@@ -32,6 +42,7 @@ export class AutoFetcher implements Disposable {
       (message) => logger.warn(message),
     )
     this.disposables.push(
+      this.emitter,
       registry.onDidChange(() => this.schedule()),
       this.operations.onDidChange(() => this.schedule()),
       host.window.onDidFocus(() => this.schedule()),
@@ -44,8 +55,15 @@ export class AutoFetcher implements Disposable {
     this.schedule()
   }
 
+  status(root: string): AutoFetchStatus {
+    return { isRunning: this.runningRoot === root, lastFetch: this.lastSuccess.get(root) ?? null }
+  }
+
   recordFetch(root: string): void {
-    this.lastFetch.set(root, Date.now())
+    const now = Date.now()
+    this.lastFetch.set(root, now)
+    this.lastSuccess.set(root, now)
+    this.emitter.fire()
     this.schedule()
   }
 
@@ -61,7 +79,7 @@ export class AutoFetcher implements Disposable {
     }
     this.clearTimer()
     const model = this.registry.activeModel
-    if (this.isRunning || !model || !this.canFetch(model)) {
+    if (this.runningRoot !== null || !model || !this.canFetch(model)) {
       return
     }
     if (this.operations.busy || model.repo.hasPendingMutations) {
@@ -69,7 +87,7 @@ export class AutoFetcher implements Disposable {
       return
     }
     const delay = Math.min(
-      fetchDelay(this.lastFetch.get(model.root), Date.now(), this.intervalMs()),
+      fetchDelay(this.lastFetch.get(model.root), Date.now(), this.intervalMs(model)),
       MAX_TIMER_MS,
     )
     if (delay === 0) {
@@ -81,28 +99,31 @@ export class AutoFetcher implements Disposable {
 
   private canFetch(model: RepoModel): boolean {
     return (
-      this.host.settings.read().autoFetchEnabled &&
+      this.host.settings.read(model.root).autoFetchEnabled &&
       this.host.window.isFocused &&
       model.graph?.hasRemotes === true
     )
   }
 
-  private intervalMs(): number {
-    return this.readInterval(this.host.settings.read().autoFetchInterval)
+  private intervalMs(model: RepoModel): number {
+    return this.readInterval(this.host.settings.read(model.root).autoFetchInterval)
   }
 
   private async fetchNow(model: RepoModel): Promise<void> {
-    this.isRunning = true
     const root = model.root
+    this.runningRoot = root
+    this.emitter.fire()
     try {
       await model.repo.fetch({ interactive: false })
+      this.lastSuccess.set(root, Date.now())
       await this.refresh(model)
     } catch (error: unknown) {
       this.logger.error(`auto fetch failed: ${errorMessage(error)}`)
     } finally {
       // A failed attempt still counts, so the next try waits out the interval.
       this.lastFetch.set(root, Date.now())
-      this.isRunning = false
+      this.runningRoot = null
+      this.emitter.fire()
       this.schedule()
     }
   }

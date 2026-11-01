@@ -57,6 +57,35 @@ async function discard(env: CommandEnv, { model, commit, file }: FileTarget): Pr
   }
 }
 
+// Takes one side of every conflict in the file. jj only does this for 2-sided conflicts.
+async function takeSide(
+  env: CommandEnv,
+  { model, commit, file }: FileTarget,
+  tool: ':ours' | ':theirs',
+): Promise<void> {
+  if (commit.isImmutable) {
+    void env.ui.warn(`Ukemi: ${shortId(commit)} is immutable.`)
+    return
+  }
+  await env.operations.run('Resolve', model, () =>
+    model.repo.resolveWithBuiltin(commit.commitId, file.path, tool),
+  )
+}
+
+// Opens the change's first conflicted file in the resolver.
+async function resolveChange(env: CommandEnv, arg: unknown): Promise<void> {
+  const target = contextCommit(env, arg)
+  if (!target) {
+    return
+  }
+  const [first] = (await changedFiles(target)).filter((file) => file.isConflicted)
+  if (!first) {
+    void env.ui.info(`Ukemi: ${shortId(target.commit)} has no conflicts.`)
+    return
+  }
+  await env.workbench.openEditor(target.model, target.commit, first.path)
+}
+
 async function discardDirectory(env: CommandEnv, arg: unknown): Promise<void> {
   const ctx = parseContext(arg)
   const target = contextCommit(env, arg)
@@ -81,6 +110,12 @@ export function fileCommands(env: CommandEnv): Record<string, Handler> {
     'ukemi.file.open': withFile(env, ({ model, commit, file }) =>
       env.workbench.openFileAtRevision(model, commit, file.path),
     ),
+    'ukemi.file.edit': withFile(env, ({ model, commit, file }) =>
+      env.workbench.openEditor(model, commit, file.path),
+    ),
+    'ukemi.conflict.resolve': (arg) => resolveChange(env, arg),
+    'ukemi.conflict.takeSide1': withFile(env, (target) => takeSide(env, target, ':ours')),
+    'ukemi.conflict.takeSide2': withFile(env, (target) => takeSide(env, target, ':theirs')),
     'ukemi.file.openDiff': withFile(env, ({ model, commit, file }) =>
       env.workbench.openFileDiff(model, commit, file),
     ),

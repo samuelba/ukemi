@@ -1,27 +1,9 @@
-import { chmod, mkdir, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
 import type { SplitHostMessage, SplitRequest, SplitWebviewMessage } from '../../shared/split'
-import { SplitSession, wrapperScript } from '../split/splitSession'
+import { SplitSession } from '../split/splitSession'
+import { ensureWrapper, type SplitToolPaths } from '../split/toolRun'
 import { errorMessage } from '../util/logger'
 import type { CommandEnv, Target } from './commands/context'
 import type { PanelChannel, PanelHandler } from './panel'
-
-export interface SplitToolPaths {
-  // Where the wrapper script for jj's diff editor is written.
-  storageDir: string
-  // The bundled `splitTool.js`.
-  toolPath: string
-}
-
-async function ensureWrapper(
-  paths: SplitToolPaths,
-): Promise<{ wrapperPath: string; workDir: string }> {
-  await mkdir(paths.storageDir, { recursive: true })
-  const wrapperPath = join(paths.storageDir, 'ukemi-split.sh')
-  await writeFile(wrapperPath, wrapperScript(process.execPath, [paths.toolPath]))
-  await chmod(wrapperPath, 0o755)
-  return { wrapperPath, workDir: paths.storageDir }
-}
 
 // Loads the split session into the panel and applies it. Returns the panel's message handler.
 export function splitController(

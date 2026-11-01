@@ -1,6 +1,8 @@
 import { useMemo, type ReactNode } from 'react'
 import type { DesktopRendererMessage, PanelTab } from '../../../shared/desktopProtocol'
 import { CleanupApp } from '../cleanup/CleanupApp'
+import { dirtyTabs } from '../editor/dirtyTabs'
+import { EditorApp } from '../editor/EditorApp'
 import { postMessage } from '../shared/hostApi'
 import { HostChannelContext, windowChannel, type HostChannel } from '../shared/hostChannel'
 import { SplitApp } from '../split/SplitApp'
@@ -31,12 +33,31 @@ function PanelView({ tab }: { tab: PanelTab }) {
   const channel = useMemo(() => tabChannel(tab.id), [tab.id])
   return (
     <HostChannelContext.Provider value={channel}>
-      {tab.kind === 'split' ? <SplitApp /> : <CleanupApp />}
+      {tab.kind === 'split' ? (
+        <SplitApp />
+      ) : tab.kind === 'editor' ? (
+        <EditorApp tabId={tab.id} />
+      ) : (
+        <CleanupApp />
+      )}
     </HostChannelContext.Provider>
   )
 }
 
-const ICONS: Record<PanelTab['kind'], string> = { split: 'split-horizontal', cleanup: 'sparkle' }
+const ICONS: Record<PanelTab['kind'], string> = {
+  split: 'split-horizontal',
+  cleanup: 'sparkle',
+  editor: 'edit',
+}
+
+// An editor tab decides itself, so it can ask before dropping unsaved edits.
+function closeTab(tab: PanelTab): void {
+  if (tab.kind === 'editor') {
+    tabChannel(tab.id).post({ type: 'close', isDirty: dirtyTabs.has(tab.id) })
+    return
+  }
+  postMessage<DesktopRendererMessage>({ type: 'desktop.tabClosed', id: tab.id })
+}
 
 interface TabButton {
   id: string
@@ -69,7 +90,7 @@ export function RightPane({
       id: tab.id,
       title: tab.title,
       icon: ICONS[tab.kind],
-      onClose: () => postMessage<DesktopRendererMessage>({ type: 'desktop.tabClosed', id: tab.id }),
+      onClose: () => closeTab(tab),
     })),
     ...(isSettingsOpen
       ? [{ id: SETTINGS_TAB, title: 'Settings', icon: 'settings-gear', onClose: onCloseSettings }]

@@ -10,7 +10,47 @@ import {
 } from '../../shared/menus'
 import packageJson from '../../package.json'
 
-export const manifest: MenuManifest = packageJson.contributes
+// Commands of the standalone app alone. The extension never registers them, so they are not in
+// package.json.
+const DESKTOP_COMMANDS: MenuManifest['commands'] = [
+  { command: 'ukemi.repoTab.rename', title: 'Rename...', category: 'Ukemi' },
+  { command: 'ukemi.repoTab.pin', title: 'Pin', category: 'Ukemi', icon: '$(pin)' },
+  { command: 'ukemi.repoTab.unpin', title: 'Unpin', category: 'Ukemi', icon: '$(pinned)' },
+]
+
+const DESKTOP_WEBVIEW_MENU: MenuManifest['menus'][string] = [
+  {
+    command: 'ukemi.repoTab.rename',
+    group: '1_tab@1',
+    when: "webviewSection == 'ukemi.repoTab'",
+  },
+  {
+    command: 'ukemi.repoTab.pin',
+    group: '1_tab@2',
+    when: "webviewSection == 'ukemi.repoTab' && !isPinned",
+  },
+  {
+    command: 'ukemi.repoTab.unpin',
+    group: '1_tab@2',
+    when: "webviewSection == 'ukemi.repoTab' && isPinned",
+  },
+]
+
+const contributes: MenuManifest = packageJson.contributes
+
+export const manifest: MenuManifest = {
+  ...contributes,
+  commands: [...contributes.commands, ...DESKTOP_COMMANDS],
+  menus: {
+    ...contributes.menus,
+    'webview/context': [...DESKTOP_WEBVIEW_MENU, ...(contributes.menus['webview/context'] ?? [])],
+    // Tab-only commands, kept out of the palette like the item-only ones in package.json.
+    commandPalette: [
+      ...DESKTOP_COMMANDS.map((c) => ({ command: c.command, when: 'false' })),
+      ...(contributes.menus.commandPalette ?? []),
+    ],
+  },
+}
 
 const titles = new Map(manifest.commands.map((c) => [c.command, c.title]))
 

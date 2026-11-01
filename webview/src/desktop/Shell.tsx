@@ -10,26 +10,31 @@ import type {
   PaletteCommand,
   PanelTab,
   SettingField,
+  SettingsRepository,
   SidePanels,
 } from '../../../shared/desktopProtocol'
-import type { HostMessage, RepoSummary, ViewSettings } from '../../../shared/protocol'
+import type { HostMessage, RepoSummary, ViewSettings, ViewState } from '../../../shared/protocol'
 import { App } from '../graph/App'
+import { FileIconFonts, FileIconThemeContext } from '../graph/FileIcon'
 import { postMessage } from '../shared/hostApi'
 import { useHostListener } from '../shared/hooks'
 import { DetailPane } from './DetailPane'
 import { Dialogs } from './Dialogs'
+import { useBundledFileIcons } from './fileIcons'
 import { AboutDialog } from './AboutDialog'
 import { BottomPanel, LOG_TAB, type TerminalTab } from './BottomPanel'
 import { Palette } from './Palette'
 import { RepoTabs } from './RepoTabs'
 import { CHANGE_TAB, RightPane, SETTINGS_TAB } from './RightPane'
-import { SettingsView } from './SettingsView'
+import { SettingsView, type SettingsScope } from './SettingsView'
 import { Sidebar } from './Sidebar'
 import { Splitter } from './Splitter'
+import { StatusBar } from './StatusBar'
 
 const LAYOUT_KEY = 'ukemi.layout'
 const MIN_SIDEBAR = 180
 const MIN_DETAIL = 320
+const MIN_GRAPH = 200
 const MIN_LOG = 90
 const LOG_LIMIT = 5_000
 
@@ -118,6 +123,7 @@ function useShortcuts(openPalette: () => void): void {
 }
 
 export function Shell() {
+  const fileIcons = useBundledFileIcons()
   const [layout, setLayout] = useState<Layout>(readLayout)
   const [panels, setPanels] = useState<SidePanels>({ bookmarks: [], workspaces: [] })
   const [detail, setDetail] = useState<ChangeDetail | null>(null)
@@ -131,16 +137,19 @@ export function Shell() {
   const [tabs, setTabs] = useState<readonly PanelTab[]>([])
   const [activeTab, setActiveTab] = useState(CHANGE_TAB)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [settingFields, setSettingFields] = useState<{ fields: SettingField[]; path: string }>({
-    fields: [],
-    path: '',
-  })
+  const [settingFields, setSettingFields] = useState<{
+    fields: SettingField[]
+    path: string
+    repository: SettingsRepository | null
+  }>({ fields: [], path: '', repository: null })
+  const [settingsScope, setSettingsScope] = useState<SettingsScope>('global')
   const [log, setLog] = useState<readonly LogLine[]>([])
   const [terminals, setTerminals] = useState<readonly TerminalTab[]>([])
   const [panelTab, setPanelTab] = useState(LOG_TAB)
   const [terminalFont, setTerminalFont] = useState<FontSpec>(DEFAULT_FONT)
   const [about, setAbout] = useState<{ info: AboutInfo; text: string } | null>(null)
   const [now, setNow] = useState(() => Date.now())
+  const [viewState, setViewState] = useState<ViewState | null>(null)
 
   const update = useCallback(
     (next: Partial<Layout> | ((current: Layout) => Partial<Layout>)) =>
@@ -156,6 +165,11 @@ export function Shell() {
     [],
   )
 
+  const showLog = useCallback(() => {
+    setPanelTab(LOG_TAB)
+    update({ showPanel: true })
+  }, [update])
+
   const showTab = (id: string) => {
     setActiveTab(id)
     update({ showDetail: true })
@@ -164,6 +178,7 @@ export function Shell() {
   useHostListener<DesktopHostMessage | HostMessage>((message) => {
     switch (message.type) {
       case 'state':
+        setViewState(message.state)
         setRepos(message.state.repos)
         setActiveRepoId(message.state.activeRepoId)
         setViewSettings(message.state.settings)
@@ -191,7 +206,12 @@ export function Shell() {
         setPlatform(message.platform)
         return
       case 'desktop.tabOpen':
-        setTabs((all) => [...all, message.tab])
+        // An id that is already open is shown again, with its new title.
+        setTabs((all) =>
+          all.some((tab) => tab.id === message.tab.id)
+            ? all.map((tab) => (tab.id === message.tab.id ? message.tab : tab))
+            : [...all, message.tab],
+        )
         showTab(message.tab.id)
         return
       case 'desktop.tabClose':
@@ -199,7 +219,11 @@ export function Shell() {
         setActiveTab((current) => (current === message.id ? CHANGE_TAB : current))
         return
       case 'desktop.settings':
-        setSettingFields({ fields: message.fields, path: message.path })
+        setSettingFields({
+          fields: message.fields,
+          path: message.path,
+          repository: message.repository,
+        })
         return
       case 'desktop.terminalOpen':
         setTerminals((all) => [
@@ -247,13 +271,14 @@ export function Shell() {
             }
             return
           case 'showLog':
-            setPanelTab(LOG_TAB)
-            update({ showPanel: true })
+            showLog()
             return
           case 'toggleTerminal':
             toggleTerminal()
             return
           case 'settings':
+          case 'repositorySettings':
+            setSettingsScope(message.action === 'settings' ? 'global' : 'repository')
             setIsSettingsOpen(true)
             showTab(SETTINGS_TAB)
             return
@@ -301,137 +326,149 @@ export function Shell() {
   const closeAbout = useCallback(() => setAbout(null), [])
   useShortcuts(openPalette)
 
+  // The panes keep their dragged widths while the window has room, and give way to their
+  // minimums when it does not, so a narrow window never pushes the change pane out of view.
   const columns = [
-    layout.showSidebar ? `${layout.sidebar}px 1px` : '',
-    'minmax(360px, 1fr)',
-    layout.showDetail ? `1px ${layout.detail}px` : '',
+    layout.showSidebar ? `minmax(${MIN_SIDEBAR}px, ${layout.sidebar}px) 1px` : '',
+    `minmax(${MIN_GRAPH}px, 1fr)`,
+    layout.showDetail ? `1px minmax(${MIN_DETAIL}px, ${layout.detail}px)` : '',
   ]
     .filter(Boolean)
     .join(' ')
 
   return (
-    <div
-      className={`shell platform-${platform}`}
-      style={{
-        gridTemplateRows: layout.showPanel
-          ? `var(--shell-titlebar) 1fr 1px ${layout.log}px`
-          : undefined,
-      }}
-    >
-      <header className="titlebar">
-        <span className="wordmark" aria-label="Ukemi">
-          ukemi
-        </span>
-        <RepoTabs repos={repos} activeRepoId={activeRepoId} />
-        <button className="titlebar-search" onClick={openPalette} title="Run a command (F1)">
-          <span className="codicon codicon-search" aria-hidden />
-          <span>Run a command</span>
-          <kbd>{platform === 'darwin' ? '⌘K' : 'Ctrl K'}</kbd>
-        </button>
-        <button
-          className={`icon-button${layout.showSidebar ? ' is-on' : ''}`}
-          title="Toggle sidebar (Ctrl+B)"
-          aria-pressed={layout.showSidebar}
-          onClick={() => update({ showSidebar: !layout.showSidebar })}
-        >
-          <span className="codicon codicon-layout-sidebar-left" aria-hidden />
-        </button>
-        <button
-          className={`icon-button${layout.showPanel ? ' is-on' : ''}`}
-          title="Toggle panel: terminal and log"
-          aria-pressed={layout.showPanel}
-          onClick={() => update({ showPanel: !layout.showPanel })}
-        >
-          <span className="codicon codicon-layout-panel" aria-hidden />
-        </button>
-        <button
-          className={`icon-button${layout.showDetail ? ' is-on' : ''}`}
-          title="Toggle details (Ctrl+J)"
-          aria-pressed={layout.showDetail}
-          onClick={() => update({ showDetail: !layout.showDetail })}
-        >
-          <span className="codicon codicon-layout-sidebar-right" aria-hidden />
-        </button>
-        <button
-          className="icon-button"
-          title="More actions"
-          onClick={(e) =>
-            postMessage<DesktopRendererMessage>({
-              type: 'desktop.titleMenu',
-              x: e.currentTarget.getBoundingClientRect().left,
-              y: e.currentTarget.getBoundingClientRect().bottom,
-            })
-          }
-        >
-          <span className="codicon codicon-ellipsis" aria-hidden />
-        </button>
-      </header>
-      <main className="workspace" style={{ gridTemplateColumns: columns }}>
-        {layout.showSidebar && (
-          <>
-            <Sidebar panels={panels} />
-            <Splitter
-              label="Resize sidebar"
-              direction="columns"
-              onDrag={(dx) => update((c) => ({ sidebar: Math.max(MIN_SIDEBAR, c.sidebar + dx) }))}
-            />
-          </>
+    <FileIconThemeContext.Provider value={fileIcons}>
+      <FileIconFonts theme={fileIcons} />
+      <div
+        className={`shell platform-${platform}`}
+        style={{
+          gridTemplateRows: layout.showPanel
+            ? `var(--shell-titlebar) 1fr 1px ${layout.log}px var(--shell-statusbar)`
+            : undefined,
+        }}
+      >
+        <header className="titlebar">
+          <span className="wordmark" aria-label="Ukemi">
+            ukemi
+          </span>
+          <RepoTabs repos={repos} activeRepoId={activeRepoId} />
+          <button className="titlebar-search" onClick={openPalette} title="Run a command (F1)">
+            <span className="codicon codicon-search" aria-hidden />
+            <span>Run a command</span>
+            <kbd>{platform === 'darwin' ? '⌘K' : 'Ctrl K'}</kbd>
+          </button>
+          <button
+            className={`icon-button${layout.showSidebar ? ' is-on' : ''}`}
+            title="Toggle sidebar (Ctrl+B)"
+            aria-pressed={layout.showSidebar}
+            onClick={() => update({ showSidebar: !layout.showSidebar })}
+          >
+            <span className="codicon codicon-layout-sidebar-left" aria-hidden />
+          </button>
+          <button
+            className={`icon-button${layout.showPanel ? ' is-on' : ''}`}
+            title="Toggle panel: terminal and log"
+            aria-pressed={layout.showPanel}
+            onClick={() => update({ showPanel: !layout.showPanel })}
+          >
+            <span className="codicon codicon-layout-panel" aria-hidden />
+          </button>
+          <button
+            className={`icon-button${layout.showDetail ? ' is-on' : ''}`}
+            title="Toggle details (Ctrl+J)"
+            aria-pressed={layout.showDetail}
+            onClick={() => update({ showDetail: !layout.showDetail })}
+          >
+            <span className="codicon codicon-layout-sidebar-right" aria-hidden />
+          </button>
+          <button
+            className="icon-button"
+            title="More actions"
+            onClick={(e) =>
+              postMessage<DesktopRendererMessage>({
+                type: 'desktop.titleMenu',
+                x: e.currentTarget.getBoundingClientRect().left,
+                y: e.currentTarget.getBoundingClientRect().bottom,
+              })
+            }
+          >
+            <span className="codicon codicon-ellipsis" aria-hidden />
+          </button>
+        </header>
+        <main className="workspace" style={{ gridTemplateColumns: columns }}>
+          {layout.showSidebar && (
+            <>
+              <Sidebar panels={panels} />
+              <Splitter
+                label="Resize sidebar"
+                direction="columns"
+                onDrag={(dx) => update((c) => ({ sidebar: Math.max(MIN_SIDEBAR, c.sidebar + dx) }))}
+              />
+            </>
+          )}
+          <div className="graph-pane">
+            <App />
+          </div>
+          {layout.showDetail && (
+            <>
+              <Splitter
+                label="Resize details"
+                direction="columns"
+                onDrag={(dx) => update((c) => ({ detail: Math.max(MIN_DETAIL, c.detail - dx) }))}
+              />
+              <RightPane
+                tabs={tabs}
+                active={activeTab}
+                isSettingsOpen={isSettingsOpen}
+                onActivate={setActiveTab}
+                onCloseSettings={() => {
+                  setIsSettingsOpen(false)
+                  setActiveTab(CHANGE_TAB)
+                }}
+                change={
+                  <DetailPane
+                    detail={detail}
+                    diff={diff}
+                    now={now}
+                    settings={viewSettings}
+                    onCloseDiff={() => setDiff(null)}
+                  />
+                }
+                settings={
+                  <SettingsView
+                    {...settingFields}
+                    scope={settingsScope}
+                    onScope={setSettingsScope}
+                  />
+                }
+              />
+            </>
+          )}
+        </main>
+        {layout.showPanel && (
+          <Splitter
+            label="Resize panel"
+            direction="rows"
+            onDrag={(dy) => update((c) => ({ log: Math.max(MIN_LOG, c.log - dy) }))}
+          />
         )}
-        <div className="graph-pane">
-          <App />
+        {/* Kept mounted while hidden, so the shells and their scrollback survive. */}
+        <div className="panel-slot" hidden={!layout.showPanel}>
+          <BottomPanel
+            terminals={terminals}
+            active={panelTab}
+            log={log}
+            font={terminalFont}
+            onActivate={setPanelTab}
+            onCloseTerminal={closeTerminal}
+            onHide={() => update({ showPanel: false })}
+          />
         </div>
-        {layout.showDetail && (
-          <>
-            <Splitter
-              label="Resize details"
-              direction="columns"
-              onDrag={(dx) => update((c) => ({ detail: Math.max(MIN_DETAIL, c.detail - dx) }))}
-            />
-            <RightPane
-              tabs={tabs}
-              active={activeTab}
-              isSettingsOpen={isSettingsOpen}
-              onActivate={setActiveTab}
-              onCloseSettings={() => {
-                setIsSettingsOpen(false)
-                setActiveTab(CHANGE_TAB)
-              }}
-              change={
-                <DetailPane
-                  detail={detail}
-                  diff={diff}
-                  now={now}
-                  settings={viewSettings}
-                  onCloseDiff={() => setDiff(null)}
-                />
-              }
-              settings={<SettingsView fields={settingFields.fields} path={settingFields.path} />}
-            />
-          </>
-        )}
-      </main>
-      {layout.showPanel && (
-        <Splitter
-          label="Resize panel"
-          direction="rows"
-          onDrag={(dy) => update((c) => ({ log: Math.max(MIN_LOG, c.log - dy) }))}
-        />
-      )}
-      {/* Kept mounted while hidden, so the shells and their scrollback survive. */}
-      <div className="panel-slot" hidden={!layout.showPanel}>
-        <BottomPanel
-          terminals={terminals}
-          active={panelTab}
-          log={log}
-          font={terminalFont}
-          onActivate={setPanelTab}
-          onCloseTerminal={closeTerminal}
-          onHide={() => update({ showPanel: false })}
-        />
+        <StatusBar state={viewState} onShowLog={showLog} />
+        {isPaletteOpen && <Palette commands={commands} onClose={() => setIsPaletteOpen(false)} />}
+        {about && <AboutDialog info={about.info} text={about.text} onClose={closeAbout} />}
+        <Dialogs />
       </div>
-      {isPaletteOpen && <Palette commands={commands} onClose={() => setIsPaletteOpen(false)} />}
-      {about && <AboutDialog info={about.info} text={about.text} onClose={closeAbout} />}
-      <Dialogs />
-    </div>
+    </FileIconThemeContext.Provider>
   )
 }

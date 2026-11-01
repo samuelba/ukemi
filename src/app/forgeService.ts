@@ -144,11 +144,8 @@ export class ForgeService implements Disposable {
         }
       }),
       host.settings.onDidChange((change) => {
-        if (!change.affects('forge.statusInterval')) {
-          return
-        }
         const model = this.registry.activeModel
-        if (model) {
+        if (model && change.affects('forge.statusInterval', model.root)) {
           this.schedule(model)
         }
       }),
@@ -401,11 +398,11 @@ export class ForgeService implements Disposable {
   }
 
   private refreshInterval(model: RepoModel): number {
-    return forgeRefreshInterval(requestsOf(model), this.idleIntervalMs())
+    return forgeRefreshInterval(requestsOf(model), this.idleIntervalMs(model))
   }
 
-  private idleIntervalMs(): number {
-    return this.readIdleInterval(this.host.settings.read().statusInterval)
+  private idleIntervalMs(model: RepoModel): number {
+    return this.readIdleInterval(this.host.settings.read(model.root).statusInterval)
   }
 
   private async loadRequests(model: RepoModel): Promise<void> {
@@ -433,7 +430,7 @@ export class ForgeService implements Disposable {
         target,
         credential,
         branchNames(model),
-        this.host.settings.read().requestLimit,
+        this.host.settings.read(model.root).requestLimit,
       ),
     )
   }

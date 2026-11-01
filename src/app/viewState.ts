@@ -1,4 +1,5 @@
 import type { ViewState, ViewStatus } from '../../shared/protocol'
+import type { AutoFetcher } from './autoFetch'
 import type { Operations } from './operations'
 import type { RepoRegistry } from './registry'
 import type { UkemiConfig } from './settings'
@@ -9,6 +10,7 @@ export interface ViewStateInputs {
   registry: RepoRegistry
   operations: Operations
   config: UkemiConfig
+  autoFetch?: Pick<AutoFetcher, 'status'>
 }
 
 function status({ isJjAvailable, hasFolders, registry }: ViewStateInputs): ViewStatus {
@@ -32,6 +34,7 @@ function status({ isJjAvailable, hasFolders, registry }: ViewStateInputs): ViewS
 export function buildViewState(inputs: ViewStateInputs): ViewState {
   const { registry, operations, config } = inputs
   const model = registry.activeModel
+  const fetched = model ? inputs.autoFetch?.status(model.root) : undefined
   return {
     status: status(inputs),
     repos: registry.summaries(),
@@ -50,6 +53,8 @@ export function buildViewState(inputs: ViewStateInputs): ViewState {
     autoFetch: {
       enabled: config.autoFetchEnabled,
       interval: config.autoFetchInterval,
+      isRunning: fetched?.isRunning ?? false,
+      lastFetch: fetched?.lastFetch ?? null,
     },
   }
 }

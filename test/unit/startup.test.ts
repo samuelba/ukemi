@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import {
   desktopFileName,
+  foldersAfterClosing,
   startupWindows,
   themeSource,
   windowsToRemember,
@@ -28,6 +29,21 @@ describe('startupWindows', () => {
   })
 })
 
+describe('startupWindows with pinned repositories', () => {
+  test('always opens pinned repositories in the first window', () => {
+    expect(startupWindows([], [['/a'], ['/c']], true, all, ['/p'])).toEqual([['/a', '/p'], ['/c']])
+    expect(startupWindows([], [['/a']], false, all, ['/p'])).toEqual([['/p']])
+    expect(startupWindows(['/x'], [], true, all, ['/p'])).toEqual([['/x', '/p']])
+  })
+
+  test('skips pinned repositories that are open or gone', () => {
+    const exists = (folder: string) => folder !== '/gone'
+    expect(
+      startupWindows([], [['/a'], ['/p']], true, exists, ['/p', '/gone', '/a/nested']),
+    ).toEqual([['/a'], ['/p']])
+  })
+})
+
 describe('windowsToRemember', () => {
   test('keeps the list when the last window closes', () => {
     expect(windowsToRemember([])).toBeUndefined()
@@ -39,6 +55,34 @@ describe('windowsToRemember', () => {
 
   test('remembers nothing when the open window has no repository left', () => {
     expect(windowsToRemember([[]])).toEqual([])
+  })
+})
+
+describe('foldersAfterClosing', () => {
+  test('drops the folder that is the closed repository', () => {
+    expect(foldersAfterClosing(['/a', '/b'], ['/a', '/b'], '/a')).toEqual(['/b'])
+  })
+
+  test('turns a scanned folder into the repositories it still shows, in its place', () => {
+    const roots = ['/x', '/work/one', '/work/two', '/work/deep/three']
+    expect(foldersAfterClosing(['/x', '/work'], roots, '/work/two')).toEqual([
+      '/x',
+      '/work/one',
+      '/work/deep/three',
+    ])
+  })
+
+  test('drops a folder that lies inside the closed repository', () => {
+    expect(foldersAfterClosing(['/repo/src', '/b'], ['/repo', '/b'], '/repo')).toEqual(['/b'])
+  })
+
+  test('keeps a repository once when a scanned folder also lists it', () => {
+    const roots = ['/work/one', '/work/two']
+    expect(foldersAfterClosing(['/work/one', '/work'], roots, '/work/two')).toEqual(['/work/one'])
+  })
+
+  test('does not take a sibling with a longer name for a folder inside', () => {
+    expect(foldersAfterClosing(['/repo-b'], ['/repo', '/repo-b'], '/repo')).toEqual(['/repo-b'])
   })
 })
 

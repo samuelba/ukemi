@@ -1,13 +1,28 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { DesktopRendererMessage, SettingField } from '../../../shared/desktopProtocol'
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import type {
+  DesktopRendererMessage,
+  SettingField,
+  SettingsRepository,
+} from '../../../shared/desktopProtocol'
 import { postMessage } from '../shared/hostApi'
+
+export type SettingsScope = 'global' | 'repository'
+
+type Save = (key: string, value: unknown) => void
 
 function send(message: DesktopRendererMessage): void {
   postMessage(message)
 }
 
-function save(key: string, value: unknown): void {
-  send({ type: 'desktop.setSetting', key, value })
+// Writes the global value, or the override of the repository the form shows.
+const SaveContext = createContext<Save>((key, value) =>
+  send({ type: 'desktop.setSetting', key, value }),
+)
+
+// In the repository mode a field shows the override, with the global value as its fallback.
+function repositoryField(field: SettingField, repository: SettingsRepository): SettingField {
+  const inherited = field.value === undefined ? field.default : field.value
+  return { ...field, value: repository.values[field.key], default: inherited }
 }
 
 // Shows `code` from the package.json descriptions as code.
@@ -79,6 +94,7 @@ function TextControl({
   const shown = toText(current(field))
   const [text, setText] = useState(shown)
   const [problem, setProblem] = useState<string | null>(null)
+  const save = useContext(SaveContext)
   useEffect(() => setText(shown), [shown])
 
   const commit = () => {
@@ -142,6 +158,7 @@ function TextControl({
 }
 
 function Control({ field }: { field: SettingField }) {
+  const save = useContext(SaveContext)
   switch (field.type) {
     case 'boolean':
       return (
@@ -200,23 +217,36 @@ function Control({ field }: { field: SettingField }) {
   }
 }
 
-function Field({ field }: { field: SettingField }) {
+function Field({ field, scope }: { field: SettingField; scope: SettingsScope }) {
+  const save = useContext(SaveContext)
   const isModified = field.value !== undefined
+  const isRepository = scope === 'repository'
   return (
     <div className={`setting${isModified ? ' is-modified' : ''}`} id={`setting-${field.key}`}>
       <div className="setting-head">
         <h3 className="setting-title">{field.title}</h3>
+        {isRepository && (
+          <span className={`setting-scope${isModified ? ' is-own' : ''}`}>
+            {isModified ? 'Set for this repository' : 'Same as all repositories'}
+          </span>
+        )}
         {isModified && (
           <button
             className="link-button"
-            title={`Reset to ${JSON.stringify(field.default)}`}
+            title={`${isRepository ? 'Use the value of all repositories' : 'Reset to'} ${JSON.stringify(field.default)}`}
             onClick={() => save(field.key, undefined)}
           >
-            Reset
+            {isRepository ? 'Use the value for all' : 'Reset'}
           </button>
         )}
       </div>
       <Description text={field.description} />
+      {!isRepository && field.overriddenIn.length > 0 && (
+        <p className="setting-hint setting-overridden">
+          <span className="codicon codicon-repo" aria-hidden /> Set differently in{' '}
+          {field.overriddenIn.join(', ')}
+        </p>
+      )}
       <div className="setting-control">
         <Control field={field} />
       </div>
@@ -232,63 +262,134 @@ function matches(field: SettingField, query: string): boolean {
   )
 }
 
-// The `ukemi.*` settings as a form. Changes save to settings.json right away.
+interface SettingsViewProps {
+  fields: readonly SettingField[]
+  path: string
+  repository: SettingsRepository | null
+  scope: SettingsScope
+  onScope: (scope: SettingsScope) => void
+}
+
+function ScopeSwitch({
+  repository,
+  scope,
+  onScope,
+}: Pick<SettingsViewProps, 'repository' | 'scope' | 'onScope'>) {
+  const option = (value: SettingsScope, label: ReactNode, isDisabled = false) => (
+    <button
+      role="radio"
+      aria-checked={scope === value}
+      className={`scope-option${scope === value ? ' is-active' : ''}`}
+      disabled={isDisabled}
+      onClick={() => onScope(value)}
+    >
+      {label}
+    </button>
+  )
+  return (
+    <div className="scope-switch" role="radiogroup" aria-label="Which settings to edit">
+      {option('global', 'All repositories')}
+      {option(
+        'repository',
+        <>
+          <span className="codicon codicon-repo" aria-hidden />
+          {repository ? repository.label : 'This repository'}
+        </>,
+        repository === null,
+      )}
+    </div>
+  )
+}
+
+// The `ukemi.*` settings as a form. Changes save to settings.json right away. In the
+// repository mode the form edits the overrides of the active repository.
 export function SettingsView({
   fields,
   path,
-}: {
-  fields: readonly SettingField[]
-  path: string
-}): ReactNode {
+  repository,
+  scope,
+  onScope,
+}: SettingsViewProps): ReactNode {
   const [query, setQuery] = useState('')
   const [onlyModified, setOnlyModified] = useState(false)
   useEffect(() => send({ type: 'desktop.loadSettings' }), [])
+  // Without a repository, the form falls back to the settings of all repositories.
+  const repo = scope === 'repository' ? repository : null
+  const shownScope: SettingsScope = repo ? 'repository' : 'global'
+  const shown = useMemo(
+    () =>
+      repo
+        ? fields.filter((f) => f.isRepositoryScoped).map((f) => repositoryField(f, repo))
+        : fields,
+    [fields, repo],
+  )
+  const save = useMemo<Save>(
+    () => (key, value) =>
+      send({ type: 'desktop.setSetting', key, value, ...(repo ? { repoId: repo.id } : {}) }),
+    [repo],
+  )
   const visible = useMemo(
-    () => fields.filter((f) => matches(f, query) && (!onlyModified || f.value !== undefined)),
-    [fields, query, onlyModified],
+    () => shown.filter((f) => matches(f, query) && (!onlyModified || f.value !== undefined)),
+    [shown, query, onlyModified],
   )
   const groups = [...new Set(visible.map((f) => f.group))]
-  const modified = fields.filter((f) => f.value !== undefined).length
+  const modified = shown.filter((f) => f.value !== undefined).length
   return (
-    <div className="settings">
-      <header className="settings-header">
-        <h1>Settings</h1>
-        <div className="settings-tools">
-          <div className="side-filter settings-search">
-            <span className="codicon codicon-search" aria-hidden />
-            <input
-              value={query}
-              placeholder="Search settings"
-              spellCheck={false}
-              onChange={(e) => setQuery(e.target.value)}
-            />
+    <SaveContext.Provider value={save}>
+      <div className={`settings${repo ? ' is-repository' : ''}`}>
+        <header className="settings-header">
+          <div className="settings-title">
+            <h1>Settings</h1>
+            <ScopeSwitch repository={repository} scope={shownScope} onScope={onScope} />
           </div>
+          {repo && (
+            <p className="settings-scope-note">
+              These settings apply to <strong title={repo.id}>{repo.label}</strong> only. The others
+              apply to all repositories.
+            </p>
+          )}
+          <div className="settings-tools">
+            <div className="side-filter settings-search">
+              <span className="codicon codicon-search" aria-hidden />
+              <input
+                value={query}
+                placeholder="Search settings"
+                spellCheck={false}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
+            <button
+              className={`button-quiet${onlyModified ? ' is-on' : ''}`}
+              aria-pressed={onlyModified}
+              onClick={() => setOnlyModified((v) => !v)}
+            >
+              Modified <span className="detail-count">{modified}</span>
+            </button>
+          </div>
+        </header>
+        {groups.map((group) => (
+          <section key={group} className="settings-group">
+            <h2>{group}</h2>
+            {visible
+              .filter((f) => f.group === group)
+              .map((field) => (
+                <Field key={field.key} field={field} scope={repo ? 'repository' : 'global'} />
+              ))}
+          </section>
+        ))}
+        {visible.length === 0 && <p className="side-empty">No settings match.</p>}
+        <footer className="settings-footer">
+          <span title={path}>
+            {repo ? 'Stored under "repositories" in settings.json' : 'Stored in settings.json'}
+          </span>
           <button
-            className={`button-quiet${onlyModified ? ' is-on' : ''}`}
-            aria-pressed={onlyModified}
-            onClick={() => setOnlyModified((v) => !v)}
+            className="link-button"
+            onClick={() => send({ type: 'desktop.openSettingsFile' })}
           >
-            Modified <span className="detail-count">{modified}</span>
+            Open the file
           </button>
-        </div>
-      </header>
-      {groups.map((group) => (
-        <section key={group} className="settings-group">
-          <h2>{group}</h2>
-          {visible
-            .filter((f) => f.group === group)
-            .map((field) => (
-              <Field key={field.key} field={field} />
-            ))}
-        </section>
-      ))}
-      {visible.length === 0 && <p className="side-empty">No settings match.</p>}
-      <footer className="settings-footer">
-        <span title={path}>Stored in settings.json</span>
-        <button className="link-button" onClick={() => send({ type: 'desktop.openSettingsFile' })}>
-          Open the file
-        </button>
-      </footer>
-    </div>
+        </footer>
+      </div>
+    </SaveContext.Provider>
   )
 }

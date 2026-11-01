@@ -1,10 +1,10 @@
 import * as vscode from 'vscode'
 import {
   parseConflicts,
-  sideName,
+  sideHeading,
   type ConflictBlock,
   type ConflictLine,
-} from '../conflict/markers'
+} from '../../shared/conflictMarkers'
 import type { Handler } from '../app/commands/context'
 import { modelForFile } from './conflictLens'
 import type { RepoRegistry } from '../app/registry'
@@ -81,7 +81,7 @@ function roleName(block: ConflictBlock, line: ConflictLine): string {
   if (line.sideIndex === null) {
     return line.line === block.startLine ? `${block.sides.length}-sided conflict` : 'base'
   }
-  return sideName(block.sides.length, line.sideIndex)
+  return sideHeading(block.sides[line.sideIndex], line.sideIndex)
 }
 
 function headerOption(block: ConflictBlock, line: ConflictLine): vscode.DecorationOptions {

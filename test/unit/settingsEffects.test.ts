@@ -14,8 +14,10 @@ function registry() {
 describe('applyRepositorySettings', () => {
   test('reloads the line stats when they are switched on or off', async () => {
     const repos = registry()
-    await applyRepositorySettings(change('showLineStats'), repos as never)
-    expect(repos.applyLineStats).toHaveBeenCalledOnce()
+    const lineStats = change('showLineStats')
+    await applyRepositorySettings(lineStats, repos as never)
+    // The registry asks the change which repositories it reaches.
+    expect(repos.applyLineStats).toHaveBeenCalledWith(lineStats)
     expect(repos.discover).not.toHaveBeenCalled()
   })
 
@@ -27,8 +29,9 @@ describe('applyRepositorySettings', () => {
 
   test('applies the workspace snapshot setting', async () => {
     const repos = registry()
-    await applyRepositorySettings(change('workspaces.snapshotOnRefresh'), repos as never)
-    expect(repos.applyWorkspaceSettings).toHaveBeenCalledOnce()
+    const snapshot = change('workspaces.snapshotOnRefresh')
+    await applyRepositorySettings(snapshot, repos as never)
+    expect(repos.applyWorkspaceSettings).toHaveBeenCalledWith(snapshot)
   })
 
   test('leaves the other settings to the views', async () => {

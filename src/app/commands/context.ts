@@ -31,10 +31,17 @@ export interface Workbench {
     to: EvolutionEntry,
   ): Promise<void>
   openFileAtRevision(model: RepoModel, commit: CommitView, path: string): Promise<void>
+  // Opens a file of the change for editing. In the desktop app that is the editor tab, which
+  // also resolves conflicts; VS Code opens the working copy's file in its own editor.
+  openEditor(model: RepoModel, commit: CommitView, path: string): Promise<void>
+  // Opens a file on disk with the app the system picks for it.
+  openFileExternally(fsPath: string): Promise<void>
   openSplit(target: Target): Promise<void>
   openCleanup(model: RepoModel): void
   // Opens the settings. A key like `ukemi.jjPath` jumps to that setting.
   openSettings(key?: string): void
+  // Opens the settings that apply to one repository only.
+  openRepositorySettings(root: string): Promise<void>
   // Opens a folder in a new window.
   openWindow(root: string): Promise<void>
   // Adds a folder to this window. Returns false when the host refused.

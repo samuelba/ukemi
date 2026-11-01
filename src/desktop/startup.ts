@@ -1,3 +1,5 @@
+import { isAbsolute, relative } from 'node:path'
+
 export const RESTORE_REPOSITORIES = 'desktop.restoreRepositories'
 
 // The windows to open at startup, each as its list of repository folders. Folders from the
@@ -8,14 +10,22 @@ export function startupWindows(
   remembered: readonly (readonly string[])[],
   restore: boolean,
   exists: (folder: string) => boolean,
+  pinned: readonly string[] = [],
 ): string[][] {
-  if (fromArgs.length > 0) {
-    return [[...fromArgs]]
-  }
   const restored = restore
     ? remembered.map((folders) => folders.filter(exists)).filter((folders) => folders.length > 0)
     : []
-  return restored.length > 0 ? restored : [[]]
+  const windows = fromArgs.length > 0 ? [[...fromArgs]] : restored.length > 0 ? restored : [[]]
+  return withPinned(windows, pinned.filter(exists))
+}
+
+// Pinned repositories always open, in the first window, unless a window has them already.
+function withPinned(windows: string[][], pinned: readonly string[]): string[][] {
+  const isOpen = (root: string) =>
+    windows.some((folders) => folders.some((folder) => folder === root || isInside(folder, root)))
+  const missing = pinned.filter((root) => !isOpen(root))
+  const [first = [], ...others] = windows
+  return [[...first, ...missing], ...others]
 }
 
 // The windows to remember after a window opened, closed or changed its tabs. Undefined keeps the
@@ -25,6 +35,31 @@ export function windowsToRemember(open: readonly (readonly string[])[]): string[
     return undefined
   }
   return open.filter((folders) => folders.length > 0).map((folders) => [...folders])
+}
+
+function isInside(parent: string, child: string): boolean {
+  const path = relative(parent, child)
+  return path !== '' && !path.startsWith('..') && !isAbsolute(path)
+}
+
+// A window's folders after one repository tab closed, so the tab stays closed on the next start.
+// A folder can be the repository, lie inside it, or hold it among others it was scanned for. The
+// last kind turns into the repositories it still shows, in its place.
+export function foldersAfterClosing(
+  folders: readonly string[],
+  repoRoots: readonly string[],
+  closed: string,
+): string[] {
+  const next = folders.flatMap((folder) => {
+    if (folder === closed || isInside(closed, folder)) {
+      return []
+    }
+    if (isInside(folder, closed)) {
+      return repoRoots.filter((root) => root !== closed && isInside(folder, root))
+    }
+    return [folder]
+  })
+  return [...new Set(next)]
 }
 
 export const THEME = 'desktop.theme'

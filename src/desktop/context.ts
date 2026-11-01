@@ -5,6 +5,7 @@ import type { KeyValueFile } from './adapters/keyValueFile'
 import type { SecretsFile } from './adapters/secretsFile'
 import type { SettingsFile } from './adapters/settingsFile'
 import type { TrustStore } from './adapters/trustStore'
+import type { RepoTabStore } from './adapters/repoTabStore'
 import type { LogBuffer } from './logBuffer'
 import type { DesktopSession } from './session'
 
@@ -34,6 +35,7 @@ export interface DesktopContext {
   readonly secrets: SecretsFile
   readonly state: KeyValueFile
   readonly trust: TrustStore
+  readonly repoTabs: RepoTabStore
   readonly jj: { path: string | null; version: string | null }
   about(): AboutInfo
   // The fonts of diffs and terminals, from the settings and the system.

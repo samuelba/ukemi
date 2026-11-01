@@ -38,7 +38,7 @@ async function main(root: string, output: string): Promise<void> {
       changedFilesView: 'list',
       ciOnlyMine: true,
     },
-    autoFetch: { enabled: false, interval: '10m' },
+    autoFetch: { enabled: false, interval: '10m', isRunning: false, lastFetch: null },
   }
   const target = model.graph?.commits.find(
     (c) => !c.isEmpty && c.localBookmarks.some((b) => b.name === 'main'),

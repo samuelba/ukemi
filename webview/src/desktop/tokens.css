@@ -40,6 +40,10 @@
   --vscode-editor-background: var(--paper);
   --vscode-sideBar-background: var(--paper-sunken);
   --vscode-sideBarSectionHeader-border: var(--rule);
+  --vscode-statusBar-background: var(--paper-sunken);
+  --vscode-statusBar-foreground: var(--ink-soft);
+  --vscode-statusBar-border: var(--rule);
+  --vscode-statusBarItem-hoverBackground: var(--vscode-toolbar-hoverBackground);
   --vscode-editorWidget-background: var(--paper-raised);
   --vscode-editorHoverWidget-background: var(--paper-raised);
   --vscode-editorHoverWidget-border: var(--rule);
@@ -81,6 +85,9 @@
   --vscode-gitDecoration-conflictingResourceForeground: #9c2f8f;
   --vscode-diffEditor-insertedLineBackground: rgba(95, 138, 74, 0.16);
   --vscode-diffEditor-removedLineBackground: rgba(200, 67, 30, 0.13);
+  --vscode-scrollbarSlider-background: color-mix(in srgb, var(--ink-faint) 55%, transparent);
+  --vscode-scrollbarSlider-hoverBackground: color-mix(in srgb, var(--ink-faint) 75%, transparent);
+  --vscode-scrollbarSlider-activeBackground: color-mix(in srgb, var(--ink-faint) 90%, transparent);
 }
 
 :root.vscode-dark {

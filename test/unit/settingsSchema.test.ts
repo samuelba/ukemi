@@ -68,6 +68,17 @@ describe('settingFields', () => {
     })
   })
 
+  test('marks the fields a repository can override, and where they are overridden', () => {
+    const scoped = settingFields({}, (key) => (key === 'historyDepth' ? ['big-mono'] : []))
+    const depth = scoped.find((f) => f.key === 'historyDepth')
+    expect(depth).toMatchObject({ isRepositoryScoped: true, overriddenIn: ['big-mono'] })
+    expect(scoped.find((f) => f.key === 'changeIdLength')).toMatchObject({
+      isRepositoryScoped: false,
+      overriddenIn: [],
+    })
+    expect(scoped.filter((f) => f.isRepositoryScoped)).toHaveLength(11)
+  })
+
   test('marks unset values as undefined', () => {
     expect(field('jjPath')?.value).toBeUndefined()
     expect(fields.every((f) => f.description.length > 0)).toBe(true)

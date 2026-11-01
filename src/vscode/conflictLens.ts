@@ -4,13 +4,16 @@ import { z } from 'zod'
 import {
   conflictAtLine,
   conflictEdits,
+  fileSideLabel,
+  fileSideTitle,
   parseConflicts,
+  sharedSideCount,
   sideName,
   type ConflictBlock,
   type ConflictChoice,
   type ConflictEdit,
   type ConflictSide,
-} from '../conflict/markers'
+} from '../../shared/conflictMarkers'
 import type { RepoModel } from '../repo/repoModel'
 import { errorMessage } from '../util/logger'
 import type { CommandEnv, Handler } from '../app/commands/context'
@@ -87,7 +90,7 @@ function lensesFor(
     block.sides.map((side, sideIndex) =>
       codeLens(
         block.startLine,
-        `Accept ${sideName(block.sides.length, sideIndex)}`,
+        `Accept ${sideName(side, sideIndex)}`,
         side.label,
         'ukemi.conflict.accept',
         { uri, sideIndex, conflictIndex: block.index },
@@ -184,7 +187,7 @@ async function pickFileSide(blocks: readonly ConflictBlock[]): Promise<ConflictC
 
 function sidePicks(sides: readonly ConflictSide[]): SidePick[] {
   return sides.map((side, sideIndex) => ({
-    label: `Accept ${sideName(sides.length, sideIndex)}`,
+    label: `Accept ${sideName(side, sideIndex)}`,
     description: side.label || undefined,
     sideIndex,
   }))
@@ -281,25 +284,6 @@ function cursorLine(document: vscode.TextDocument): number {
     return editor.selection.active.line
   }
   return 0
-}
-
-function fileSideTitle(blocks: readonly ConflictBlock[], sideIndex: number): string {
-  if (blocks.every((block) => block.sides.length === 2)) {
-    return sideName(2, sideIndex)
-  }
-  return sideName(Math.max(sharedSideCount(blocks), 3), sideIndex)
-}
-
-function sharedSideCount(blocks: readonly ConflictBlock[]): number {
-  return blocks.reduce(
-    (count, block) => Math.min(count, block.sides.length),
-    Number.POSITIVE_INFINITY,
-  )
-}
-
-function fileSideLabel(blocks: readonly ConflictBlock[], sideIndex: number): string {
-  const labels = [...new Set(blocks.map((block) => block.sides[sideIndex]?.label ?? ''))]
-  return labels.length === 1 ? (labels[0] ?? '') : ''
 }
 
 function readArgs(arg: unknown): CommandArgs {

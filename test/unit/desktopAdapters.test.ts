@@ -6,6 +6,7 @@ import type { DesktopHostMessage } from '../../shared/desktopProtocol'
 import { KeyValueFile } from '../../src/desktop/adapters/keyValueFile'
 import { RendererUi } from '../../src/desktop/adapters/rendererUi'
 import { SecretsFile, type Encryptor } from '../../src/desktop/adapters/secretsFile'
+import type { SettingsChange } from '../../src/app/settings'
 import { SettingsFile } from '../../src/desktop/adapters/settingsFile'
 
 const dirs: string[] = []
@@ -216,6 +217,96 @@ describe('SettingsFile', () => {
     expect(changes[0]?.('showGitTags')).toBe(true)
     expect(changes[0]?.('autoFetch.enabled')).toBe(false)
     expect(settings.read().showGitTags).toBe(false)
+    settings.dispose()
+  })
+
+  test('lays the overrides of a repository over the global values', () => {
+    const path = join(tempDir(), 'settings.json')
+    writeFileSync(
+      path,
+      JSON.stringify({
+        showGitTags: false,
+        historyDepth: '30d',
+        repositories: {
+          '/repo/a': { showGitTags: true, 'forge.requestLimit': 10, changeIdLength: 12 },
+        },
+      }),
+    )
+    const settings = new SettingsFile(path)
+    expect(settings.read('/repo/a')).toMatchObject({
+      showGitTags: true,
+      historyDepth: '30d',
+      requestLimit: 10,
+      // Not a repository setting, so the override is ignored.
+      changeIdLength: 4,
+    })
+    expect(settings.read('/repo/b')).toMatchObject({ showGitTags: false, requestLimit: 50 })
+    expect(settings.read()).toMatchObject({ showGitTags: false })
+    expect(settings.inspect('showGitTags', '/repo/a')).toEqual({
+      globalValue: false,
+      repoValue: true,
+    })
+    expect(settings.inspect('changeIdLength', '/repo/a').repoValue).toBeUndefined()
+    settings.dispose()
+  })
+
+  test('writes and removes repository overrides', async () => {
+    const path = join(tempDir(), 'settings.json')
+    const settings = new SettingsFile(path)
+    await settings.update('historyDepth', '14d', { root: '/repo/a' })
+    expect(settings.read('/repo/a').historyDepth).toBe('14d')
+    expect(settings.read('/repo/b').historyDepth).toBe('7d')
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({
+      repositories: { '/repo/a': { historyDepth: '14d' } },
+    })
+
+    await settings.update('historyDepth', undefined, { root: '/repo/a' })
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({})
+    await expect(settings.update('changeIdLength', 8, { root: '/repo/a' })).rejects.toThrow(
+      /cannot be set per repository/,
+    )
+    settings.dispose()
+  })
+
+  test('tells which repositories a change affects', async () => {
+    const settings = new SettingsFile(join(tempDir(), 'settings.json'))
+    await settings.update('showGitTags', true, { root: '/repo/a' })
+    const changes: SettingsChange[] = []
+    settings.onDidChange((change) => changes.push(change))
+
+    await settings.update('showGitTags', false)
+    // The global value changed, but /repo/a keeps its own.
+    expect(changes[0]?.affects('showGitTags')).toBe(true)
+    expect(changes[0]?.affects('showGitTags', '/repo/a')).toBe(false)
+    expect(changes[0]?.affects('showGitTags', '/repo/b')).toBe(true)
+
+    await settings.update('historyDepth', '1y', { root: '/repo/b' })
+    expect(changes[1]?.affects('historyDepth')).toBe(true)
+    expect(changes[1]?.affects('historyDepth', '/repo/b')).toBe(true)
+    expect(changes[1]?.affects('historyDepth', '/repo/a')).toBe(false)
+    expect(changes[1]?.affects('showGitTags', '/repo/b')).toBe(false)
+
+    // A prefix reaches /repo/a through the keys it does not override.
+    await settings.update('autoFetch.enabled', true, { root: '/repo/a' })
+    await settings.update('autoFetch.interval', '5m')
+    expect(changes[3]?.affects('autoFetch', '/repo/a')).toBe(true)
+    settings.dispose()
+  })
+
+  test('falls back to the default for an interval that is not text', () => {
+    const path = join(tempDir(), 'settings.json')
+    writeFileSync(
+      path,
+      JSON.stringify({
+        repositories: { '/repo': { 'autoFetch.interval': 5 } },
+        'forge.statusInterval': {},
+      }),
+    )
+    const settings = new SettingsFile(path)
+    expect(settings.read('/repo')).toMatchObject({
+      autoFetchInterval: '10m',
+      statusInterval: '60s',
+    })
     settings.dispose()
   })
 

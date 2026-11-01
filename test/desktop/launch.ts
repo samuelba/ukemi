@@ -34,6 +34,37 @@ export function fixtureRepo(): string {
   return repo
 }
 
+// base → `mine` and `theirs` edit one line, merged into a conflicted `merge`, with an empty `@` above.
+export function conflictRepo(): string {
+  const repo = mkdtempSync(join(tmpdir(), 'ukemi-desktop-conflict-'))
+  jj(repo, 'git', 'init')
+  writeFileSync(join(repo, 'f.txt'), 'a\nb\nc\n')
+  jj(repo, 'commit', '-m', 'base')
+  const base = jj(repo, 'log', '-r', '@-', '--no-graph', '-T', 'change_id').trim()
+  jj(repo, 'new', base, '-m', 'mine')
+  writeFileSync(join(repo, 'f.txt'), 'a\nMINE\nc\n')
+  jj(repo, 'new', base, '-m', 'theirs')
+  writeFileSync(join(repo, 'f.txt'), 'a\nTHEIRS\nc\n')
+  jj(repo, 'new', 'description(exact:"mine\n")', '@', '-m', 'merge')
+  jj(repo, 'new', '-m', 'wc')
+  writeFileSync(join(repo, 'notes.txt'), 'one\n')
+  return repo
+}
+
+// The descriptions of the conflicted changes, newest first.
+export function conflictedChanges(repo: string): string[] {
+  const out = jj(
+    repo,
+    'log',
+    '-r',
+    'conflicts()',
+    '--no-graph',
+    '-T',
+    'description.first_line() ++ "\\n"',
+  )
+  return out.split('\n').filter(Boolean)
+}
+
 export function logOf(repo: string): string {
   return jj(
     repo,

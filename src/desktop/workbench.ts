@@ -1,6 +1,7 @@
 import { open } from 'node:fs/promises'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import type { CleanupHostMessage, CleanupWebviewMessage } from '../../shared/cleanup'
+import type { EditorHostMessage, EditorWebviewMessage } from '../../shared/editor'
 import type {
   DesktopHostMessage,
   DiffDocument,
@@ -12,6 +13,7 @@ import type { CommitView } from '../../shared/protocol'
 import type { SplitHostMessage, SplitWebviewMessage } from '../../shared/split'
 import { cleanupController } from '../app/cleanupController'
 import { shortId, type CommandEnv, type Workbench } from '../app/commands/context'
+import { editorController } from '../app/editorController'
 import type { PanelChannel, PanelHandler } from '../app/panel'
 import {
   BINARY_PLACEHOLDER,
@@ -25,20 +27,23 @@ import {
   type DiffEntry,
   type FileSide,
 } from '../app/revisionContent'
-import { splitController, type SplitToolPaths } from '../app/splitController'
+import { splitController } from '../app/splitController'
 import type { RepoModel } from '../repo/repoModel'
+import type { SplitToolPaths } from '../split/toolRun'
 
 // Bigger files are left out of the diff pane. Open them in an editor instead.
 export const MAX_DIFF_BYTES = 2_000_000
 const TOO_LARGE = '(file too large to show)'
 const LOAD_CONCURRENCY = 8
 
-export type PanelEntry = 'split' | 'cleanup'
+export type PanelEntry = 'split' | 'cleanup' | 'editor'
 
 export type OpenPanelWindow = <H, W>(
   entry: PanelEntry,
   title: string,
   connect: (channel: PanelChannel<H>) => PanelHandler<W>,
+  // A tab with the same key is shown again instead of opening another one.
+  key?: string,
 ) => void
 
 export interface DesktopWorkbenchDeps {
@@ -48,7 +53,9 @@ export interface DesktopWorkbenchDeps {
   addFolder(root: string): void
   hasFolders(): boolean
   openSettings(): void
+  openRepositorySettings(root: string): Promise<void>
   openTerminal(cwd: string, name: string): void
+  openPath(fsPath: string): Promise<void>
   installJj(): Promise<void>
   splitPaths: SplitToolPaths
 }
@@ -127,6 +134,39 @@ function statusMap(files: readonly ChangedFile[]): Map<string, ChangedFile['stat
 // Shows diffs in the window's detail pane and opens Split and Clean up in their own windows.
 export function desktopWorkbench(deps: DesktopWorkbenchDeps, env: () => CommandEnv): Workbench {
   const show = (document: DiffDocument) => deps.post({ type: 'desktop.diff', document })
+  // Open editor tabs by key, so opening a file again shows its tab.
+  const editors = new Map<string, PanelChannel<EditorHostMessage>>()
+
+  // A conflicted file opens in the change's resolver tab, which steps through its conflicts.
+  const openEditor = async (model: RepoModel, commit: CommitView, path: string) => {
+    const conflicted = commit.hasConflict
+      ? (await model.filesFor(commit.commitId)).some((f) => f.path === path && f.isConflicted)
+      : false
+    const key = conflicted
+      ? `resolve:${model.root}:${commit.changeId}`
+      : `edit:${model.root}:${commit.changeId}:${path}`
+    const title = conflicted
+      ? `Resolve ${shortId(commit)}`
+      : `${basename(path)} @ ${shortId(commit)}`
+    const open = editors.get(key)
+    if (open && !open.isClosed) {
+      void open.post({ type: 'show', path })
+    }
+    deps.openPanelWindow<EditorHostMessage, EditorWebviewMessage>(
+      'editor',
+      title,
+      (channel) => {
+        editors.set(key, channel)
+        return editorController(
+          env(),
+          { model, changeId: commit.changeId, path },
+          channel,
+          deps.splitPaths,
+        )
+      },
+      key,
+    )
+  }
 
   const showCommit = async (
     model: RepoModel,
@@ -166,6 +206,8 @@ export function desktopWorkbench(deps: DesktopWorkbenchDeps, env: () => CommandE
       const side = await sideText(model, fileAtRevision(commit, path))
       show({ kind: 'file', title: `${path} @ ${shortId(commit)}`, path, text: side.text })
     },
+    openEditor,
+    openFileExternally: (fsPath) => deps.openPath(fsPath),
     openSplit: async (target) => {
       deps.openPanelWindow<SplitHostMessage, SplitWebviewMessage>(
         'split',
@@ -181,6 +223,7 @@ export function desktopWorkbench(deps: DesktopWorkbenchDeps, env: () => CommandE
       )
     },
     openSettings: () => deps.openSettings(),
+    openRepositorySettings: (root) => deps.openRepositorySettings(root),
     openWindow: async (root) => deps.openWindow(root),
     addFolder: (root) => {
       deps.addFolder(root)

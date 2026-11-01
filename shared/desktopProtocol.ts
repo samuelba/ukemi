@@ -108,7 +108,7 @@ export interface ChangeDetail {
 // A Split or Clean up view, shown as a tab next to the change details.
 export interface PanelTab {
   id: string
-  kind: 'split' | 'cleanup'
+  kind: 'split' | 'cleanup' | 'editor'
   title: string
 }
 
@@ -133,6 +133,18 @@ export interface SettingField {
   default: unknown
   // Undefined when the user has not set it.
   value: unknown
+  // A repository may override it. See shared/settingsScope.ts.
+  isRepositoryScoped: boolean
+  // The labels of the repositories that override it.
+  overriddenIn: string[]
+}
+
+// The repository the settings form edits in its "This repository" mode.
+export interface SettingsRepository {
+  id: string
+  label: string
+  // Its overrides, by key.
+  values: Record<string, unknown>
 }
 
 export interface FontSpec {
@@ -183,6 +195,7 @@ export type ShellAction =
   | 'toggleSidebar'
   | 'toggleDetail'
   | 'settings'
+  | 'repositorySettings'
   | 'toggleLog'
   | 'showLog'
   | 'toggleTerminal'
@@ -193,6 +206,8 @@ export type DesktopHostMessage =
   | { type: 'desktop.uiInvalid'; id: number; problem: string }
   | { type: 'desktop.uiClose'; id: number }
   | { type: 'desktop.panels'; panels: SidePanels }
+  // Starts editing the name of a repository tab in place.
+  | { type: 'desktop.startRename'; repoId: string }
   | { type: 'desktop.detail'; detail: ChangeDetail | null }
   | { type: 'desktop.diff'; document: DiffDocument }
   | { type: 'desktop.commands'; commands: PaletteCommand[]; toolbar: MenuEntry[] }
@@ -201,7 +216,12 @@ export type DesktopHostMessage =
   | { type: 'desktop.tabOpen'; tab: PanelTab }
   | { type: 'desktop.tabClose'; id: string }
   | { type: 'desktop.panel'; panelId: string; message: unknown }
-  | { type: 'desktop.settings'; fields: SettingField[]; path: string }
+  | {
+      type: 'desktop.settings'
+      fields: SettingField[]
+      path: string
+      repository: SettingsRepository | null
+    }
   | { type: 'desktop.log'; lines: LogLine[]; replace: boolean }
   | { type: 'desktop.terminalOpen'; id: string; title: string; cwd: string }
   | { type: 'desktop.terminalData'; id: string; data: string }
@@ -219,7 +239,13 @@ export type DesktopRendererMessage =
   | { type: 'desktop.tabClosed'; id: string }
   | { type: 'desktop.panel'; panelId: string; message: unknown }
   | { type: 'desktop.loadSettings' }
-  | { type: 'desktop.setSetting'; key: string; value: unknown }
+  // A blank name gives the tab its folder name back.
+  | { type: 'desktop.renameTab'; repoId: string; name: string }
+  // `toIndex` counts the tabs as shown, for a drop. `offset` moves by places from where the
+  // tab is now, so quick key presses add up. A tab stays among the pinned or the other tabs.
+  | { type: 'desktop.moveTab'; repoId: string; toIndex?: number; offset?: number }
+  // With a repoId, sets or removes (value undefined) that repository's override.
+  | { type: 'desktop.setSetting'; key: string; value: unknown; repoId?: string }
   | { type: 'desktop.openSettingsFile' }
   | { type: 'desktop.openRepo' }
   | { type: 'desktop.closeRepo'; repoId: string }

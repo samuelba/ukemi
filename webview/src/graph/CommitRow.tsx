@@ -190,6 +190,7 @@ export function CommitRow(props: CommitRowProps) {
         isWorkingCopy: commit.isWorkingCopy,
         isImmutable: commit.isImmutable,
         isEmpty: commit.isEmpty,
+        hasConflict: commit.hasConflict,
         isTrunk: commit.isTrunk,
         hasRemotes: props.hasRemotes,
         hasForge: props.hasForge,

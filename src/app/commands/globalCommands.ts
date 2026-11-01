@@ -11,6 +11,7 @@ import { collectBookmarks, type BookmarkRef } from '../../repo/workspaceItems'
 import { errorMessage } from '../../util/logger'
 import { validateBookmarkName, validateRemoteName, validateRemoteUrl } from '../../util/text'
 import { showForgeMissing } from '../forgeMissing'
+import { updateWhereItLives, type UkemiConfig } from '../settings'
 import type { PickItem } from '../ui'
 import { contextModel, parseContext, type CommandEnv, type Handler } from './context'
 
@@ -269,6 +270,17 @@ async function goTo(env: CommandEnv, model: RepoModel): Promise<void> {
   }
 }
 
+// Flips a switch of the active repository: its own override if it has one, else for all.
+function toggleSetting(
+  env: CommandEnv,
+  key: string,
+  field: 'autoFetchEnabled' | 'showGitTags',
+): Promise<void> {
+  const root = env.registry.activeModel?.root ?? null
+  const current: UkemiConfig = env.settings.read(root ?? undefined)
+  return updateWhereItLives(env.settings, key, !current[field], root)
+}
+
 function setChangedFilesView(env: CommandEnv, view: ChangedFilesView): Promise<void> {
   return env.settings.update('changedFilesView', view)
 }
@@ -291,10 +303,8 @@ export function globalCommands(env: CommandEnv): Record<string, Handler> {
       }
       await env.forge.refreshRequests(model, { force: true })
     }),
-    'ukemi.toggleAutoFetch': () =>
-      env.settings.update('autoFetch.enabled', !env.settings.read().autoFetchEnabled),
-    'ukemi.toggleGitTags': () =>
-      env.settings.update('showGitTags', !env.settings.read().showGitTags),
+    'ukemi.toggleAutoFetch': () => toggleSetting(env, 'autoFetch.enabled', 'autoFetchEnabled'),
+    'ukemi.toggleGitTags': () => toggleSetting(env, 'showGitTags', 'showGitTags'),
     'ukemi.push': withModel(env, (model) =>
       env.operations.run('Push', model, () => model.repo.push()),
     ),
@@ -349,6 +359,12 @@ export function globalCommands(env: CommandEnv): Record<string, Handler> {
     }),
     'ukemi.forge.signOut': withModel(env, (model) => env.forge.signOut(model)),
     'ukemi.openSettings': () => env.workbench.openSettings(),
+    'ukemi.openRepositorySettings': async (arg?: unknown) => {
+      const root = parseContext(arg).repoId ?? env.registry.activeModel?.root
+      if (root) {
+        await env.workbench.openRepositorySettings(root)
+      }
+    },
     'ukemi.installJj': () => env.workbench.installJj(),
     'ukemi.view.asList': () => setChangedFilesView(env, 'list'),
     'ukemi.view.asTree': () => setChangedFilesView(env, 'tree'),

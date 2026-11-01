@@ -12,6 +12,7 @@ import type {
 import { isDesktopMessage } from '../../shared/desktopProtocol'
 import type { MenuEntry } from '../../shared/menus'
 import type { CommitView, WebviewMessage } from '../../shared/protocol'
+import { isRepositoryKey } from '../../shared/settingsScope'
 import { AutoFetcher } from '../app/autoFetch'
 import { ChangeSelection } from '../app/changeSelection'
 import { commitCommands } from '../app/commands/commitCommands'
@@ -38,6 +39,7 @@ import { errorMessage, type Logger } from '../util/logger'
 import { LoopbackRedirect } from './adapters/loopbackRedirect'
 import { RendererUi, type NativeUi } from './adapters/rendererUi'
 import { fsWatchRepo } from './adapters/watchRepo'
+import { arrangeTabs, move, pin, rename, unpin } from './repoTabs'
 import { TO_RENDERER, type DesktopContext } from './context'
 import {
   graphTitleMenu,
@@ -49,6 +51,7 @@ import {
 } from './menus'
 import { aboutText } from './about'
 import { settingFields } from './settingsSchema'
+import { foldersAfterClosing } from './startup'
 import { Terminals } from './terminals'
 import { desktopWorkbench, type PanelEntry } from './workbench'
 
@@ -99,8 +102,12 @@ export class DesktopSession implements Disposable {
   private readonly handleWebview: (message: WebviewMessage) => Promise<void>
   private readonly tabs = new Map<string, Tab>()
   private nextTab = 1
+  // Tab ids by the key their opener gave, for tabs that open once.
+  private readonly tabKeys = new Map<string, string>()
   private readonly disposables: Disposable[] = []
   private isReady = false
+  // The repository the settings form last showed.
+  private settingsRoot: string | null = null
   private isClosed = false
   // Native dialogs need a mapped parent. On Wayland, a dialog on a hidden window kills the app.
   private shown!: Promise<void>
@@ -142,9 +149,17 @@ export class DesktopSession implements Disposable {
       this.forge,
       this.autoFetch,
       this.askpass,
-      this.registry.onDidChange(() => this.scheduleState()),
+      this.registry.onDidChange(() => {
+        this.scheduleState()
+        // The form's "This repository" mode follows the active repository.
+        if (this.settingsRoot !== (this.registry.activeModel?.root ?? null)) {
+          this.postSettings()
+        }
+      }),
       this.registry.onDidChangeModel(() => this.scheduleState()),
       this.operations.onDidChange(() => this.scheduleState()),
+      this.autoFetch.onDidChange(() => this.scheduleState()),
+      context.repoTabs.onDidChange(() => this.scheduleState()),
       context.settings.onDidChange(() => {
         this.scheduleState()
         this.postSettings()
@@ -235,14 +250,11 @@ export class DesktopSession implements Disposable {
     }
   }
 
-  // Closes a repository tab. A repository found inside an open folder closes on its own.
+  // Closes a repository tab, also one found inside an open folder, and remembers it closed.
   async closeRepo(repoId: string): Promise<void> {
-    const index = this.folderList.indexOf(repoId)
-    if (index < 0) {
-      await this.registry.remove(repoId)
-      return
-    }
-    this.folderList.splice(index, 1)
+    const roots = this.registry.summaries().map((summary) => summary.id)
+    const next = foldersAfterClosing(this.folderList, roots, repoId)
+    this.folderList.splice(0, this.folderList.length, ...next)
     this.context.foldersChanged()
     this.window.setTitle(this.title())
     await this.registry.discover()
@@ -252,6 +264,14 @@ export class DesktopSession implements Disposable {
   showSettings(): void {
     this.postSettings()
     this.shell('settings')
+  }
+
+  async showRepositorySettings(root: string): Promise<void> {
+    if (this.registry.activeModel?.root !== root) {
+      await this.registry.setActive(root)
+    }
+    this.postSettings()
+    this.shell('repositorySettings')
   }
 
   showAbout(): void {
@@ -323,12 +343,20 @@ export class DesktopSession implements Disposable {
       workbench: desktopWorkbench(
         {
           post: (message) => this.post(message),
-          openPanelWindow: (entry, title, connect) => this.openPanelTab(entry, title, connect),
+          openPanelWindow: (entry, title, connect, key) =>
+            this.openPanelTab(entry, title, connect, key),
           openWindow: (root) => void this.addFolder(root),
           addFolder: (root) => void this.addFolder(root),
           hasFolders: () => false,
           openSettings: () => this.showSettings(),
+          openRepositorySettings: (root) => this.showRepositorySettings(root),
           openTerminal: (cwd, name) => this.terminals.open(cwd, name),
+          openPath: async (fsPath) => {
+            const problem = await shell.openPath(fsPath)
+            if (problem) {
+              void this.ui.error(`Ukemi: could not open ${fsPath}: ${problem}`)
+            }
+          },
           installJj: () => context.installJj(this.ui),
           splitPaths: {
             storageDir: context.paths.userData,
@@ -457,12 +485,55 @@ export class DesktopSession implements Disposable {
       ...workspaceCommands(env),
       ...evolutionCommands(env),
       'ukemi.showLog': () => this.shell('showLog'),
+      'ukemi.repoTab.rename': (arg) =>
+        this.withTab(arg, (repoId) => {
+          this.post({ type: 'desktop.startRename', repoId })
+        }),
+      'ukemi.repoTab.pin': (arg) =>
+        this.withTab(arg, (repoId) => this.context.repoTabs.change((p) => pin(p, repoId))),
+      'ukemi.repoTab.unpin': (arg) =>
+        this.withTab(arg, (repoId) => this.context.repoTabs.change((p) => unpin(p, repoId))),
       'ukemi.openView': () => this.focus(),
     }
   }
 
+  // Runs a tab command for a repository this window shows. The menu passes `{ repoId }`.
+  private async withTab(arg: unknown, fn: (repoId: string) => unknown): Promise<void> {
+    const repoId = isRecord(arg) ? arg.repoId : undefined
+    if (typeof repoId === 'string' && this.isOpenRepo(repoId)) {
+      await fn(repoId)
+    }
+  }
+
+  private isOpenRepo(repoId: unknown): repoId is string {
+    return this.registry.summaries().some((summary) => summary.id === repoId)
+  }
+
+  // The tabs as the window shows them, for moves by index.
+  private visibleTabs(): string[] {
+    return arrangeTabs(this.registry.summaries(), this.context.repoTabs.read()).map((t) => t.id)
+  }
+
   private async handleDesktop(message: DesktopRendererMessage): Promise<void> {
     switch (message.type) {
+      case 'desktop.renameTab':
+        if (this.isOpenRepo(message.repoId) && typeof message.name === 'string') {
+          const { repoId, name } = message
+          await this.context.repoTabs.change((p) => rename(p, repoId, name))
+        }
+        return
+      case 'desktop.moveTab':
+        if (this.isOpenRepo(message.repoId)) {
+          const { repoId, toIndex, offset } = message
+          const visible = this.visibleTabs()
+          const target = Number.isFinite(offset)
+            ? visible.indexOf(repoId) + Number(offset)
+            : Number(toIndex)
+          if (Number.isFinite(target)) {
+            await this.context.repoTabs.change((p) => move(p, visible, repoId, target))
+          }
+        }
+        return
       case 'desktop.uiAnswer':
         if (typeof message.id === 'number' && isRecord(message.answer)) {
           this.ui.answer(message.id, message.answer)
@@ -507,12 +578,7 @@ export class DesktopSession implements Disposable {
         this.postSettings()
         return
       case 'desktop.setSetting':
-        if (
-          typeof message.key === 'string' &&
-          settingFields({}).some((f) => f.key === message.key)
-        ) {
-          await this.context.settings.update(message.key, message.value)
-        }
+        await this.setSetting(message.key, message.value, message.repoId)
         return
       case 'desktop.openSettingsFile':
         this.context.openSettingsFile()
@@ -634,9 +700,12 @@ export class DesktopSession implements Disposable {
       hasFolders: this.folderList.length > 0,
       registry: this.registry,
       operations: this.operations,
-      config: this.context.settings.read(),
+      // The active repository's settings, with its overrides.
+      config: this.context.settings.read(this.registry.activeModel?.root),
+      autoFetch: this.autoFetch,
     })
-    this.post({ type: 'state', state })
+    const repos = arrangeTabs(state.repos, this.context.repoTabs.read())
+    this.post({ type: 'state', state: { ...state, repos } })
     const panels = sidePanels(this.registry.activeModel, this.folderList)
     this.post({
       type: 'desktop.panels',
@@ -714,8 +783,17 @@ export class DesktopSession implements Disposable {
     entry: PanelEntry,
     title: string,
     connect: (channel: PanelChannel<H>) => PanelHandler<W>,
+    key?: string,
   ): void {
+    const known = key ? this.tabKeys.get(key) : undefined
+    if (known && this.tabs.has(known)) {
+      this.post({ type: 'desktop.tabOpen', tab: { id: known, kind: entry, title } })
+      return
+    }
     const id = `${entry}-${this.nextTab++}`
+    if (key) {
+      this.tabKeys.set(key, id)
+    }
     let closed = false
     const channel: PanelChannel<H> = {
       post: async (message) => {
@@ -754,11 +832,42 @@ export class DesktopSession implements Disposable {
     return { ...row, inline: treeItemActions(row.view, row.contextValue, (c) => this.offers(c)) }
   }
 
+  private async setSetting(key: unknown, value: unknown, repoId: unknown): Promise<void> {
+    if (typeof key !== 'string' || !settingFields({}).some((f) => f.key === key)) {
+      return
+    }
+    if (repoId === undefined) {
+      await this.context.settings.update(key, value)
+      return
+    }
+    // Only open repositories, so the renderer cannot write overrides for arbitrary paths.
+    const isOpen = this.registry.summaries().some((summary) => summary.id === repoId)
+    if (typeof repoId === 'string' && isOpen && isRepositoryKey(key)) {
+      await this.context.settings.update(key, value, { root: repoId })
+    }
+  }
+
   private postSettings(): void {
+    const settings = this.context.settings
+    const overrides = settings.overrides()
+    const labels = new Map(this.registry.summaries().map((s) => [s.id, s.label]))
+    const overriddenIn = (key: string) =>
+      [...overrides]
+        .filter(([, values]) => key in values)
+        .map(([root]) => labels.get(root) ?? basename(root))
+    const root = this.registry.activeModel?.root ?? null
+    this.settingsRoot = root
     this.post({
       type: 'desktop.settings',
-      fields: settingFields(this.context.settings.values()),
-      path: this.context.settings.path,
+      fields: settingFields(settings.values(), overriddenIn),
+      path: settings.path,
+      repository: root
+        ? {
+            id: root,
+            label: labels.get(root) ?? basename(root),
+            values: { ...settings.values(root) },
+          }
+        : null,
     })
   }
 

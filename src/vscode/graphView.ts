@@ -198,7 +198,7 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable,
       hasFolders: (vscode.workspace.workspaceFolders ?? []).length > 0,
       registry: this.registry,
       operations: this.operations,
-      config: readConfig(),
+      config: readConfig(this.registry.activeModel?.root),
     })
   }
 

@@ -28,7 +28,7 @@ function readShare(): number {
 }
 
 function ChangeHeader({ detail, now }: { detail: ChangeDetail; now: number }) {
-  const { commit } = detail
+  const { commit, repoId } = detail
   const change = splitId(commit.changeId, commit.changePrefix, 8)
   const hash = splitId(commit.commitId, commit.commitPrefix, 8)
   const [subject = '', ...body] = commit.description.trimEnd().split('\n')
@@ -45,7 +45,24 @@ function ChangeHeader({ detail, now }: { detail: ChangeDetail; now: number }) {
         </span>
         {commit.isWorkingCopy && <span className="detail-tag detail-tag-here">@ working copy</span>}
         {commit.isImmutable && <span className="detail-tag">immutable</span>}
-        {commit.hasConflict && <span className="detail-tag detail-tag-conflict">conflict</span>}
+        {commit.hasConflict &&
+          (commit.isImmutable ? (
+            <span className="detail-tag detail-tag-conflict">conflict</span>
+          ) : (
+            <button
+              className="detail-tag detail-tag-conflict"
+              title="Resolve the conflicts of this change"
+              onClick={() =>
+                send({
+                  type: 'desktop.run',
+                  command: 'ukemi.conflict.resolve',
+                  arg: { repoId, commitId: commit.commitId },
+                })
+              }
+            >
+              conflict · resolve
+            </button>
+          ))}
       </div>
       <h1 className={`detail-subject${subject ? '' : ' is-empty'}`}>
         {subject || '(no description)'}

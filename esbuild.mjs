@@ -72,7 +72,8 @@ const desktopBuilds = [
     platform: 'browser',
     format: 'iife',
     target: 'es2022',
-    loader: { '.ttf': 'file' },
+    // The bundled file icon theme's font, for the desktop app only.
+    loader: { '.ttf': 'file', '.woff': 'file' },
     define: { 'process.env.NODE_ENV': JSON.stringify(isProduction ? 'production' : 'development') },
   },
 ]

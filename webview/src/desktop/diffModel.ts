@@ -1,4 +1,5 @@
 import { diffWordsWithSpace, structuredPatch } from 'diff'
+import type { Token } from '../editor/syntaxClasses'
 
 export interface DiffPart {
   text: string
@@ -12,6 +13,13 @@ export interface DiffRow {
   newLine: number | null
   // Word-level marks, only on a changed line paired with its counterpart.
   parts?: DiffPart[]
+}
+
+// A run of a line with one syntax class and one word mark.
+export interface DiffSegment {
+  text: string
+  cls?: string
+  changed: boolean
 }
 
 export interface DiffHunk {
@@ -149,4 +157,40 @@ export function patchHunks(patch: string): DiffHunk[] {
   flushHunk()
   flushNotes()
   return hunks
+}
+
+// Cuts a line at both its syntax tokens and its word marks, so each run has one of each.
+export function segments(
+  text: string,
+  tokens: readonly Token[] | undefined,
+  parts: readonly DiffPart[] | undefined,
+): DiffSegment[] {
+  const marks = parts ?? [{ text, changed: false }]
+  const cuts = new Set([0, text.length])
+  let offset = 0
+  const ranges = marks.map((part) => {
+    const range = { from: offset, to: offset + part.text.length, changed: part.changed }
+    offset = range.to
+    cuts.add(range.to)
+    return range
+  })
+  for (const token of tokens ?? []) {
+    cuts.add(Math.min(token.from, text.length))
+    cuts.add(Math.min(token.to, text.length))
+  }
+  const points = [...cuts].sort((a, b) => a - b)
+  const result: DiffSegment[] = []
+  for (let i = 0; i + 1 < points.length; i++) {
+    const from = points[i] as number
+    const to = points[i + 1] as number
+    const token = tokens?.find((item) => item.from <= from && to <= item.to)
+    const changed = ranges.some((range) => range.changed && range.from <= from && to <= range.to)
+    const previous = result[result.length - 1]
+    if (previous && previous.cls === token?.cls && previous.changed === changed) {
+      previous.text += text.slice(from, to)
+    } else {
+      result.push({ text: text.slice(from, to), cls: token?.cls, changed })
+    }
+  }
+  return result
 }

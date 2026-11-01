@@ -18,10 +18,10 @@ export function applyRepositorySettings(
     return registry.discover()
   }
   if (change.affects('workspaces.snapshotOnRefresh')) {
-    registry.applyWorkspaceSettings()
+    registry.applyWorkspaceSettings(change)
   }
   if (change.affects('showLineStats')) {
-    return registry.applyLineStats()
+    return registry.applyLineStats(change)
   }
 }
 

@@ -8,6 +8,8 @@ import { RepoModel } from '../repo/repoModel'
 import type { Logger } from '../util/logger'
 import { Emitter, type Disposable } from './events'
 import type { Host } from './host'
+import { readView, rememberView, type GraphView } from './rememberedView'
+import type { SettingsChange } from './settings'
 
 const ACTIVE_REFRESH_DELAY_MS = 400
 const BACKGROUND_REFRESH_DELAY_MS = 3_000
@@ -135,18 +137,34 @@ export class RepoRegistry implements Disposable {
     }
   }
 
-  applyWorkspaceSettings(): void {
-    const enabled = this.host.settings.read().snapshotOnRefresh
-    for (const model of this.models) {
-      model.setSnapshotOtherWorkspaces(enabled)
+  // Each repository can override these, so a change only reaches the ones it affects.
+  applyWorkspaceSettings(change?: SettingsChange): void {
+    for (const model of this.modelsAffected('workspaces.snapshotOnRefresh', change)) {
+      model.setSnapshotOtherWorkspaces(this.host.settings.read(model.root).snapshotOnRefresh)
     }
   }
 
-  applyLineStats(): Promise<void> {
-    const enabled = this.host.settings.read().showLineStats
-    return Promise.all(this.models.map((model) => model.setShowLineStats(enabled))).then(
-      () => undefined,
-    )
+  applyLineStats(change?: SettingsChange): Promise<void> {
+    const models = this.modelsAffected('showLineStats', change)
+    return Promise.all(
+      models.map((model) =>
+        model.setShowLineStats(this.host.settings.read(model.root).showLineStats),
+      ),
+    ).then(() => undefined)
+  }
+
+  // The graph opens with this filter and depth the next time the repository opens.
+  rememberView(root: string, view: GraphView): PromiseLike<void> {
+    return rememberView(this.host.store, root, view, this.defaultView(root))
+  }
+
+  private defaultView(root: string): GraphView {
+    const config = this.host.settings.read(root)
+    return { filter: config.defaultFilter, depth: config.historyDepth }
+  }
+
+  private modelsAffected(key: string, change: SettingsChange | undefined): RepoModel[] {
+    return this.models.filter((model) => !change || change.affects(key, model.root))
   }
 
   async remove(root: string): Promise<void> {
@@ -192,10 +210,11 @@ export class RepoRegistry implements Disposable {
     if (kind !== 'jj') {
       return entry
     }
-    const config = this.host.settings.read()
+    const config = this.host.settings.read(root)
+    const view = readView(this.host.store, root, this.defaultView(root))
     const model = new RepoModel(new JjRepo(root, this.runner), this.logger, {
-      depth: config.historyDepth,
-      filter: config.defaultFilter,
+      depth: view?.depth ?? config.historyDepth,
+      filter: view?.filter ?? config.defaultFilter,
       snapshotOtherWorkspaces: config.snapshotOnRefresh,
       showLineStats: config.showLineStats,
     })

@@ -153,6 +153,29 @@ describe('RepoModel', () => {
     ).toEqual(['local:local-only', 'local:pushed', 'origin:pushed'])
   })
 
+  test('counts how far the current bookmarks are ahead of and behind their remotes', async () => {
+    const remote = join(fixture.dir, 'remote.git')
+    execFileSync('git', ['init', '--bare', '-q', remote])
+    jj(root, 'git', 'remote', 'add', 'origin', remote)
+    writeFile(root, 'a.txt', 'a\n')
+    jj(root, 'describe', '-m', 'pushed')
+    jj(root, 'bookmark', 'set', 'feature', '-r', '@')
+    jj(root, 'git', 'push', '--bookmark', 'feature')
+    jj(root, 'new', '-m', 'one more')
+    writeFile(root, 'b.txt', 'b\n')
+    jj(root, 'new', '-m', 'and another')
+    writeFile(root, 'c.txt', 'c\n')
+    jj(root, 'bookmark', 'set', 'feature', '-r', '@')
+    jj(root, 'bookmark', 'set', 'local-only', '-r', '@')
+
+    await model.refresh()
+
+    expect(model.graph?.tracking).toEqual([
+      { name: 'feature', remote: 'origin', tracked: true, ahead: 2, behind: 0 },
+    ])
+    expect(model.graph?.operationId).toMatch(/^[0-9a-f]+$/)
+  })
+
   test('treats bookmarks as synced when the repository has no remote', async () => {
     jj(root, 'bookmark', 'set', 'solo', '-r', '@')
 

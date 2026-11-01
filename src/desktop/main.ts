@@ -27,6 +27,7 @@ import { adoptLoginShellPath } from './adapters/loginShellPath'
 import { SecretsFile } from './adapters/secretsFile'
 import { SettingsFile } from './adapters/settingsFile'
 import { TrustStore } from './adapters/trustStore'
+import { RepoTabStore } from './adapters/repoTabStore'
 import { TO_MAIN, type DesktopContext, type DesktopPaths, type Page } from './context'
 import { fileLogger } from './fileLogger'
 import { detectSystemFont, resolveFonts, type SystemFont } from './fonts'
@@ -111,6 +112,7 @@ class DesktopApp implements DesktopContext {
   readonly settings = new SettingsFile(join(this.paths.userData, 'settings.json'))
   readonly state = new KeyValueFile(join(this.paths.userData, 'state.json'))
   readonly trust = new TrustStore(this.state)
+  readonly repoTabs = new RepoTabStore(this.state)
   readonly jj: { path: string | null; version: string | null } = { path: null, version: null }
   private systemFont: SystemFont | null = null
   readonly secrets: SecretsFile
@@ -165,6 +167,7 @@ class DesktopApp implements DesktopContext {
       this.state.get<string[][]>(OPEN_FOLDERS_KEY) ?? [],
       this.settings.values()[RESTORE_REPOSITORIES] !== false,
       (folder) => existsSync(folder),
+      this.repoTabs.read().pinned,
     )
     for (const folders of windows) {
       this.openWindow(folders)

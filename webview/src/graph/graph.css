@@ -317,6 +317,10 @@
   background: var(--ukemi-here-bg);
 }
 
+.badge.here.labeled {
+  padding-right: 5px;
+}
+
 .badge .svg-icon {
   width: 12px;
   height: 12px;

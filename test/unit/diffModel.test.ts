@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { diffHunks, patchHunks } from '../../webview/src/desktop/diffModel'
+import { diffHunks, patchHunks, segments } from '../../webview/src/desktop/diffModel'
 
 const lines = (...items: string[]) => `${items.join('\n')}\n`
 
@@ -73,5 +73,28 @@ describe('patchHunks', () => {
   test('keeps lines outside hunks as notes', () => {
     const [first] = patchHunks('Commit description changed:\n  - fix\n  + fix typo\n')
     expect(first?.rows.every((r) => r.kind === 'note')).toBe(true)
+  })
+})
+
+describe('segments', () => {
+  test('keeps a line whole when it has no tokens or marks', () => {
+    expect(segments('plain', undefined, undefined)).toEqual([{ text: 'plain', changed: false }])
+  })
+
+  test('cuts a token where a word mark starts, keeping its class on both pieces', () => {
+    const tokens = [
+      { from: 0, to: 3, cls: 'tok-keyword' },
+      { from: 4, to: 9, cls: 'tok-string' },
+    ]
+    const parts = [
+      { text: 'let "a', changed: false },
+      { text: 'bc"', changed: true },
+    ]
+    expect(segments('let "abc"', tokens, parts)).toEqual([
+      { text: 'let', cls: 'tok-keyword', changed: false },
+      { text: ' ', cls: undefined, changed: false },
+      { text: '"a', cls: 'tok-string', changed: false },
+      { text: 'bc"', cls: 'tok-string', changed: true },
+    ])
   })
 })

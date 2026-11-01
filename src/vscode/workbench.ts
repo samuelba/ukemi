@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import * as vscode from 'vscode'
 import type { CommandEnv, Workbench } from '../app/commands/context'
 import { openCleanupPanel } from './cleanupPanel'
@@ -22,9 +23,27 @@ export function vscodeWorkbench(
     openCommitDiff,
     openVersionDiff,
     openFileAtRevision,
+    // VS Code is the editor: the working copy's file opens in it, and its conflict lenses resolve.
+    openEditor: async (model, commit, path) => {
+      if (commit.isWorkingCopy) {
+        await vscode.window.showTextDocument(vscode.Uri.file(join(model.root, path)))
+        return
+      }
+      await openFileAtRevision(model, commit, path)
+      void vscode.window.showInformationMessage(
+        'Ukemi: only working-copy files can be edited here. Run "jj new" on the change to edit it.',
+      )
+    },
+    openFileExternally: async (fsPath) => {
+      await vscode.window.showTextDocument(vscode.Uri.file(fsPath))
+    },
     openSplit: async (target) => openSplitPanel(env(), paths, target),
     openCleanup: (model) => openCleanupPanel(env(), paths.extensionUri, model),
     openSettings: (key) => openSettings(key ?? `@ext:${paths.extensionId}`),
+    // VS Code keeps repository settings in the settings of the workspace folder.
+    openRepositorySettings: async () => {
+      await vscode.commands.executeCommand('workbench.action.openFolderSettings')
+    },
     openWindow: async (root) => {
       await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), {
         forceNewWindow: true,

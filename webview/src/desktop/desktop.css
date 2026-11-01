@@ -13,14 +13,43 @@ body {
 
 :root {
   --shell-titlebar: 40px;
+  --shell-statusbar: 24px;
   --shell-radius: 6px;
   --shell-ease: cubic-bezier(0.16, 1, 0.3, 1);
   --shell-fast: 120ms;
 }
 
+/* Chromium's overlay scrollbars only show while scrolling. Styled ones stay visible wherever a
+   pane overflows. A rule that sets scrollbar-width, like the tab strips, still wins. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--vscode-scrollbarSlider-background) padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--vscode-scrollbarSlider-hoverBackground) padding-box;
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: var(--vscode-scrollbarSlider-activeBackground) padding-box;
+}
+
 .shell {
   display: grid;
-  grid-template-rows: var(--shell-titlebar) 1fr;
+  /* The hidden panel slot leaves the grid, so the status bar takes the last row either way. */
+  grid-template-rows: var(--shell-titlebar) 1fr var(--shell-statusbar);
+  grid-template-columns: minmax(0, 1fr);
   height: 100%;
 }
 
@@ -202,16 +231,33 @@ kbd {
 
 /* Sidebar ----------------------------------------------------------------------------------- */
 
+/* Bookmarks and Workspaces split the height, and each scrolls on its own. Sidebar.tsx sets the
+   rows. */
 .sidebar {
-  overflow: auto;
-  padding: 6px 0 16px;
+  display: grid;
+  /* Without a track size, the column grows to the longest bookmark and hides the scrollbar. */
+  grid-template-columns: minmax(0, 1fr);
+  overflow: hidden;
   background: var(--vscode-sideBar-background);
 }
 
-.side-section + .side-section {
-  margin-top: 10px;
-  border-top: 1px solid var(--vscode-sideBarSectionHeader-border);
+.side-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   padding-top: 6px;
+}
+
+.side-section-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: 8px;
+}
+
+/* Without the splitter between them, a closed section keeps a rule above the next one. */
+.sidebar:not([data-split]) .side-section + .side-section {
+  border-top: 1px solid var(--vscode-sideBarSectionHeader-border);
 }
 
 .side-section-header {
@@ -342,6 +388,8 @@ kbd {
 
 .detail {
   display: grid;
+  /* Without a track size, the column grows to the widest line and the pane clips it. */
+  grid-template-columns: minmax(0, 1fr);
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -398,6 +446,14 @@ kbd {
   border-color: transparent;
   background: var(--vscode-inputValidation-errorBackground);
   color: var(--vscode-errorForeground);
+}
+
+button.detail-tag-conflict {
+  cursor: pointer;
+}
+
+button.detail-tag-conflict:hover {
+  border-color: var(--vscode-errorForeground);
 }
 
 .detail-subject {
@@ -571,6 +627,11 @@ kbd {
   cursor: pointer;
 }
 
+/* Sits close to its path, like in the file list. */
+.diff-file-header .file-icon {
+  margin-right: -4px;
+}
+
 .diff-path {
   overflow: hidden;
   flex: 1;
@@ -659,6 +720,50 @@ kbd {
 .diff-text {
   padding-right: 16px;
   white-space: pre;
+}
+
+/* The editor's syntax colors, from editor.css. */
+.diff-text .tok-keyword,
+.diff-text .tok-heading {
+  color: var(--syntax-keyword);
+}
+
+.diff-text .tok-heading {
+  font-weight: 600;
+}
+
+.diff-text .tok-string {
+  color: var(--syntax-string);
+}
+
+.diff-text .tok-comment {
+  color: var(--syntax-comment);
+  font-style: italic;
+}
+
+.diff-text .tok-number {
+  color: var(--syntax-number);
+}
+
+.diff-text .tok-function {
+  color: var(--syntax-function);
+}
+
+.diff-text .tok-type {
+  color: var(--syntax-type);
+}
+
+.diff-text .tok-property {
+  color: var(--syntax-property);
+}
+
+.diff-text .tok-link {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: underline;
+}
+
+.diff-text .tok-invalid {
+  color: var(--vscode-errorForeground);
 }
 
 .diff-added {
@@ -1122,6 +1227,60 @@ kbd {
   text-overflow: ellipsis;
 }
 
+/* A pinned tab keeps its pin in sight, and a gap sets the pinned tabs apart from the others. */
+.repo-tab .repo-tab-pin {
+  opacity: 0.7;
+}
+
+.repo-tab.is-last-pinned {
+  margin-right: 9px;
+}
+
+.repo-tab.is-last-pinned::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: -6px;
+  bottom: 6px;
+  width: 1px;
+  background: var(--vscode-widget-border);
+}
+
+.repo-tab-input {
+  width: auto;
+  min-width: 0;
+  max-width: 180px;
+  height: 20px;
+  padding: 0 4px;
+  border: 1px solid var(--vscode-focusBorder);
+  border-radius: 4px;
+  outline: none;
+  background: var(--vscode-input-background, var(--vscode-editor-background));
+  color: var(--vscode-foreground);
+  font: inherit;
+  user-select: text;
+}
+
+/* Where a dragged tab lands: a bar in the gap before or after the tab under the pointer. */
+.repo-tab.drop-before::after,
+.repo-tab.drop-after::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--vscode-focusBorder);
+}
+
+.repo-tab.drop-before::after {
+  left: -2px;
+}
+
+.repo-tab.drop-after::after {
+  right: -2px;
+}
+
 .repo-tab-count {
   padding: 0 5px;
   border-radius: 999px;
@@ -1166,6 +1325,7 @@ kbd {
 .right-pane {
   display: grid;
   grid-template-rows: auto 1fr;
+  grid-template-columns: minmax(0, 1fr);
   min-height: 0;
   background: var(--vscode-editorWidget-background);
 }
@@ -1315,10 +1475,85 @@ kbd {
 }
 
 .settings-header h1 {
-  margin: 0 0 12px;
+  margin: 0;
   font-size: 20px;
   font-weight: 600;
   letter-spacing: -0.01em;
+}
+
+.settings-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+
+.settings-title h1 {
+  margin: 0;
+}
+
+/* All repositories | This repository: a segmented control, the active side raised. */
+.scope-switch {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: var(--shell-radius);
+  background: var(--vscode-sideBar-background);
+}
+
+.scope-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 220px;
+  padding: 3px 10px;
+  border: none;
+  border-radius: calc(var(--shell-radius) - 2px);
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition:
+    background var(--shell-fast),
+    color var(--shell-fast);
+}
+
+.scope-option:hover:not(:disabled) {
+  color: var(--vscode-foreground);
+}
+
+.scope-option.is-active {
+  background: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+  box-shadow: 0 1px 2px var(--vscode-widget-shadow);
+}
+
+.scope-option:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.scope-option:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+/* In the repository mode the header carries the accent of the working copy, so the mode is
+   hard to miss while editing. */
+.settings.is-repository .settings-header {
+  border-bottom-color: var(--shu-ink);
+}
+
+.settings-scope-note {
+  margin: -4px 0 10px;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
 }
 
 .settings-tools {
@@ -1356,6 +1591,29 @@ kbd {
   width: 2px;
   border-radius: 2px;
   background: var(--vscode-focusBorder);
+}
+
+.setting-scope {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.setting-scope.is-own {
+  color: var(--shu-ink);
+}
+
+.settings.is-repository .setting.is-modified::before {
+  background: var(--shu-ink);
+}
+
+.setting-overridden {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.setting-overridden .codicon {
+  font-size: 12px;
 }
 
 .setting-head {
@@ -1794,4 +2052,142 @@ textarea.setting-input {
   right: 4px;
   padding-left: 14px;
   background: linear-gradient(to right, transparent, var(--vscode-sideBar-background) 14px);
+}
+
+/* Status bar: the active repository at a glance ------------------------------------------- */
+
+.status-bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 0 6px;
+  border-top: 1px solid var(--vscode-statusBar-border);
+  background: var(--vscode-statusBar-background);
+  color: var(--vscode-statusBar-foreground);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.status-group {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* Only the left group gives way, and in it only the change subject. */
+.status-left {
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.status-right {
+  flex: none;
+}
+
+.status-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0 7px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+  transition: background var(--shell-fast);
+}
+
+button.status-item {
+  cursor: pointer;
+}
+
+button.status-item:hover {
+  background: var(--vscode-statusBarItem-hoverBackground);
+  color: var(--vscode-foreground);
+}
+
+button.status-item:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: -2px;
+}
+
+.status-item .codicon {
+  flex: none;
+  font-size: 14px;
+}
+
+.status-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-code {
+  flex: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 11.5px;
+}
+
+/* Shrinks far faster than the bookmark, so the subject gives way first. */
+.status-change {
+  flex: 0 1000 auto;
+  min-width: 80px;
+}
+
+/* A long bookmark name gives way after the change subject, down to a few characters. */
+.status-bookmark {
+  flex: 0 1 auto;
+  min-width: 72px;
+}
+
+.status-bookmark .status-code {
+  flex: 0 1 auto;
+}
+
+.status-bookmark .status-text {
+  flex: none;
+}
+
+.status-conflicts,
+.status-right .status-item {
+  flex: none;
+}
+
+.status-announce {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.status-item.tone-muted {
+  color: var(--ink-faint);
+}
+
+.status-item.tone-warning {
+  color: var(--vscode-editorWarning-foreground);
+}
+
+.status-item.tone-error {
+  flex: 0 1 auto;
+  max-width: 40ch;
+  color: var(--vscode-errorForeground);
+}
+
+.status-change.tone-warning .status-code {
+  color: var(--shu-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-item .codicon-modifier-spin {
+    animation: none;
+  }
 }

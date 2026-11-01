@@ -315,7 +315,7 @@ async function syncStackFor(
           `The remote branches ${branches.join(', ')} have different content than your local ones. Someone may have pushed to them. Overwrite them with your local versions?`,
           'Overwrite',
         ),
-      nativeStacks: env.settings.read().nativeStacks,
+      nativeStacks: env.settings.read(model.root).nativeStacks,
     }),
   )
   await env.forge.refreshRequests(model, { force: true })
@@ -338,7 +338,7 @@ async function autoSyncStack(
     const result = await syncStacks(model, client, env.logger, {
       push: false,
       seed,
-      nativeStacks: env.settings.read().nativeStacks,
+      nativeStacks: env.settings.read(model.root).nativeStacks,
     })
     env.logger.info(describeSync(result))
     if (result.retargeted.length > 0 || result.native.length > 0) {

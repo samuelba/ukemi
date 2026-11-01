@@ -1,6 +1,9 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import type { DiffDocument, DiffFile } from '../../../shared/desktopProtocol'
-import { diffHunks, patchHunks, type DiffHunk, type DiffRow } from './diffModel'
+import { parserFor } from '../editor/languages'
+import { highlightLines, type Token } from '../editor/syntaxClasses'
+import { FileTypeIcon } from '../graph/FileIcon'
+import { diffHunks, patchHunks, segments, type DiffHunk, type DiffRow } from './diffModel'
 
 const STATUS_LETTER: Record<DiffFile['status'], string> = {
   added: 'A',
@@ -11,7 +14,31 @@ const STATUS_LETTER: Record<DiffFile['status'], string> = {
   changed: '~',
 }
 
-function Line({ row }: { row: DiffRow }) {
+// The syntax tokens of each side's lines, when the language is known.
+interface SideTokens {
+  old: Token[][] | null
+  new: Token[][] | null
+}
+
+const NO_TOKENS: SideTokens = { old: null, new: null }
+
+function sideTokens(path: string, text: string | undefined): Token[][] | null {
+  return text === undefined ? null : highlightLines(text, parserFor(path, text))
+}
+
+// A removed line has the old side's colors, every other line the new side's.
+function rowTokens(row: DiffRow, tokens: SideTokens): Token[] | undefined {
+  if (row.kind === 'note') {
+    return undefined
+  }
+  if (row.kind === 'removed') {
+    return row.oldLine === null ? undefined : tokens.old?.[row.oldLine - 1]
+  }
+  return row.newLine === null ? undefined : tokens.new?.[row.newLine - 1]
+}
+
+function Line({ row, tokens }: { row: DiffRow; tokens: SideTokens }) {
+  const lineTokens = rowTokens(row, tokens)
   return (
     <tr className={`diff-row diff-${row.kind}`}>
       <td className="diff-num">{row.oldLine ?? ''}</td>
@@ -20,33 +47,34 @@ function Line({ row }: { row: DiffRow }) {
         {row.kind === 'added' ? '+' : row.kind === 'removed' ? '−' : ''}
       </td>
       <td className="diff-text">
-        {row.parts
-          ? row.parts.map((part, index) =>
-              part.changed ? (
-                <mark key={index}>{part.text}</mark>
+        {row.parts || lineTokens
+          ? segments(row.text, lineTokens, row.parts).map((part, index) => {
+              const text = <span className={part.cls}>{part.text}</span>
+              return part.changed ? (
+                <mark key={index}>{text}</mark>
               ) : (
-                <span key={index}>{part.text}</span>
-              ),
-            )
-          : row.text || ' '}
+                <Fragment key={index}>{text}</Fragment>
+              )
+            })
+          : row.text || ' '}
       </td>
     </tr>
   )
 }
 
-function Hunks({ hunks }: { hunks: readonly DiffHunk[] }) {
+function Hunks({ hunks, tokens = NO_TOKENS }: { hunks: readonly DiffHunk[]; tokens?: SideTokens }) {
   return (
     <table className="diff-table">
       <tbody>
         {hunks.map((hunk, index) => (
-          <HunkRows key={index} hunk={hunk} />
+          <HunkRows key={index} hunk={hunk} tokens={tokens} />
         ))}
       </tbody>
     </table>
   )
 }
 
-function HunkRows({ hunk }: { hunk: DiffHunk }) {
+function HunkRows({ hunk, tokens }: { hunk: DiffHunk; tokens: SideTokens }) {
   return (
     <>
       {hunk.header && (
@@ -55,7 +83,7 @@ function HunkRows({ hunk }: { hunk: DiffHunk }) {
         </tr>
       )}
       {hunk.rows.map((row, index) => (
-        <Line key={index} row={row} />
+        <Line key={index} row={row} tokens={tokens} />
       ))}
     </>
   )
@@ -80,6 +108,17 @@ function FileDiff({ file, startOpen }: { file: DiffFile; startOpen: boolean }) {
     () => (isBinary ? [] : diffHunks(file.left?.text ?? null, file.right?.text ?? null)),
     [file, isBinary],
   )
+  // Only an open file pays for parsing its two sides.
+  const tokens = useMemo(
+    (): SideTokens =>
+      !isOpen || isBinary
+        ? NO_TOKENS
+        : {
+            old: sideTokens(file.path, file.left?.text),
+            new: sideTokens(file.path, file.right?.text),
+          },
+    [file, isOpen, isBinary],
+  )
   const counts = lineCounts(hunks)
   return (
     <section className="diff-file" data-open={isOpen} id={`diff-${file.path}`}>
@@ -88,6 +127,7 @@ function FileDiff({ file, startOpen }: { file: DiffFile; startOpen: boolean }) {
         <span className={`diff-status diff-status-${file.status}`}>
           {STATUS_LETTER[file.status]}
         </span>
+        <FileTypeIcon path={file.path} />
         <span className="diff-path">{file.path}</span>
         {!isBinary && (
           <span className="diff-counts">
@@ -102,9 +142,29 @@ function FileDiff({ file, startOpen }: { file: DiffFile; startOpen: boolean }) {
         ) : hunks.length === 0 ? (
           <p className="diff-placeholder">No changes in the content.</p>
         ) : (
-          <Hunks hunks={hunks} />
+          <Hunks hunks={hunks} tokens={tokens} />
         ))}
     </section>
+  )
+}
+
+function FileView({ path, text }: { path: string; text: string }) {
+  const rows = useMemo(
+    (): DiffRow[] =>
+      text
+        .replace(/\n$/, '')
+        .split('\n')
+        .map((line, index) => ({ kind: 'same', text: line, oldLine: null, newLine: index + 1 })),
+    [text],
+  )
+  const tokens = useMemo(
+    (): SideTokens => ({ old: null, new: sideTokens(path, text) }),
+    [path, text],
+  )
+  return (
+    <div className="diff-view">
+      <Hunks hunks={[{ header: '', rows }]} tokens={tokens} />
+    </div>
   )
 }
 
@@ -119,15 +179,7 @@ export function DiffView({ document }: { document: DiffDocument }) {
     )
   }
   if (document.kind === 'file') {
-    const rows: DiffRow[] = document.text
-      .replace(/\n$/, '')
-      .split('\n')
-      .map((text, index) => ({ kind: 'same', text, oldLine: null, newLine: index + 1 }))
-    return (
-      <div className="diff-view">
-        <Hunks hunks={[{ header: '', rows }]} />
-      </div>
-    )
+    return <FileView path={document.path} text={document.text} />
   }
   return (
     <div className="diff-view">

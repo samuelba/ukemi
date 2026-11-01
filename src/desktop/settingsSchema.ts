@@ -1,4 +1,5 @@
 import type { SettingField, SettingOption } from '../../shared/desktopProtocol'
+import { isRepositoryKey } from '../../shared/settingsScope'
 import packageJson from '../../package.json'
 import {
   EDITOR_FONT_FAMILY,
@@ -42,7 +43,10 @@ const GROUPS: ReadonlyArray<readonly [string, (key: string) => boolean]> = [
 ]
 
 // Settings of the standalone app alone. VS Code never sees them, so they are not in package.json.
-const DESKTOP_FIELDS: readonly Omit<SettingField, 'value'>[] = [
+const DESKTOP_FIELDS: readonly Omit<
+  SettingField,
+  'value' | 'isRepositoryScoped' | 'overriddenIn'
+>[] = [
   {
     key: RESTORE_REPOSITORIES,
     group: 'General',
@@ -165,8 +169,12 @@ function options(schema: PropertySchema): SettingOption[] | undefined {
   })
 }
 
-// The form fields of the settings view, with the values the user has set.
-export function settingFields(values: Readonly<Record<string, unknown>>): SettingField[] {
+// The form fields of the settings view, with the values the user has set. `overriddenIn`
+// names the repositories that override a key.
+export function settingFields(
+  values: Readonly<Record<string, unknown>>,
+  overriddenIn: (key: string) => string[] = () => [],
+): SettingField[] {
   const properties = packageJson.contributes.configuration.properties as Record<
     string,
     PropertySchema
@@ -183,6 +191,8 @@ export function settingFields(values: Readonly<Record<string, unknown>>): Settin
         type: fieldType(schema),
         default: schema.default,
         value: values[key],
+        isRepositoryScoped: isRepositoryKey(key),
+        overriddenIn: isRepositoryKey(key) ? overriddenIn(key) : [],
       }
       const choices = options(schema)
       return {
@@ -194,7 +204,12 @@ export function settingFields(values: Readonly<Record<string, unknown>>): Settin
         ...(schema.patternErrorMessage ? { patternMessage: schema.patternErrorMessage } : {}),
       }
     })
-  const desktop = DESKTOP_FIELDS.map((field) => ({ ...field, value: values[field.key] }))
+  const desktop = DESKTOP_FIELDS.map((field) => ({
+    ...field,
+    value: values[field.key],
+    isRepositoryScoped: false,
+    overriddenIn: [],
+  }))
   const all = [...desktop, ...fields]
   return GROUP_ORDER.flatMap((group) => all.filter((field) => field.group === group))
 }

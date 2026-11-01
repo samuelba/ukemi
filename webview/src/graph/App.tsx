@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { FileIconTheme } from '../../../shared/fileIconTheme'
 import type { ChangedFile } from '../../../shared/model'
 import type { CommitView, HostMessage, ViewState, WebviewMessage } from '../../../shared/protocol'
@@ -23,6 +23,8 @@ const fileKey = (repoId: string, commitId: string) => `${repoId}\n${commitId}`
 export function App() {
   const [state, setState] = useState<ViewState | null>(null)
   const [fileIcons, setFileIcons] = useState<FileIconTheme | null>(null)
+  // The desktop app has no host theme and provides its own bundled one around the graph.
+  const bundledIcons = useContext(FileIconThemeContext)
   const [files, setFiles] = useState<ReadonlyMap<string, ChangedFile[]>>(new Map())
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const [isWorkingCopyCollapsed, setIsWorkingCopyCollapsed] = useState(false)
@@ -179,7 +181,7 @@ export function App() {
     commit.isWorkingCopy ? graph?.workingCopyFiles : files.get(fileKey(repoId, commit.commitId))
 
   return (
-    <FileIconThemeContext.Provider value={fileIcons}>
+    <FileIconThemeContext.Provider value={fileIcons ?? bundledIcons}>
       <FileIconFonts theme={fileIcons} />
       <div className="app">
         <Toolbar

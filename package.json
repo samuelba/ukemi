@@ -48,6 +48,26 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@codemirror/commands": "6.11.1",
+    "@codemirror/lang-cpp": "6.0.3",
+    "@codemirror/lang-css": "6.3.1",
+    "@codemirror/lang-go": "6.0.1",
+    "@codemirror/lang-html": "6.4.12",
+    "@codemirror/lang-java": "6.0.2",
+    "@codemirror/lang-javascript": "6.2.5",
+    "@codemirror/lang-json": "6.0.2",
+    "@codemirror/lang-markdown": "6.5.2",
+    "@codemirror/lang-php": "6.0.2",
+    "@codemirror/lang-python": "6.2.1",
+    "@codemirror/lang-rust": "6.0.2",
+    "@codemirror/lang-sass": "6.0.2",
+    "@codemirror/lang-yaml": "6.1.3",
+    "@codemirror/language": "6.13.1",
+    "@codemirror/legacy-modes": "6.5.5",
+    "@codemirror/search": "6.7.2",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.15",
+    "@lezer/highlight": "1.2.5",
     "@playwright/test": "1.64.1",
     "@resvg/resvg-js": "^2.6.2",
     "@types/node": "^20.19.43",
@@ -189,6 +209,12 @@
       {
         "command": "ukemi.openSettings",
         "title": "Open Settings",
+        "category": "Ukemi",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "ukemi.openRepositorySettings",
+        "title": "Repository Settings...",
         "category": "Ukemi",
         "icon": "$(gear)"
       },
@@ -507,6 +533,28 @@
         "icon": "$(diff)"
       },
       {
+        "command": "ukemi.file.edit",
+        "title": "Edit File",
+        "category": "Ukemi",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "ukemi.conflict.resolve",
+        "title": "Resolve Conflicts",
+        "category": "Ukemi",
+        "icon": "$(warning)"
+      },
+      {
+        "command": "ukemi.conflict.takeSide1",
+        "title": "Resolve with Side #1",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.conflict.takeSide2",
+        "title": "Resolve with Side #2",
+        "category": "Ukemi"
+      },
+      {
         "command": "ukemi.file.splitAbove",
         "title": "Move to New Change After",
         "category": "Ukemi"
@@ -790,6 +838,11 @@
     "menus": {
       "webview/context": [
         {
+          "command": "ukemi.openRepositorySettings",
+          "group": "2_settings@1",
+          "when": "webviewSection == 'ukemi.repoTab'"
+        },
+        {
           "command": "ukemi.commit.new",
           "group": "1_new@1",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit'"
@@ -808,6 +861,11 @@
           "command": "ukemi.commit.makeEditable",
           "group": "1_new@4",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit' && isImmutable"
+        },
+        {
+          "command": "ukemi.conflict.resolve",
+          "group": "1_new@5",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit' && hasConflict && !isImmutable"
         },
         {
           "command": "ukemi.commit.describe",
@@ -999,9 +1057,24 @@
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.file'"
         },
         {
+          "command": "ukemi.file.edit",
+          "group": "1_open@3",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.file' && !isImmutable && !isRemoved"
+        },
+        {
           "command": "ukemi.file.addToChat",
           "group": "1_open@3",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.file' && !isRemoved"
+        },
+        {
+          "command": "ukemi.conflict.takeSide1",
+          "group": "2_resolve@1",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.file' && isConflicted && !isImmutable"
+        },
+        {
+          "command": "ukemi.conflict.takeSide2",
+          "group": "2_resolve@2",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.file' && isConflicted && !isImmutable"
         },
         {
           "command": "ukemi.file.splitBelow",
@@ -1492,6 +1565,22 @@
           "when": "false"
         },
         {
+          "command": "ukemi.file.edit",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.conflict.resolve",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.conflict.takeSide1",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.conflict.takeSide2",
+          "when": "false"
+        },
+        {
           "command": "ukemi.file.splitAbove",
           "when": "false"
         },
@@ -1846,6 +1935,7 @@
           "description": "Folder names to skip during the repository search."
         },
         "ukemi.defaultFilter": {
+          "scope": "resource",
           "type": "string",
           "enum": [
             "recent",
@@ -1865,6 +1955,7 @@
           "description": "Filter that the change graph shows first."
         },
         "ukemi.historyDepth": {
+          "scope": "resource",
           "type": "string",
           "enum": [
             "7d",
@@ -1889,16 +1980,19 @@
           "description": "Show full file paths in the change graph."
         },
         "ukemi.showLineStats": {
+          "scope": "resource",
           "type": "boolean",
           "default": false,
           "description": "Show added and removed line counts on the working copy and on changed files. This reads those file contents on each refresh."
         },
         "ukemi.showGitTags": {
+          "scope": "resource",
           "type": "boolean",
           "default": true,
           "description": "Show git tags on changes in the graph."
         },
         "ukemi.workspaces.snapshotOnRefresh": {
+          "scope": "resource",
           "type": "boolean",
           "default": false,
           "description": "On each refresh, snapshot every other workspace so its file changes show up. Each snapshot is a jj operation and can race with jj running in that workspace."
@@ -1917,11 +2011,13 @@
           "description": "How changed files appear under a change in the graph."
         },
         "ukemi.autoFetch.enabled": {
+          "scope": "resource",
           "type": "boolean",
           "default": false,
           "description": "Fetch the active repository on a timer."
         },
         "ukemi.autoFetch.interval": {
+          "scope": "resource",
           "type": "string",
           "default": "10m",
           "pattern": "^(every\\s+)?(\\d+(\\.\\d+)?|\\.\\d+)\\s*[smhdSMHD]$",
@@ -1956,11 +2052,13 @@
           "markdownDescription": "GitLab OAuth application client IDs, keyed by host. The client ID is not a secret. Example: `{ \"git.example.com\": \"abc123\" }`. Create a non-confidential application with the `api` scope and redirect URIs `vscode://samuelba.ukemi-jj/gitlab-auth` and `cursor://samuelba.ukemi-jj/gitlab-auth`."
         },
         "ukemi.forge.ciOnlyMine": {
+          "scope": "resource",
           "type": "boolean",
           "default": true,
           "description": "Show CI status only on open merge and pull requests that you authored."
         },
         "ukemi.forge.requestLimit": {
+          "scope": "resource",
           "type": "integer",
           "default": 50,
           "minimum": 1,
@@ -1968,11 +2066,13 @@
           "description": "How many of the most recently updated merge and pull requests to load. Each request returns at most 100, so a higher value loads more pages."
         },
         "ukemi.forge.nativeStacks": {
+          "scope": "resource",
           "type": "boolean",
           "default": true,
           "markdownDescription": "When you sync a stack of pull requests on GitHub, also group them into GitHub's native stack view. This uses GitHub's stacked pull requests API, which is a preview feature. Ukemi skips it when the API is not available for the repository."
         },
         "ukemi.forge.statusInterval": {
+          "scope": "resource",
           "type": "string",
           "default": "60s",
           "pattern": "^(every\\s+)?(\\d+(\\.\\d+)?|\\.\\d+)\\s*[smhdSMHD]$",

@@ -4,6 +4,8 @@ const NO_TERMINATING_NEWLINE = '(no terminating newline)'
 export interface ConflictSide {
   label: string
   text: string
+  // For a side jj writes as a diff, the label of the snapshot the diff starts from.
+  diffFrom?: string
 }
 
 export type ConflictLineKind = 'marker' | 'side' | 'base' | 'added' | 'removed'
@@ -60,14 +62,65 @@ type Header =
   | { kind: 'end'; line: RawLine }
   | { kind: 'section'; section: Section; next: number }
 
-export function sideName(sideCount: number, sideIndex: number): string {
-  if (sideCount === 2 && sideIndex === 0) {
-    return 'current'
+const MAX_NAME_LENGTH = 40
+
+// jj labels a side `<change id> <commit id> "<description>"`, or leaves the description out; git
+// labels it with a branch. People know a side by its description, else by its change id.
+export function labelName(label: string): string | null {
+  const jj = /^(\S+) [0-9a-f]+(?: "(.*)")?$/.exec(label.trim())
+  if (!jj) {
+    return label.trim() || null
   }
-  if (sideCount === 2 && sideIndex === 1) {
-    return 'incoming'
+  const description = jj[2]
+  if (!description) {
+    return jj[1] ?? null
   }
-  return `side ${sideIndex + 1}`
+  const short =
+    description.length > MAX_NAME_LENGTH
+      ? `${description.slice(0, MAX_NAME_LENGTH - 1).trimEnd()}…`
+      : description
+  return `"${short}"`
+}
+
+// What a button calls the side: `"mine"`, `kxqmrwzp`, `HEAD`, or `side 2` without a label.
+export function sideName(side: ConflictSide | undefined, sideIndex: number): string {
+  return (side && labelName(side.label)) ?? `side ${sideIndex + 1}`
+}
+
+// The side's number and name, as its header line shows them. jj writes some sides as a diff
+// from another snapshot, which the heading says, so the -/+ lines make sense.
+export function sideHeading(side: ConflictSide | undefined, sideIndex: number): string {
+  const name = side ? labelName(side.label) : null
+  const heading = name ? `side ${sideIndex + 1} · ${name}` : `side ${sideIndex + 1}`
+  if (!side?.diffFrom) {
+    return heading
+  }
+  return `${heading} · shown as changes from ${labelName(side.diffFrom) ?? 'the base'}`
+}
+
+// How many sides every conflict of a file has, for actions that take one side everywhere.
+export function sharedSideCount(blocks: readonly ConflictBlock[]): number {
+  return blocks.reduce(
+    (count, block) => Math.min(count, block.sides.length),
+    Number.POSITIVE_INFINITY,
+  )
+}
+
+// The side's name when every conflict of the file gives it the same label, else its number.
+export function fileSideTitle(blocks: readonly ConflictBlock[], sideIndex: number): string {
+  const label = fileSideLabel(blocks, sideIndex)
+  return (label && labelName(label)) || `side ${sideIndex + 1}`
+}
+
+// The side's label when every conflict of the file gives it the same one, else empty.
+export function fileSideLabel(blocks: readonly ConflictBlock[], sideIndex: number): string {
+  const labels = [...new Set(blocks.map((block) => block.sides[sideIndex]?.label ?? ''))]
+  return labels.length === 1 ? (labels[0] ?? '') : ''
+}
+
+// Keeps every side of the conflict, one after the other.
+export function bothSidesEdit(block: ConflictBlock): ConflictEdit {
+  return editFor(block, block.sides.map((side) => side.text).join(''))
 }
 
 export function conflictAtLine(
@@ -251,7 +304,13 @@ function finishJj(
   const sides = sections.flatMap((section) =>
     section.kind === 'base'
       ? []
-      : [{ label: displayLabel(section.label), text: sideText(section, mixed) }],
+      : [
+          {
+            label: displayLabel(section.label),
+            text: sideText(section, mixed),
+            ...(section.kind === 'diff' ? { diffFrom: displayLabel(section.fromLabel) } : {}),
+          },
+        ],
   )
   if (sides.length === 0) {
     return null

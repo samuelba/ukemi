@@ -1,7 +1,7 @@
 import type { DragEvent } from 'react'
 import type { CommitView, RequestBadge } from '../../../shared/protocol'
 import { stackLabel } from '../../../shared/stack'
-import { postMessage, vscodeContext } from '../shared/hostApi'
+import { isDesktop, postMessage, vscodeContext } from '../shared/hostApi'
 import { RequestHover } from './RequestHover'
 import { CiStatusIcon, REQUEST_LABEL } from './requestMeta'
 
@@ -58,8 +58,10 @@ export function Badges({ commit, repoId, hasForge, showGitTags }: BadgesProps) {
   return (
     <span className="badges">
       {commit.isWorkingCopy && (
-        <span className="badge here" title="you are here">
+        // The app's graph has room for the words; the extension's sidebar keeps the bare icon.
+        <span className={`badge here${isDesktop ? ' labeled' : ''}`} title="you are here">
           <HereIcon />
+          {isDesktop && 'you are here'}
         </span>
       )}
       {commit.isWorkingCopy && commit.isEmpty && (

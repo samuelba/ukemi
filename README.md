@@ -116,6 +116,17 @@ Select the gear in the title bar of the Ukemi view to open the Ukemi settings.
 | `ukemi.forge.nativeStacks`           | Group synced GitHub pull request stacks into GitHub's native stack view. Default: on.              |
 | `ukemi.forge.statusInterval`         | How often to reload CI status. Default: `60s`, or 15s while your pipeline runs.                    |
 
+### Settings per repository
+
+A repository can have its own value for the graph settings (`showGitTags`, `showLineStats`, `defaultFilter`, `historyDepth`), auto fetch, `workspaces.snapshotOnRefresh` and the `forge.*` settings. Every other setting applies to all repositories. Each repository also reopens with the filter and history depth it was left at.
+
+- **VS Code:** set them in the folder settings of the workspace folder (**Preferences: Open Folder Settings**). A repository nested inside a workspace folder uses that folder's settings.
+- **Ukemi app:** right-click a repository tab and choose **Repository Settings…**, or switch the settings view to the repository. The values are stored under `repositories` in `settings.json`:
+
+  ```json
+  { "repositories": { "/home/me/big-mono": { "autoFetch.enabled": false, "historyDepth": "14d" } } }
+  ```
+
 ## Sign in
 
 Ukemi uses the same credentials for the forge API (pull and merge requests, CI status) and for `git` over HTTPS when jj fetches or pushes. No CLI is required.
