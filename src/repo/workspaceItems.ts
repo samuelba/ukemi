@@ -153,36 +153,48 @@ export function suggestedWorkspaceName(base: string, commit?: NameSource): strin
   return defaultWorkspaceName(base)
 }
 
-export function collectBookmarks(commits: readonly CommitBookmarks[]): {
+export interface BookmarkRefs {
   local: BookmarkRef[]
   remote: BookmarkRef[]
-} {
+}
+
+// Keeps the first ref for each local name and each name@remote pair.
+export function uniqueBookmarkRefs(refs: Iterable<BookmarkRef>): BookmarkRefs {
   const localSeen = new Set<string>()
   const remoteSeen = new Set<string>()
   const local: BookmarkRef[] = []
   const remote: BookmarkRef[] = []
-  for (const commit of commits) {
-    for (const bookmark of commit.localBookmarks) {
-      if (localSeen.has(bookmark.name)) {
-        continue
+  for (const ref of refs) {
+    if (ref.remote === undefined) {
+      if (!localSeen.has(ref.name)) {
+        localSeen.add(ref.name)
+        local.push(ref)
       }
-      localSeen.add(bookmark.name)
-      local.push({ name: bookmark.name, commitId: commit.commitId })
+      continue
     }
-    for (const bookmark of commit.remoteBookmarks) {
-      const key = `${bookmark.name}@${bookmark.remote}`
-      if (remoteSeen.has(key)) {
-        continue
-      }
+    const key = `${ref.name}@${ref.remote}`
+    if (!remoteSeen.has(key)) {
       remoteSeen.add(key)
-      remote.push({
-        name: bookmark.name,
-        remote: bookmark.remote,
-        commitId: commit.commitId,
-      })
+      remote.push(ref)
     }
   }
   return { local, remote }
+}
+
+export function collectBookmarks(commits: readonly CommitBookmarks[]): BookmarkRefs {
+  return uniqueBookmarkRefs(
+    commits.flatMap((commit) => [
+      ...commit.localBookmarks.map((bookmark) => ({
+        name: bookmark.name,
+        commitId: commit.commitId,
+      })),
+      ...commit.remoteBookmarks.map((bookmark) => ({
+        name: bookmark.name,
+        remote: bookmark.remote,
+        commitId: commit.commitId,
+      })),
+    ]),
+  )
 }
 
 export function workspaceBaseItems(

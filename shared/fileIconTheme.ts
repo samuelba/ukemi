@@ -166,14 +166,19 @@ function extensionCandidates(name: string): string[] {
   return candidates
 }
 
-function iconByExtension(theme: FileIconTheme, name: string): FileIcon | undefined {
+// Tries the longest extension first, so `foo.d.ts` matches `d.ts` before `ts`.
+function firstByExtension<T>(name: string, lookup: (ext: string) => T | undefined): T | undefined {
   for (const ext of extensionCandidates(name)) {
-    const icon = iconById(theme, theme.fileExtensions[ext])
-    if (icon) {
-      return icon
+    const found = lookup(ext)
+    if (found) {
+      return found
     }
   }
   return undefined
+}
+
+function iconByExtension(theme: FileIconTheme, name: string): FileIcon | undefined {
+  return firstByExtension(name, (ext) => iconById(theme, theme.fileExtensions[ext]))
 }
 
 function iconByLanguage(theme: FileIconTheme, name: string): FileIcon | undefined {
@@ -185,13 +190,7 @@ function iconByLanguage(theme: FileIconTheme, name: string): FileIcon | undefine
 }
 
 function languageByExtension(theme: FileIconTheme, name: string): string | undefined {
-  for (const ext of extensionCandidates(name)) {
-    const language = theme.languages.extensions[ext]
-    if (language) {
-      return language
-    }
-  }
-  return undefined
+  return firstByExtension(name, (ext) => theme.languages.extensions[ext])
 }
 
 function iconById(theme: FileIconTheme, id: string | undefined): FileIcon | undefined {

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FileIconTheme } from '../../../shared/fileIconTheme'
 import type { ChangedFile } from '../../../shared/model'
-import type { CommitView, HostMessage, ViewState } from '../../../shared/protocol'
+import type { CommitView, HostMessage, ViewState, WebviewMessage } from '../../../shared/protocol'
 import { title } from '../shared/format'
+import { useHostMessages } from '../shared/hooks'
 import { postMessage } from '../shared/vscodeApi'
 import { CommitRow } from './CommitRow'
 import { DescribeDialog } from './DescribeDialog'
@@ -30,9 +31,8 @@ export function App() {
   const [describing, setDescribing] = useState<Describing | null>(null)
   const [now, setNow] = useState(() => Date.now())
 
-  useEffect(() => {
-    const onMessage = (event: MessageEvent<HostMessage>) => {
-      const message = event.data
+  useHostMessages<HostMessage>(
+    (message) => {
       switch (message.type) {
         case 'state':
           setState(message.state)
@@ -61,13 +61,11 @@ export function App() {
           return
         }
       }
-    }
-    window.addEventListener('message', onMessage)
-    return () => window.removeEventListener('message', onMessage)
-  }, [state])
+    },
+    { type: 'ready' } satisfies WebviewMessage,
+  )
 
   useEffect(() => {
-    postMessage({ type: 'ready' })
     const timer = window.setInterval(() => setNow(Date.now()), 60_000)
     return () => window.clearInterval(timer)
   }, [])

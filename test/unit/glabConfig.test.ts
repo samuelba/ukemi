@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import { glabEndpoint, glabFetch, responseFromGlab } from '../../src/forge/glabApi'
+import { responseFromCli } from '../../src/forge/cli'
+import { glabEndpoint, glabFetch } from '../../src/forge/glabApi'
 import { configHasHost, glabConfigFile, glabKnowsHost } from '../../src/forge/glabConfig'
 
 const CONFIG = `
@@ -164,9 +165,10 @@ describe('glab api', () => {
   })
 
   test('reads the status from an error response', () => {
-    const response = responseFromGlab(
+    const response = responseFromCli(
       'HTTP/2.0 401 Unauthorized\n\n{"message":"401 Unauthorized"}\n',
       1,
+      'glab',
     )
     expect(response.status).toBe(401)
   })

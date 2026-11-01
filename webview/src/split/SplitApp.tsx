@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import type {
   Segment,
   SplitFile,
@@ -8,6 +8,7 @@ import type {
   SplitWebviewMessage,
 } from '../../../shared/split'
 import { changeIds } from '../../../shared/split'
+import { useElementHeight, useHostMessages } from '../shared/hooks'
 import { LoadingScreen } from '../shared/LoadingMark'
 import { postMessage } from '../shared/vscodeApi'
 
@@ -197,27 +198,16 @@ export function SplitApp() {
   const [request, setRequest] = useState<SplitRequest | null>(null)
   const [choices, setChoices] = useState<ReadonlyMap<string, FileChoice>>(new Map())
   const [message, setMessage] = useState('')
-  const [headerHeight, setHeaderHeight] = useState(0)
+  const [headerRef, headerHeight] = useElementHeight()
 
-  const headerRef = useCallback((node: HTMLElement | null) => {
-    if (!node) {
-      return
-    }
-    const observer = new ResizeObserver(() => setHeaderHeight(node.offsetHeight))
-    observer.observe(node)
-    return () => observer.disconnect()
-  }, [])
-
-  useEffect(() => {
-    const onMessage = (event: MessageEvent<SplitHostMessage>) => {
-      if (event.data.type === 'load') {
-        setRequest(event.data.request)
+  useHostMessages<SplitHostMessage>(
+    (incoming) => {
+      if (incoming.type === 'load') {
+        setRequest(incoming.request)
       }
-    }
-    window.addEventListener('message', onMessage)
-    send({ type: 'ready' })
-    return () => window.removeEventListener('message', onMessage)
-  }, [])
+    },
+    { type: 'ready' } satisfies SplitWebviewMessage,
+  )
 
   const selections = useMemo<SplitSelection[]>(
     () =>

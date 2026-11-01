@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import { useState, type CSSProperties, type ReactNode } from 'react'
 import {
   UNDESCRIBED_LIMIT,
   type CleanupDeletedBookmark,
@@ -10,19 +10,66 @@ import {
   type CleanupUndescribed,
   type CleanupWebviewMessage,
 } from '../../../shared/cleanup'
-import type { ChangedFile } from '../../../shared/model'
+import { FILE_STATUS_LETTER, type ChangedFile } from '../../../shared/model'
 import { relativeTime } from '../shared/format'
+import { useElementHeight, useHostMessages } from '../shared/hooks'
 import { LoadingScreen } from '../shared/LoadingMark'
 import { postMessage } from '../shared/vscodeApi'
 
 const send = (message: CleanupWebviewMessage) => postMessage(message)
 
-const FILE_STATUS: Record<ChangedFile['status'], string> = {
-  added: 'A',
-  modified: 'M',
-  removed: 'D',
-  renamed: 'R',
-  copied: 'C',
+interface Column {
+  className: string
+  header?: string
+}
+
+const BOOKMARKS_COLUMNS: readonly Column[] = [
+  { className: 'col-check' },
+  { className: 'col-name', header: 'Bookmark' },
+  { className: 'col-reason', header: 'Reason' },
+  { className: 'col-text', header: 'Description' },
+  { className: 'col-option', header: 'Abandon commits' },
+]
+
+const WORKSPACES_COLUMNS: readonly Column[] = [
+  { className: 'col-check' },
+  { className: 'col-name', header: 'Workspace' },
+  { className: 'col-text', header: 'Detail' },
+  { className: 'col-option', header: 'Delete files' },
+]
+
+const DIVERGENT_COLUMNS: readonly Column[] = [
+  { className: 'col-check' },
+  { className: 'col-id', header: 'Change' },
+  { className: 'col-text', header: 'Description' },
+  { className: 'col-note', header: 'Reason' },
+]
+
+const DELETED_COLUMNS: readonly Column[] = [
+  { className: 'col-check' },
+  { className: 'col-name', header: 'Bookmark' },
+  { className: 'col-text', header: 'Detail' },
+  { className: 'col-remote', header: 'Delete remote' },
+]
+
+const UNDESCRIBED_COLUMNS: readonly Column[] = [
+  { className: 'col-check' },
+  { className: 'col-files' },
+  { className: 'col-id', header: 'Change' },
+  { className: 'col-id', header: 'Commit' },
+  { className: 'col-note', header: 'When' },
+  { className: 'col-text', header: 'Note' },
+  { className: 'col-action' },
+]
+
+function toggle(current: ReadonlySet<string>, name: string, selected: boolean): Set<string> {
+  const next = new Set(current)
+  if (selected) {
+    next.add(name)
+  } else {
+    next.delete(name)
+  }
+  return next
 }
 
 function isEmpty(snapshot: CleanupSnapshot): boolean {
@@ -66,27 +113,19 @@ export function CleanupApp() {
   const [undescribedDrops, setUndescribedDrops] = useState<ReadonlySet<string>>(new Set())
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const [filesByCommit, setFilesByCommit] = useState<Readonly<Record<string, ChangedFile[]>>>({})
-  const [headerHeight, setHeaderHeight] = useState(0)
-  const headerRef = useCallback((node: HTMLElement | null) => {
-    if (!node) {
-      return
-    }
-    const observer = new ResizeObserver(() => setHeaderHeight(node.offsetHeight))
-    observer.observe(node)
-    return () => observer.disconnect()
-  }, [])
+  const [headerRef, headerHeight] = useElementHeight()
 
-  useEffect(() => {
-    const onMessage = (event: MessageEvent<CleanupHostMessage>) => {
-      if (event.data.type === 'files') {
-        const { commitId, files } = event.data
+  useHostMessages<CleanupHostMessage>(
+    (message) => {
+      if (message.type === 'files') {
+        const { commitId, files } = message
         setFilesByCommit((current) => ({ ...current, [commitId]: files }))
         return
       }
-      if (event.data.type !== 'load') {
+      if (message.type !== 'load') {
         return
       }
-      const next = event.data.snapshot
+      const next = message.snapshot
       setSnapshot(next)
       setBookmarks(
         new Set(next.bookmarks.filter((bookmark) => bookmark.checked).map((b) => b.name)),
@@ -104,11 +143,9 @@ export function CleanupApp() {
       setUndescribedDrops(new Set())
       setExpanded(new Set())
       setFilesByCommit({})
-    }
-    window.addEventListener('message', onMessage)
-    send({ type: 'ready' })
-    return () => window.removeEventListener('message', onMessage)
-  }, [])
+    },
+    { type: 'ready' } satisfies CleanupWebviewMessage,
+  )
 
   if (!snapshot) {
     return <LoadingScreen heading="Loading…" />
@@ -133,16 +170,6 @@ export function CleanupApp() {
     divergent: [...drops],
     undescribed: [...undescribedDrops],
   }
-  const toggle = (current: ReadonlySet<string>, name: string, selected: boolean) => {
-    const next = new Set(current)
-    if (selected) {
-      next.add(name)
-    } else {
-      next.delete(name)
-    }
-    return next
-  }
-
   return (
     <div
       className="cleanup"
@@ -168,87 +195,70 @@ export function CleanupApp() {
         </div>
       </header>
       {snapshot.bookmarks.length > 0 && (
-        <section className="cleanup-section">
-          <h2>
-            Bookmarks <span className="muted">({snapshot.bookmarks.length})</span>
-          </h2>
-          <p className="muted cleanup-note">
-            Forgets the local bookmark and its Git branch (refs/heads/…). The remote bookmark stays.
-            Abandon commits deletes only commits that are on this bookmark and not on trunk or
-            another bookmark, back to that fork. A bookmark already in trunk has none of those
-            commits, so the control stays off.
-          </p>
-          <table className="cleanup-table bookmarks">
-            <caption className="sr-only">Bookmarks</caption>
-            <colgroup>
-              <col className="col-check" />
-              <col className="col-name" />
-              <col className="col-reason" />
-              <col className="col-text" />
-              <col className="col-option" />
-            </colgroup>
-            <thead>
-              <tr>
-                <th scope="col" />
-                <th scope="col">Bookmark</th>
-                <th scope="col">Reason</th>
-                <th scope="col">Description</th>
-                <th scope="col">Abandon commits</th>
+        <CleanupSection
+          title="Bookmarks"
+          count={snapshot.bookmarks.length}
+          tableClass="bookmarks"
+          columns={BOOKMARKS_COLUMNS}
+          note={
+            <>
+              Forgets the local bookmark and its Git branch (refs/heads/…). The remote bookmark
+              stays. Abandon commits deletes only commits that are on this bookmark and not on trunk
+              or another bookmark, back to that fork. A bookmark already in trunk has none of those
+              commits, so the control stays off.
+            </>
+          }
+        >
+          <tbody>
+            {snapshot.bookmarks.map((bookmark) => (
+              <tr key={bookmark.name}>
+                <td>
+                  <input
+                    id={`bookmark-${bookmark.name}`}
+                    type="checkbox"
+                    checked={bookmarks.has(bookmark.name)}
+                    onChange={(event) => {
+                      const selected = event.target.checked
+                      setBookmarks(toggle(bookmarks, bookmark.name, selected))
+                      if (!selected) {
+                        setAbandonCommits(toggle(abandonCommits, bookmark.name, false))
+                      }
+                    }}
+                  />
+                </td>
+                <Cell htmlFor={`bookmark-${bookmark.name}`} className="name">
+                  {bookmark.name}
+                </Cell>
+                <Cell htmlFor={`bookmark-${bookmark.name}`} className="muted">
+                  {bookmark.detail}
+                </Cell>
+                <Cell htmlFor={`bookmark-${bookmark.name}`}>
+                  {bookmark.description || '(no description)'}
+                </Cell>
+                <td>
+                  <input
+                    type="checkbox"
+                    aria-label={`Abandon commits for ${bookmark.name}`}
+                    checked={
+                      bookmark.abandonCommitIds.length > 0 &&
+                      bookmarks.has(bookmark.name) &&
+                      abandonCommits.has(bookmark.name)
+                    }
+                    disabled={
+                      bookmark.abandonCommitIds.length === 0 || !bookmarks.has(bookmark.name)
+                    }
+                    onChange={(event) =>
+                      setAbandonCommits(toggle(abandonCommits, bookmark.name, event.target.checked))
+                    }
+                  />
+                  {bookmark.abandonCommitIds.length > 0 && (
+                    <span className="muted"> {bookmark.abandonCommitIds.length}</span>
+                  )}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {snapshot.bookmarks.map((bookmark) => (
-                <tr key={bookmark.name}>
-                  <td>
-                    <input
-                      id={`bookmark-${bookmark.name}`}
-                      type="checkbox"
-                      checked={bookmarks.has(bookmark.name)}
-                      onChange={(event) => {
-                        const selected = event.target.checked
-                        setBookmarks(toggle(bookmarks, bookmark.name, selected))
-                        if (!selected) {
-                          setAbandonCommits(toggle(abandonCommits, bookmark.name, false))
-                        }
-                      }}
-                    />
-                  </td>
-                  <Cell htmlFor={`bookmark-${bookmark.name}`} className="name">
-                    {bookmark.name}
-                  </Cell>
-                  <Cell htmlFor={`bookmark-${bookmark.name}`} className="muted">
-                    {bookmark.detail}
-                  </Cell>
-                  <Cell htmlFor={`bookmark-${bookmark.name}`}>
-                    {bookmark.description || '(no description)'}
-                  </Cell>
-                  <td>
-                    <input
-                      type="checkbox"
-                      aria-label={`Abandon commits for ${bookmark.name}`}
-                      checked={
-                        bookmark.abandonCommitIds.length > 0 &&
-                        bookmarks.has(bookmark.name) &&
-                        abandonCommits.has(bookmark.name)
-                      }
-                      disabled={
-                        bookmark.abandonCommitIds.length === 0 || !bookmarks.has(bookmark.name)
-                      }
-                      onChange={(event) =>
-                        setAbandonCommits(
-                          toggle(abandonCommits, bookmark.name, event.target.checked),
-                        )
-                      }
-                    />
-                    {bookmark.abandonCommitIds.length > 0 && (
-                      <span className="muted"> {bookmark.abandonCommitIds.length}</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+            ))}
+          </tbody>
+        </CleanupSection>
       )}
       {snapshot.deletedBookmarks.length > 0 && (
         <DeletedBookmarks
@@ -270,111 +280,85 @@ export function CleanupApp() {
         />
       )}
       {snapshot.workspaces.length > 0 && (
-        <section className="cleanup-section">
-          <h2>
-            Workspaces <span className="muted">({snapshot.workspaces.length})</span>
-          </h2>
-          <p className="muted cleanup-note">
-            Forgets the workspace in the repository. The folder and its files stay on disk unless
-            Delete files is checked. Delete files removes that folder after the workspace is
-            forgotten. jj undo does not restore those files.
-          </p>
-          <table className="cleanup-table workspaces">
-            <caption className="sr-only">Workspaces</caption>
-            <colgroup>
-              <col className="col-check" />
-              <col className="col-name" />
-              <col className="col-text" />
-              <col className="col-option" />
-            </colgroup>
-            <thead>
-              <tr>
-                <th scope="col" />
-                <th scope="col">Workspace</th>
-                <th scope="col">Detail</th>
-                <th scope="col">Delete files</th>
+        <CleanupSection
+          title="Workspaces"
+          count={snapshot.workspaces.length}
+          tableClass="workspaces"
+          columns={WORKSPACES_COLUMNS}
+          note={
+            <>
+              Forgets the workspace in the repository. The folder and its files stay on disk unless
+              Delete files is checked. Delete files removes that folder after the workspace is
+              forgotten. jj undo does not restore those files.
+            </>
+          }
+        >
+          <tbody>
+            {snapshot.workspaces.map((workspace) => (
+              <tr key={workspace.name}>
+                <td>
+                  <input
+                    id={`workspace-${workspace.name}`}
+                    type="checkbox"
+                    checked={workspaces.has(workspace.name)}
+                    onChange={(event) => {
+                      const selected = event.target.checked
+                      setWorkspaces(toggle(workspaces, workspace.name, selected))
+                      if (!selected) {
+                        setDeleteFiles(toggle(deleteFiles, workspace.name, false))
+                      }
+                    }}
+                  />
+                </td>
+                <Cell htmlFor={`workspace-${workspace.name}`} className="name">
+                  {workspace.name}
+                </Cell>
+                <Cell htmlFor={`workspace-${workspace.name}`} className="muted">
+                  {workspace.detail}
+                </Cell>
+                <td>
+                  <input
+                    type="checkbox"
+                    aria-label={`Delete files for ${workspace.name}`}
+                    checked={workspace.canDeleteFiles && deleteFiles.has(workspace.name)}
+                    disabled={!workspace.canDeleteFiles}
+                    onChange={(event) => {
+                      const selected = event.target.checked
+                      setDeleteFiles(toggle(deleteFiles, workspace.name, selected))
+                      if (selected) {
+                        setWorkspaces(toggle(workspaces, workspace.name, true))
+                      }
+                    }}
+                  />
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {snapshot.workspaces.map((workspace) => (
-                <tr key={workspace.name}>
-                  <td>
-                    <input
-                      id={`workspace-${workspace.name}`}
-                      type="checkbox"
-                      checked={workspaces.has(workspace.name)}
-                      onChange={(event) => {
-                        const selected = event.target.checked
-                        setWorkspaces(toggle(workspaces, workspace.name, selected))
-                        if (!selected) {
-                          setDeleteFiles(toggle(deleteFiles, workspace.name, false))
-                        }
-                      }}
-                    />
-                  </td>
-                  <Cell htmlFor={`workspace-${workspace.name}`} className="name">
-                    {workspace.name}
-                  </Cell>
-                  <Cell htmlFor={`workspace-${workspace.name}`} className="muted">
-                    {workspace.detail}
-                  </Cell>
-                  <td>
-                    <input
-                      type="checkbox"
-                      aria-label={`Delete files for ${workspace.name}`}
-                      checked={workspace.canDeleteFiles && deleteFiles.has(workspace.name)}
-                      disabled={!workspace.canDeleteFiles}
-                      onChange={(event) => {
-                        const selected = event.target.checked
-                        setDeleteFiles(toggle(deleteFiles, workspace.name, selected))
-                        if (selected) {
-                          setWorkspaces(toggle(workspaces, workspace.name, true))
-                        }
-                      }}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+            ))}
+          </tbody>
+        </CleanupSection>
       )}
       {snapshot.divergent.length > 0 && (
-        <section className="cleanup-section">
-          <h2>
-            Divergent changes <span className="muted">({snapshot.divergent.length})</span>
-          </h2>
-          <p className="muted cleanup-note">
-            Abandons the checked commits and rebases kept children onto the commit you keep. The
-            working copy is left unchecked. An immutable commit, or a commit with an immutable
-            child, cannot be abandoned.
-          </p>
-          <table className="cleanup-table divergent">
-            <caption className="sr-only">Divergent changes</caption>
-            <colgroup>
-              <col className="col-check" />
-              <col className="col-id" />
-              <col className="col-text" />
-              <col className="col-note" />
-            </colgroup>
-            <thead>
-              <tr>
-                <th scope="col" />
-                <th scope="col">Change</th>
-                <th scope="col">Description</th>
-                <th scope="col">Reason</th>
-              </tr>
-            </thead>
-            {snapshot.divergent.map((group) => (
-              <DivergenceGroup
-                key={group.changeId}
-                group={group}
-                drops={drops}
-                onToggle={(commitId, selected) => setDrops(toggle(drops, commitId, selected))}
-              />
-            ))}
-          </table>
-        </section>
+        <CleanupSection
+          title="Divergent changes"
+          count={snapshot.divergent.length}
+          tableClass="divergent"
+          columns={DIVERGENT_COLUMNS}
+          note={
+            <>
+              Abandons the checked commits and rebases kept children onto the commit you keep. The
+              working copy is left unchecked. An immutable commit, or a commit with an immutable
+              child, cannot be abandoned.
+            </>
+          }
+        >
+          {snapshot.divergent.map((group) => (
+            <DivergenceGroup
+              key={group.changeId}
+              group={group}
+              drops={drops}
+              onToggle={(commitId, selected) => setDrops(toggle(drops, commitId, selected))}
+            />
+          ))}
+        </CleanupSection>
       )}
       {snapshot.undescribed.length > 0 && (
         <UndescribedCommits
@@ -396,6 +380,51 @@ export function CleanupApp() {
         />
       )}
     </div>
+  )
+}
+
+function CleanupSection({
+  title,
+  count,
+  note,
+  tableClass,
+  caption = title,
+  columns,
+  children,
+}: {
+  title: string
+  count: number
+  note: ReactNode
+  tableClass: string
+  caption?: string
+  columns: readonly Column[]
+  children: ReactNode
+}) {
+  return (
+    <section className="cleanup-section">
+      <h2>
+        {title} <span className="muted">({count})</span>
+      </h2>
+      <p className="muted cleanup-note">{note}</p>
+      <table className={`cleanup-table ${tableClass}`}>
+        <caption className="sr-only">{caption}</caption>
+        <colgroup>
+          {columns.map((column, index) => (
+            <col key={index} className={column.className} />
+          ))}
+        </colgroup>
+        <thead>
+          <tr>
+            {columns.map((column, index) => (
+              <th key={index} scope="col">
+                {column.header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        {children}
+      </table>
+    </section>
   )
 }
 
@@ -473,64 +502,51 @@ function DeletedBookmarks({
   onDeleteRemote: (name: string, selected: boolean) => void
 }) {
   return (
-    <section className="cleanup-section">
-      <h2>
-        Deleted bookmarks <span className="muted">({bookmarks.length})</span>
-      </h2>
-      <p className="muted cleanup-note">
-        Forgets the local record. The remote stays unless Delete remote is checked. That checkbox
-        pushes the deletion.
-      </p>
-      <table className="cleanup-table deleted">
-        <caption className="sr-only">Deleted bookmarks</caption>
-        <colgroup>
-          <col className="col-check" />
-          <col className="col-name" />
-          <col className="col-text" />
-          <col className="col-remote" />
-        </colgroup>
-        <thead>
-          <tr>
-            <th scope="col" />
-            <th scope="col">Bookmark</th>
-            <th scope="col">Detail</th>
-            <th scope="col">Delete remote</th>
-          </tr>
-        </thead>
-        <tbody>
-          {bookmarks.map((bookmark) => {
-            const inputId = `deleted-${bookmark.name}`
-            return (
-              <tr key={bookmark.name}>
-                <td>
-                  <input
-                    id={inputId}
-                    type="checkbox"
-                    checked={selected.has(bookmark.name)}
-                    onChange={(event) => onToggle(bookmark.name, event.target.checked)}
-                  />
-                </td>
-                <Cell htmlFor={inputId} className="name">
-                  {bookmark.name}
-                </Cell>
-                <Cell htmlFor={inputId} className="muted">
-                  {bookmark.detail}
-                </Cell>
-                <td>
-                  <input
-                    type="checkbox"
-                    aria-label={`Delete remote bookmark ${bookmark.name}`}
-                    checked={bookmark.canDeleteRemote && deleteRemote.has(bookmark.name)}
-                    disabled={!bookmark.canDeleteRemote}
-                    onChange={(event) => onDeleteRemote(bookmark.name, event.target.checked)}
-                  />
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </section>
+    <CleanupSection
+      title="Deleted bookmarks"
+      count={bookmarks.length}
+      tableClass="deleted"
+      columns={DELETED_COLUMNS}
+      note={
+        <>
+          Forgets the local record. The remote stays unless Delete remote is checked. That checkbox
+          pushes the deletion.
+        </>
+      }
+    >
+      <tbody>
+        {bookmarks.map((bookmark) => {
+          const inputId = `deleted-${bookmark.name}`
+          return (
+            <tr key={bookmark.name}>
+              <td>
+                <input
+                  id={inputId}
+                  type="checkbox"
+                  checked={selected.has(bookmark.name)}
+                  onChange={(event) => onToggle(bookmark.name, event.target.checked)}
+                />
+              </td>
+              <Cell htmlFor={inputId} className="name">
+                {bookmark.name}
+              </Cell>
+              <Cell htmlFor={inputId} className="muted">
+                {bookmark.detail}
+              </Cell>
+              <td>
+                <input
+                  type="checkbox"
+                  aria-label={`Delete remote bookmark ${bookmark.name}`}
+                  checked={bookmark.canDeleteRemote && deleteRemote.has(bookmark.name)}
+                  disabled={!bookmark.canDeleteRemote}
+                  onChange={(event) => onDeleteRemote(bookmark.name, event.target.checked)}
+                />
+              </td>
+            </tr>
+          )
+        })}
+      </tbody>
+    </CleanupSection>
   )
 }
 
@@ -567,85 +583,67 @@ function UndescribedCommits({
 }) {
   const now = Date.now()
   return (
-    <section className="cleanup-section">
-      <h2>
-        No description <span className="muted">({commits.length})</span>
-      </h2>
-      <p className="muted cleanup-note">
-        Abandons the checked commits and rebases their children onto the parent. Nothing is checked
-        at first. An immutable commit, or a commit with an immutable child, cannot be abandoned.
-        Open diff only shows the change.
-        {truncated ? ` Showing the latest ${UNDESCRIBED_LIMIT}.` : ''}
-      </p>
-      <table className="cleanup-table undescribed">
-        <caption className="sr-only">Commits with no description</caption>
-        <colgroup>
-          <col className="col-check" />
-          <col className="col-files" />
-          <col className="col-id" />
-          <col className="col-id" />
-          <col className="col-note" />
-          <col className="col-text" />
-          <col className="col-action" />
-        </colgroup>
-        <thead>
-          <tr>
-            <th scope="col" />
-            <th scope="col" />
-            <th scope="col">Change</th>
-            <th scope="col">Commit</th>
-            <th scope="col">When</th>
-            <th scope="col">Note</th>
-            <th scope="col" />
+    <CleanupSection
+      title="No description"
+      count={commits.length}
+      tableClass="undescribed"
+      caption="Commits with no description"
+      columns={UNDESCRIBED_COLUMNS}
+      note={
+        <>
+          Abandons the checked commits and rebases their children onto the parent. Nothing is
+          checked at first. An immutable commit, or a commit with an immutable child, cannot be
+          abandoned. Open diff only shows the change.
+          {truncated ? ` Showing the latest ${UNDESCRIBED_LIMIT}.` : ''}
+        </>
+      }
+    >
+      {commits.map((commit) => (
+        <tbody key={commit.commitId}>
+          <tr className={commit.canAbandon ? undefined : 'is-disabled'}>
+            <td>
+              <input
+                type="checkbox"
+                aria-label={`Abandon commit ${commit.commitPrefix}`}
+                checked={commit.canAbandon && selected.has(commit.commitId)}
+                disabled={!commit.canAbandon}
+                onChange={(event) => onSelect(commit.commitId, event.target.checked)}
+              />
+            </td>
+            <td>
+              <button
+                type="button"
+                className="cleanup-file"
+                aria-expanded={expanded.has(commit.commitId)}
+                onClick={() => onToggle(commit.commitId)}
+              >
+                {expanded.has(commit.commitId) ? 'Hide' : 'Files'}
+              </button>
+            </td>
+            <td className="name">{commit.changePrefix}</td>
+            <td className="name">{commit.commitPrefix}</td>
+            <td className="muted">{relativeTime(commit.timestamp, now)}</td>
+            <td className="muted">{undescribedNote(commit)}</td>
+            <td>
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => send({ type: 'openDiff', commitId: commit.commitId })}
+              >
+                Open diff
+              </button>
+            </td>
           </tr>
-        </thead>
-        {commits.map((commit) => (
-          <tbody key={commit.commitId}>
-            <tr className={commit.canAbandon ? undefined : 'is-disabled'}>
-              <td>
-                <input
-                  type="checkbox"
-                  aria-label={`Abandon commit ${commit.commitPrefix}`}
-                  checked={commit.canAbandon && selected.has(commit.commitId)}
-                  disabled={!commit.canAbandon}
-                  onChange={(event) => onSelect(commit.commitId, event.target.checked)}
-                />
-              </td>
-              <td>
-                <button
-                  type="button"
-                  className="cleanup-file"
-                  aria-expanded={expanded.has(commit.commitId)}
-                  onClick={() => onToggle(commit.commitId)}
-                >
-                  {expanded.has(commit.commitId) ? 'Hide' : 'Files'}
-                </button>
-              </td>
-              <td className="name">{commit.changePrefix}</td>
-              <td className="name">{commit.commitPrefix}</td>
-              <td className="muted">{relativeTime(commit.timestamp, now)}</td>
-              <td className="muted">{undescribedNote(commit)}</td>
-              <td>
-                <button
-                  type="button"
-                  className="button secondary"
-                  onClick={() => send({ type: 'openDiff', commitId: commit.commitId })}
-                >
-                  Open diff
-                </button>
+          {expanded.has(commit.commitId) && (
+            <tr>
+              <td colSpan={7}>
+                <ChangedFiles commitId={commit.commitId} files={filesByCommit[commit.commitId]} />
               </td>
             </tr>
-            {expanded.has(commit.commitId) && (
-              <tr>
-                <td colSpan={7}>
-                  <ChangedFiles commitId={commit.commitId} files={filesByCommit[commit.commitId]} />
-                </td>
-              </tr>
-            )}
-          </tbody>
-        ))}
-      </table>
-    </section>
+          )}
+        </tbody>
+      ))}
+    </CleanupSection>
   )
 }
 
@@ -665,7 +663,7 @@ function ChangedFiles({ commitId, files }: { commitId: string; files: ChangedFil
             className="cleanup-file"
             onClick={() => send({ type: 'openFile', commitId, path: file.path })}
           >
-            {FILE_STATUS[file.status]} {file.path}
+            {FILE_STATUS_LETTER[file.status]} {file.path}
           </button>
         </li>
       ))}

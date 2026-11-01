@@ -4,8 +4,8 @@ import {
   sessionProviderFor,
   type CredentialUi,
   type GithubCredential,
-  type SecretStore,
 } from '../../src/forge/githubCredentials'
+import type { SecretStore } from '../../src/forge/secretStore'
 
 const HOST = 'github.com'
 const TOKEN: GithubCredential = { username: 'sam', token: 'ghp_token' }

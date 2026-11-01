@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import * as vscode from 'vscode'
 import { z } from 'zod'
-import type { SecretStore } from '../forge/githubCredentials'
+import { readSecretJson, type SecretStore } from '../forge/secretStore'
 import {
   createPkcePair,
   exchangeGitlabCode,
@@ -193,17 +193,8 @@ export class GitlabAuth implements vscode.Disposable {
     }
   }
 
-  private async read(host: string): Promise<GitlabOAuthSession | null> {
-    const raw = await this.secrets.get(oauthKey(host))
-    if (!raw) {
-      return null
-    }
-    try {
-      const parsed = sessionSchema.safeParse(JSON.parse(raw))
-      return parsed.success ? parsed.data : null
-    } catch {
-      return null
-    }
+  private read(host: string): Promise<GitlabOAuthSession | null> {
+    return readSecretJson(this.secrets, oauthKey(host), sessionSchema)
   }
 
   private async store(host: string, session: GitlabOAuthSession): Promise<void> {

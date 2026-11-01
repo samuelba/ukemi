@@ -1,5 +1,5 @@
 import { useMemo, useState, type CSSProperties, type DragEvent } from 'react'
-import type { ChangedFile } from '../../../shared/model'
+import { FILE_STATUS_LETTER, type ChangedFile } from '../../../shared/model'
 import type { ChangedFilesView, CommitView } from '../../../shared/protocol'
 import { fileDragTransfer } from '../../../shared/fileUri'
 import { splitPath } from '../shared/format'
@@ -14,14 +14,6 @@ export const FILE_LOCKED_MIME = 'application/x-ukemi-file-locked'
 const URI_LIST_MIME = 'text/uri-list'
 // Workbench drag type that chat (Cursor and VS Code) turns into a file attachment.
 const RESOURCE_URLS_MIME = 'ResourceURLs'
-
-const STATUS_LETTER: Record<ChangedFile['status'], string> = {
-  added: 'A',
-  modified: 'M',
-  removed: 'D',
-  renamed: 'R',
-  copied: 'C',
-}
 
 interface FileListProps {
   commit: CommitView
@@ -45,6 +37,33 @@ interface FileRowProps {
 
 function depthStyle(depth: number): CSSProperties {
   return { '--file-depth': depth } as CSSProperties
+}
+
+interface DiscardButtonProps {
+  title: string
+  command: string
+  context: { repoId: string; commitId: string; path: string }
+}
+
+// Sits inside a row that opens on click and double click, so neither may reach the row.
+function DiscardButton({ title, command, context }: DiscardButtonProps) {
+  return (
+    <button
+      type="button"
+      className="icon-button"
+      title={title}
+      onClick={(event) => {
+        event.stopPropagation()
+        if (event.detail > 1) {
+          return
+        }
+        postMessage({ type: 'command', command, context })
+      }}
+      onDoubleClick={(event) => event.stopPropagation()}
+    >
+      <i className="codicon codicon-discard" />
+    </button>
+  )
 }
 
 function FileRow({
@@ -108,31 +127,19 @@ function FileRow({
       <span className="file-trailing">
         {!commit.isImmutable && (
           <span className="actions">
-            <button
-              type="button"
-              className="icon-button"
+            <DiscardButton
               title="Discard changes"
-              onClick={(event) => {
-                event.stopPropagation()
-                if (event.detail > 1) {
-                  return
-                }
-                postMessage({
-                  type: 'command',
-                  command: 'ukemi.file.discard',
-                  context: { repoId, commitId: commit.commitId, path: file.path },
-                })
-              }}
-              onDoubleClick={(event) => event.stopPropagation()}
-            >
-              <i className="codicon codicon-discard" />
-            </button>
+              command="ukemi.file.discard"
+              context={{ repoId, commitId: commit.commitId, path: file.path }}
+            />
           </span>
         )}
         {showLineStats && (
           <LineStats added={file.linesAdded ?? 0} removed={file.linesRemoved ?? 0} />
         )}
-        <span className="file-status">{file.isConflicted ? '!' : STATUS_LETTER[file.status]}</span>
+        <span className="file-status">
+          {file.isConflicted ? '!' : FILE_STATUS_LETTER[file.status]}
+        </span>
       </span>
     </li>
   )
@@ -211,25 +218,11 @@ function FileTreeItems({
           {!commit.isImmutable && (
             <span className="file-trailing">
               <span className="actions">
-                <button
-                  type="button"
-                  className="icon-button"
+                <DiscardButton
                   title="Discard changes in this folder"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    if (event.detail > 1) {
-                      return
-                    }
-                    postMessage({
-                      type: 'command',
-                      command: 'ukemi.file.discardDirectory',
-                      context: { repoId, commitId: commit.commitId, path: node.path },
-                    })
-                  }}
-                  onDoubleClick={(event) => event.stopPropagation()}
-                >
-                  <i className="codicon codicon-discard" />
-                </button>
+                  command="ukemi.file.discardDirectory"
+                  context={{ repoId, commitId: commit.commitId, path: node.path }}
+                />
               </span>
             </span>
           )}

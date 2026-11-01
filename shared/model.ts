@@ -41,6 +41,14 @@ export interface Commit {
 
 export type FileStatus = 'added' | 'modified' | 'removed' | 'renamed' | 'copied'
 
+export const FILE_STATUS_LETTER: Readonly<Record<FileStatus, string>> = {
+  added: 'A',
+  modified: 'M',
+  removed: 'D',
+  renamed: 'R',
+  copied: 'C',
+}
+
 export interface ChangedFile {
   path: string
   sourcePath: string

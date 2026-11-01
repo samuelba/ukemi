@@ -31,3 +31,25 @@ export function fetchDelay(lastFetch: number | undefined, now: number, intervalM
   }
   return Math.max(0, lastFetch + intervalMs - now)
 }
+
+// Reads a duration setting, falling back on an invalid value and warning once per value.
+export function durationSetting(
+  name: string,
+  fallbackMs: number,
+  fallbackText: string,
+  warn: (message: string) => void,
+): (text: string) => number {
+  let warned: string | null = null
+  return (text) => {
+    const parsed = parseDuration(text)
+    if (parsed !== null) {
+      warned = null
+      return parsed
+    }
+    if (warned !== text) {
+      warned = text
+      warn(`${name} "${text.slice(0, 40)}" is not valid, using ${fallbackText}`)
+    }
+    return fallbackMs
+  }
+}

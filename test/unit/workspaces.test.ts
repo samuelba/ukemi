@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { parseWorkspaces } from '../../src/jj/parse'
 import {
+  collectBookmarks,
   defaultWorkspaceName,
   isWorkspaceOpen,
   suggestedWorkspaceName,
@@ -134,5 +135,37 @@ describe('workspaceBaseItems', () => {
     )
     expect(workspaceBaseItems({ trunkName: 'main', commits })[0]?.suggestedName).toBe('main')
     expect(workspaceBaseItems({ trunkName: null, commits })[0]?.revision).toBe('@')
+  })
+})
+
+describe('collectBookmarks', () => {
+  test('keeps the first commit for each local name and each remote pair', () => {
+    const commits: CommitBookmarks[] = [
+      {
+        commitId: 'a',
+        localBookmarks: [{ name: 'main' }, { name: 'foo@origin' }],
+        remoteBookmarks: [{ name: 'main', remote: 'origin' }],
+      },
+      {
+        commitId: 'b',
+        localBookmarks: [{ name: 'main' }],
+        remoteBookmarks: [
+          { name: 'main', remote: 'origin' },
+          { name: 'main', remote: 'upstream' },
+          { name: 'foo', remote: 'origin' },
+        ],
+      },
+    ]
+    expect(collectBookmarks(commits)).toEqual({
+      local: [
+        { name: 'main', commitId: 'a' },
+        { name: 'foo@origin', commitId: 'a' },
+      ],
+      remote: [
+        { name: 'main', remote: 'origin', commitId: 'a' },
+        { name: 'main', remote: 'upstream', commitId: 'b' },
+        { name: 'foo', remote: 'origin', commitId: 'b' },
+      ],
+    })
   })
 })
