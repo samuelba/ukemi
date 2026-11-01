@@ -5,9 +5,9 @@ import {
   type ConflictBlock,
   type ConflictLine,
 } from '../conflict/markers'
-import type { Handler } from './commands/context'
+import type { Handler } from '../app/commands/context'
 import { modelForFile } from './conflictLens'
-import type { RepoRegistry } from './registry'
+import type { RepoRegistry } from '../app/registry'
 
 const SIDE_SLOTS = 4
 const REFRESH_DELAY_MS = 150

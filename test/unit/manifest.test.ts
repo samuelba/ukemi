@@ -96,7 +96,7 @@ describe('package.json manifest', () => {
   })
 
   test('declares every setting the host reads', () => {
-    const config = readFileSync(join(root, 'src/vscode/config.ts'), 'utf8')
+    const config = readFileSync(join(root, 'src/app/settings.ts'), 'utf8')
     const read = [...config.matchAll(/c\.get<[^>]+>\('([\w.]+)'/g)].map((m) => `ukemi.${m[1]}`)
     expect(read.filter((key) => !(key in pkg.contributes.configuration.properties))).toEqual([])
   })

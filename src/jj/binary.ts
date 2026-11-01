@@ -5,6 +5,7 @@ import { access, chmod, mkdir, mkdtemp, readdir, rename, rm, writeFile } from 'n
 import { homedir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import { promisify } from 'node:util'
+import { flatpakAppId, hostSpawn } from '../util/hostProcess'
 import { isVersionAtLeast, parseVersion, type JjVersion } from './parse'
 
 const execFileAsync = promisify(execFile)
@@ -65,8 +66,13 @@ export function candidatePaths(pathEnv: string | undefined, home: string): strin
 
 export async function probeVersion(path: string): Promise<JjVersion | null> {
   try {
-    await access(path, constants.X_OK)
-    const { stdout } = await execFileAsync(path, ['--version'], {
+    // From a Flatpak, jj runs on the host, where a path can exist that the sandbox cannot see.
+    if (!flatpakAppId()) {
+      await access(path, constants.X_OK)
+    }
+    const host = hostSpawn(path, ['--version'])
+    const { stdout } = await execFileAsync(host.command, host.args, {
+      env: host.env,
       timeout: VERSION_PROBE_TIMEOUT_MS,
     })
     return parseVersion(stdout)
@@ -81,7 +87,12 @@ export async function resolveJj(options: {
   searchPaths?: readonly string[]
 }): Promise<ResolveResult> {
   const configured = options.configuredPath.trim()
-  const searchPaths = options.searchPaths ?? candidatePaths(process.env.PATH, homedir())
+  // In a Flatpak the sandbox's PATH says nothing about the host, so the host looks `jj` up.
+  const searchPaths =
+    options.searchPaths ??
+    (flatpakAppId()
+      ? ['jj', ...candidatePaths('', homedir())]
+      : candidatePaths(process.env.PATH, homedir()))
   const candidates: Array<{ path: string; source: JjSource }> = [
     ...(configured ? [{ path: configured, source: 'setting' as const }] : []),
     ...searchPaths.map((path) => ({ path, source: 'path' as const })),

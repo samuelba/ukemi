@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { destinationItems } from '../../src/vscode/commands/commitCommands'
+import { destinationItems } from '../../src/app/commands/commitCommands'
 
 describe('destinationItems', () => {
   test('lists trunk, local bookmarks, and remote bookmarks', () => {

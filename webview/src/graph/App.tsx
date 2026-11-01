@@ -4,11 +4,12 @@ import type { ChangedFile } from '../../../shared/model'
 import type { CommitView, HostMessage, ViewState, WebviewMessage } from '../../../shared/protocol'
 import { title } from '../shared/format'
 import { useHostMessages } from '../shared/hooks'
-import { postMessage } from '../shared/vscodeApi'
+import { postMessage } from '../shared/hostApi'
 import { CommitRow } from './CommitRow'
 import { DescribeDialog } from './DescribeDialog'
 import { EmptyState } from './EmptyState'
 import { FileIconFonts, FileIconThemeContext } from './FileIcon'
+import { selectedRow, type Selection } from './selection'
 import { Toolbar } from './Toolbar'
 
 interface Describing {
@@ -26,7 +27,8 @@ export function App() {
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const [isWorkingCopyCollapsed, setIsWorkingCopyCollapsed] = useState(false)
   const requested = useRef(new Set<string>())
-  const [selected, setSelected] = useState<string | null>(null)
+  const [selection, setSelection] = useState<Selection | null>(null)
+  const announced = useRef<string | null>(null)
   const [revealId, setRevealId] = useState<string | null>(null)
   const [describing, setDescribing] = useState<Describing | null>(null)
   const [now, setNow] = useState(() => Date.now())
@@ -38,11 +40,13 @@ export function App() {
           setState(message.state)
           setNow(Date.now())
           return
-        case 'reveal':
-          setSelected(message.commitId)
+        case 'reveal': {
+          const commit = state?.graph?.commits.find((c) => c.commitId === message.commitId)
+          setSelection({ commitId: message.commitId, changeId: commit?.changeId ?? '' })
           setRevealId(message.commitId)
           postMessage({ type: 'selectCommit', commitId: message.commitId })
           return
+        }
         case 'files':
           setFiles((prev) =>
             new Map(prev).set(fileKey(message.repoId, message.commitId), message.files),
@@ -140,10 +144,32 @@ export function App() {
     })
   }, [])
 
-  const selectCommit = useCallback((commitId: string) => {
-    setSelected(commitId)
-    postMessage({ type: 'selectCommit', commitId })
-  }, [])
+  const selectCommit = useCallback(
+    (commitId: string) => {
+      const commit = graph?.commits.find((c) => c.commitId === commitId)
+      setSelection({ commitId, changeId: commit?.changeId ?? '' })
+      postMessage({ type: 'selectCommit', commitId })
+    },
+    [graph],
+  )
+
+  const selected = useMemo(
+    () => (graph ? selectedRow(graph.commits, selection) : null),
+    [graph, selection],
+  )
+
+  // Another repository starts with its working copy selected.
+  useEffect(() => {
+    setSelection(null)
+  }, [repoId])
+
+  // The host learns about the working copy chosen by default, so its views show the same change.
+  useEffect(() => {
+    if (selection === null && selected && announced.current !== repoId) {
+      announced.current = repoId
+      postMessage({ type: 'selectCommit', commitId: selected })
+    }
+  }, [selection, selected, repoId])
 
   if (!state) {
     return <EmptyState status="loading" repos={[]} activeRepoId={null} error={null} busy={null} />

@@ -1,7 +1,7 @@
 import type { DragEvent } from 'react'
 import type { CommitView, RequestBadge } from '../../../shared/protocol'
 import { stackLabel } from '../../../shared/stack'
-import { postMessage, vscodeContext } from '../shared/vscodeApi'
+import { postMessage, vscodeContext } from '../shared/hostApi'
 import { RequestHover } from './RequestHover'
 import { CiStatusIcon, REQUEST_LABEL } from './requestMeta'
 

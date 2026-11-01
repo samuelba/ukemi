@@ -3,6 +3,7 @@ import { homedir } from 'node:os'
 import path from 'node:path'
 import { parse } from 'yaml'
 import { isSafeHttpsHost } from './hostName'
+import { hostConfigEnv } from '../util/hostProcess'
 
 export function ghConfigFile(
   env: NodeJS.ProcessEnv,
@@ -43,7 +44,7 @@ export function configHosts(text: string): string[] {
 }
 
 export function ghHosts(options: ReadOptions = {}): string[] {
-  const file = ghConfigFile(options.env ?? process.env, options.home ?? homedir())
+  const file = ghConfigFile(options.env ?? hostConfigEnv(), options.home ?? homedir())
   try {
     return configHosts(
       (options.readFile ?? ((filePath: string) => readFileSync(filePath, 'utf8')))(file),

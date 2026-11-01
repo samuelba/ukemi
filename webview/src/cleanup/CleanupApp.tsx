@@ -14,9 +14,7 @@ import { FILE_STATUS_LETTER, type ChangedFile } from '../../../shared/model'
 import { relativeTime } from '../shared/format'
 import { useElementHeight, useHostMessages } from '../shared/hooks'
 import { LoadingScreen } from '../shared/LoadingMark'
-import { postMessage } from '../shared/vscodeApi'
-
-const send = (message: CleanupWebviewMessage) => postMessage(message)
+import { useSend } from '../shared/hostChannel'
 
 interface Column {
   className: string
@@ -102,6 +100,7 @@ function initialDrops(snapshot: CleanupSnapshot): Set<string> {
 }
 
 export function CleanupApp() {
+  const send = useSend<CleanupWebviewMessage>()
   const [snapshot, setSnapshot] = useState<CleanupSnapshot | null>(null)
   const [bookmarks, setBookmarks] = useState<ReadonlySet<string>>(new Set())
   const [abandonCommits, setAbandonCommits] = useState<ReadonlySet<string>>(new Set())
@@ -581,6 +580,7 @@ function UndescribedCommits({
   onSelect: (commitId: string, selected: boolean) => void
   onToggle: (commitId: string) => void
 }) {
+  const send = useSend<CleanupWebviewMessage>()
   const now = Date.now()
   return (
     <CleanupSection
@@ -648,6 +648,7 @@ function UndescribedCommits({
 }
 
 function ChangedFiles({ commitId, files }: { commitId: string; files: ChangedFile[] | undefined }) {
+  const send = useSend<CleanupWebviewMessage>()
   if (!files) {
     return <LoadingScreen heading="Loading…" />
   }

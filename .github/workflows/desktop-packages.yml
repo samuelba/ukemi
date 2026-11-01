@@ -1,0 +1,55 @@
+name: Desktop packages
+
+# Builds every installer of the standalone app, so packaging breaks show up before a release.
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      - electron-builder.yml
+      - esbuild.mjs
+      - package.json
+      - package-lock.json
+      - src/desktop/**
+      - src/util/hostProcess.ts
+      - src/util/nodeWrapper.ts
+      - .github/workflows/desktop-packages.yml
+      - .github/actions/linux-packaging/**
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-packages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - if: runner.os == 'Linux'
+        uses: ./.github/actions/linux-packaging
+      - run: npm ci
+      - run: npm run desktop:package
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v7
+        with:
+          name: desktop-${{ runner.os }}
+          if-no-files-found: error
+          path: |
+            out/desktop-release/*.AppImage
+            out/desktop-release/*.deb
+            out/desktop-release/*.rpm
+            out/desktop-release/*.snap
+            out/desktop-release/*.flatpak
+            out/desktop-release/*.dmg
+            out/desktop-release/*.exe

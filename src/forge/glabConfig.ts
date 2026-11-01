@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { parse } from 'yaml'
+import { hostConfigEnv } from '../util/hostProcess'
 
 export function glabConfigFile(env: NodeJS.ProcessEnv, home: string): string {
   const dir =
@@ -20,7 +21,7 @@ export function glabKnowsHost(
     readFile?: (file: string) => string
   } = {},
 ): boolean {
-  const file = glabConfigFile(options.env ?? process.env, options.home ?? homedir())
+  const file = glabConfigFile(options.env ?? hostConfigEnv(), options.home ?? homedir())
   try {
     const text = (options.readFile ?? ((filePath: string) => readFileSync(filePath, 'utf8')))(file)
     return configHasHost(text, host)

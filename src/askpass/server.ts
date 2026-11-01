@@ -1,9 +1,12 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type Server, type Socket } from 'node:net'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { flatpakAppId, sharedTempDir } from '../util/hostProcess'
 import { nodeWrapperScript } from '../util/nodeWrapper'
+
+// What askpassMain reads. From a Flatpak, git runs on the host and the script hands these over.
+const ASKPASS_ENV = ['UKEMI_ASKPASS_SOCKET', 'UKEMI_ASKPASS_NONCE', 'UKEMI_ASKPASS_INTERACTIVE']
 import { parsePrompt, type CredentialRequest } from './prompt'
 
 export type { CredentialRequest } from './prompt'
@@ -41,12 +44,21 @@ export class AskpassServer {
   ) {}
 
   async start(): Promise<void> {
-    const dir = mkdtempSync(join(tmpdir(), 'ukemi-askpass-'))
+    // Git on the host and the helper in the sandbox both reach this folder at the same path.
+    const base = sharedTempDir()
+    mkdirSync(base, { recursive: true })
+    const dir = mkdtempSync(join(base, 'ukemi-askpass-'))
+    const appId = flatpakAppId()
     const socketPath = join(dir, 'askpass.sock')
     const scriptPath = join(dir, 'askpass.sh')
-    writeFileSync(scriptPath, nodeWrapperScript(this.nodePath, this.helperArgs, 'UKEMI_ASKPASS'), {
-      mode: 0o700,
-    })
+    const sandbox = appId ? { appId, forwardEnv: ASKPASS_ENV } : null
+    writeFileSync(
+      scriptPath,
+      nodeWrapperScript(this.nodePath, this.helperArgs, 'UKEMI_ASKPASS', sandbox),
+      {
+        mode: 0o700,
+      },
+    )
     const server = createServer((socket) => this.handle(socket))
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject)

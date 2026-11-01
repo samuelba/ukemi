@@ -13,8 +13,8 @@ import {
 } from '../conflict/markers'
 import type { RepoModel } from '../repo/repoModel'
 import { errorMessage } from '../util/logger'
-import type { CommandEnv, Handler } from './commands/context'
-import type { RepoRegistry } from './registry'
+import type { CommandEnv, Handler } from '../app/commands/context'
+import type { RepoRegistry } from '../app/registry'
 
 const commandArgs = z.object({
   uri: z.string().optional(),

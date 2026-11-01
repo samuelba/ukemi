@@ -1,0 +1,101 @@
+# Packages the standalone Ukemi app. The VS Code extension is packaged by vsce instead.
+appId: dev.samuelba.ukemi
+productName: Ukemi
+copyright: Copyright © Samuel Bachmann
+directories:
+  output: out/desktop-release
+  buildResources: resources
+extraMetadata:
+  main: dist/desktop/main.js
+  # Electron takes the window's app id from this. It must match the installed .desktop file, or
+  # the running window gets a generic icon. The main process also sets it, for dev runs.
+  desktopName: ukemi.desktop
+# esbuild bundles every dependency but node-pty, which is native and ships as files.
+files:
+  - package.json
+  - dist/desktop/**
+  - dist/webview/**
+  - dist/askpass.js
+  - dist/splitTool.js
+  - resources/icon.png
+  - '!**/*.map'
+  - '!node_modules/**'
+  - node_modules/node-pty/package.json
+  - node_modules/node-pty/lib/**/*.js
+  - '!node_modules/node-pty/lib/**/*.test.js'
+  # Only the binary for the package's own architecture. node-pty would prefer a binary compiled
+  # on the build machine, in build/Release, which can be the wrong architecture, so that one
+  # never ships. Linux has no prebuilt one: scripts/stage-node-pty.mjs stages the compiled one.
+  - node_modules/node-pty/prebuilds/${platform}-${arch}/**
+# git and jj run these with the app in Node mode, by path, so they cannot live in the archive.
+# node-pty loads its binary, and starts spawn-helper on macOS, from real files.
+asarUnpack:
+  - dist/askpass.js
+  - dist/splitTool.js
+  - node_modules/node-pty/**
+npmRebuild: false
+linux:
+  target: [AppImage, deb, rpm, snap, flatpak]
+  category: Development
+  icon: resources/icon.png
+  executableName: ukemi
+  # Names the .desktop file and its StartupWMClass after desktopName.
+  syncDesktopName: true
+  synopsis: Jujutsu (jj) GUI
+  # deb and rpm need a maintainer. The GitHub noreply address keeps a private one out of packages.
+  maintainer: Samuel Bachmann <samuelba@users.noreply.github.com>
+  vendor: Samuel Bachmann
+deb:
+  packageName: ukemi
+  artifactName: ukemi_${version}_${arch}.${ext}
+rpm:
+  packageName: ukemi
+  artifactName: ukemi-${version}.${arch}.${ext}
+# Classic confinement: Ukemi runs the user's own jj, git, gh and glab, which a strict snap cannot
+# reach. A Snap Store upload needs approval for it; the release only attaches the .snap file.
+snap:
+  confinement: classic
+  grade: stable
+  base: core22
+  summary: Jujutsu (jj) GUI
+# The sandbox has no jj or git. Ukemi runs them on the host through flatpak-spawn (see
+# src/util/hostProcess.ts), which needs the org.freedesktop.Flatpak bus name.
+flatpak:
+  runtime: org.freedesktop.Platform
+  runtimeVersion: '25.08'
+  sdk: org.freedesktop.Sdk
+  base: org.electronjs.Electron2.BaseApp
+  baseVersion: '25.08'
+  license: LICENSE
+  finishArgs:
+    - --socket=wayland
+    - --socket=fallback-x11
+    - --share=ipc
+    - --device=dri
+    # Fetch, push and the GitHub and GitLab APIs.
+    - --share=network
+    # Repositories live anywhere in the home folder.
+    - --filesystem=home
+    # Runs jj, git, gh, glab and the terminal on the host.
+    - --talk-name=org.freedesktop.Flatpak
+    # The OS keychain that keeps forge sign-ins.
+    - --talk-name=org.freedesktop.secrets
+    - --talk-name=org.kde.kwalletd5
+    - --talk-name=org.kde.kwalletd6
+    - --talk-name=org.freedesktop.Notifications
+# One dmg per architecture: node-pty has a different binary for each, which a universal app
+# cannot merge.
+mac:
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  artifactName: Ukemi-${version}-${arch}.${ext}
+  category: public.app-category.developer-tools
+  # macOS needs at least 512 px. scripts/render-icons.mjs renders it from icon.svg.
+  icon: resources/icon-1024.png
+win:
+  target: [nsis]
+  icon: resources/icon.png
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

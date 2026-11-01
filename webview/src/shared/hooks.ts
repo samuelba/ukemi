@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { postMessage } from './vscodeApi'
+import { useHostChannel } from './hostChannel'
 
 // Listens for host messages, then posts `ready` so the host only sends once someone is listening.
 // The latest handler always runs, so it can read current state without resubscribing.
@@ -9,10 +9,23 @@ export function useHostMessages<T>(onMessage: (message: T) => void, ready: unkno
     handler.current = onMessage
   })
   const readyMessage = useRef(ready)
+  const channel = useHostChannel()
+  useEffect(() => {
+    const unsubscribe = channel.subscribe((message) => handler.current(message as T))
+    channel.post(readyMessage.current)
+    return unsubscribe
+  }, [channel])
+}
+
+// Listens for host messages without posting `ready`, for a view next to the one that does.
+export function useHostListener<T>(onMessage: (message: T) => void): void {
+  const handler = useRef(onMessage)
+  useLayoutEffect(() => {
+    handler.current = onMessage
+  })
   useEffect(() => {
     const listener = (event: MessageEvent<T>) => handler.current(event.data)
     window.addEventListener('message', listener)
-    postMessage(readyMessage.current)
     return () => window.removeEventListener('message', listener)
   }, [])
 }

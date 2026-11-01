@@ -11,6 +11,7 @@ import type {
   Remote,
   Workspace,
 } from '../../shared/model'
+import { hostSpawn } from '../util/hostProcess'
 import { errorMessage } from '../util/logger'
 import { SerialQueue } from '../util/serialQueue'
 import {
@@ -640,8 +641,9 @@ async function createLocalRepo(
 }
 
 async function remoteHasHeads(runner: JjRunner, url: string): Promise<boolean> {
-  const { stdout } = await execFileAsync('git', ['ls-remote', '--heads', url], {
-    env: runner.spawnEnv(),
+  const host = hostSpawn('git', ['ls-remote', '--heads', url], { env: runner.hostEnv() })
+  const { stdout } = await execFileAsync(host.command, host.args, {
+    env: host.env,
     timeout: NETWORK_TIMEOUT_MS,
     encoding: 'utf8',
   })

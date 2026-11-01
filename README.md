@@ -36,6 +36,54 @@ Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/item
 - Linux (tested on Ubuntu 24.04 and Fedora 44).
 - jj 0.40 or later. Ukemi downloads jj 0.46 when you agree.
 
+## Desktop app
+
+Ukemi also runs as an app of its own, without VS Code. Every [GitHub release](https://github.com/samuelba/ukemi/releases) has these files:
+
+| System  | File                             | Install                                                                   |
+| ------- | -------------------------------- | ------------------------------------------------------------------------- |
+| Linux   | `ukemi-<version>.x86_64.rpm`     | `sudo dnf install ./ukemi-<version>.x86_64.rpm`                           |
+| Linux   | `ukemi_<version>_amd64.deb`      | `sudo apt install ./ukemi_<version>_amd64.deb`                            |
+| Linux   | `Ukemi-<version>-x86_64.flatpak` | `flatpak install --user ./Ukemi-<version>-x86_64.flatpak`                 |
+| Linux   | `ukemi-jj_<version>_amd64.snap`  | `sudo snap install --dangerous --classic ./ukemi-jj_<version>_amd64.snap` |
+| Linux   | `Ukemi-<version>.AppImage`       | See [AppImage](#appimage) below                                           |
+| macOS   | `Ukemi-<version>-arm64.dmg`      | Apple silicon. Open it and drag Ukemi to Applications                     |
+| macOS   | `Ukemi-<version>-x64.dmg`        | Intel. Open it and drag Ukemi to Applications                             |
+| Windows | `Ukemi Setup <version>.exe`      | Run the installer                                                         |
+
+The macOS and Windows builds are not signed yet. On macOS, open Ukemi from the context menu the first time. On Windows, choose **More info** and **Run anyway**.
+
+Start it from the app menu, or with a repository: `ukemi ~/src/repo`. Settings, the window layout and the log are in `~/.config/Ukemi` on Linux.
+
+### AppImage
+
+An AppImage runs without installing. To get it into the app menu with its icon, put it in a fixed place and extract the icon:
+
+```sh
+mkdir -p ~/Applications ~/.local/share/applications ~/.local/share/icons/hicolor/256x256/apps
+mv ~/Downloads/Ukemi-*.AppImage ~/Applications/Ukemi.AppImage
+chmod +x ~/Applications/Ukemi.AppImage
+cd /tmp && ~/Applications/Ukemi.AppImage --appimage-extract usr/share/icons/hicolor/256x256/apps/ukemi.png > /dev/null
+mv /tmp/squashfs-root/usr/share/icons/hicolor/256x256/apps/ukemi.png ~/.local/share/icons/hicolor/256x256/apps/
+rm -r /tmp/squashfs-root
+```
+
+Then create `~/.local/share/applications/ukemi.desktop`. Replace `YOU` with your user name, since `.desktop` files do not expand `~` or `$HOME`:
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=Ukemi
+Comment=Jujutsu (jj) version control GUI
+Exec=/home/YOU/Applications/Ukemi.AppImage %U
+Icon=ukemi
+Terminal=false
+Categories=Development;RevisionControl;
+StartupWMClass=ukemi
+```
+
+Keep the file name `ukemi.desktop` and `StartupWMClass=ukemi`. The desktop matches the open window to this entry by that name, and shows a generic icon otherwise. If the AppImage does not start, install FUSE 2: `fuse-libs` on Fedora, `libfuse2t64` on Ubuntu 24.04.
+
 ## Settings
 
 Select the gear in the title bar of the Ukemi view to open the Ukemi settings.
@@ -151,6 +199,18 @@ npm test            # unit and integration tests, needs jj on PATH
 npm run test:e2e    # runs the extension inside the installed VS Code
 npm run package     # builds ukemi-jj-0.2.0.vsix
 ```
+
+### Desktop app
+
+```sh
+npm run desktop                   # builds and starts the app from source
+npm run test:desktop              # end-to-end tests of the app
+npm run desktop:package           # every installer for this system, in out/desktop-release
+npm run desktop:package:dir       # the unpacked app only, the quickest build to try
+npm run desktop:package:appimage  # one Linux format: appimage, flatpak, snap, deb or rpm
+```
+
+Flatpak needs `flatpak-builder` and the Flathub remote, snap needs `snapcraft`, and deb and rpm need `libcrypt.so.1` (`libxcrypt-compat` on Fedora).
 
 ### Install the VSIX
 

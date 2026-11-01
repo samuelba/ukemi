@@ -4,7 +4,7 @@ import { FILE_STATUS_LETTER, type ChangedFile } from '../../shared/model'
 import type { RepoModel } from '../repo/repoModel'
 import { readConfig } from './config'
 import { revisionUri } from './diff'
-import type { RepoRegistry } from './registry'
+import type { RepoRegistry } from '../app/registry'
 
 const STATUS_COLOR: Record<ChangedFile['status'], string> = {
   added: 'gitDecoration.addedResourceForeground',

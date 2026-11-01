@@ -14,7 +14,7 @@
   "scripts": {
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
-    "package:build": "node esbuild.mjs --production",
+    "package:build": "node esbuild.mjs --production --extension-only",
     "typecheck": "tsc -p .",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -25,17 +25,30 @@
     "package": "vsce package --no-dependencies",
     "install:cursor": "npm run package && cursor --install-extension ukemi-jj-$npm_package_version.vsix --force",
     "vscode:prepublish": "npm run package:build",
-    "test:e2e": "npm run build && node test/e2e/runE2e.mjs"
+    "test:e2e": "npm run build && node test/e2e/runE2e.mjs",
+    "desktop": "node esbuild.mjs && electron dist/desktop/main.js",
+    "desktop:watch": "node esbuild.mjs --watch",
+    "desktop:bundle": "node esbuild.mjs --production && node scripts/stage-node-pty.mjs",
+    "desktop:package": "npm run desktop:bundle && electron-builder --publish never",
+    "desktop:package:dir": "npm run desktop:bundle && electron-builder --dir --publish never",
+    "desktop:package:appimage": "npm run desktop:bundle && electron-builder --linux AppImage --publish never",
+    "desktop:package:flatpak": "npm run desktop:bundle && electron-builder --linux flatpak --publish never",
+    "desktop:package:snap": "npm run desktop:bundle && electron-builder --linux snap --publish never",
+    "desktop:package:deb": "npm run desktop:bundle && electron-builder --linux deb --publish never",
+    "desktop:package:rpm": "npm run desktop:bundle && electron-builder --linux rpm --publish never",
+    "test:desktop": "node esbuild.mjs && playwright test --config test/desktop/playwright.config.ts"
   },
   "dependencies": {
     "@vscode/codicons": "^0.0.46-24",
     "diff": "^8.0.4",
+    "node-pty": "1.1.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "yaml": "^2.9.1",
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "@resvg/resvg-js": "^2.6.2",
     "@types/node": "^20.19.43",
     "@types/react": "^19.3.0",
@@ -44,6 +57,10 @@
     "@vitest/coverage-v8": "^3.2.7",
     "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^4.0.0",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/xterm": "6.0.0",
+    "electron": "44.9.0",
+    "electron-builder": "26.17.0",
     "esbuild": "^0.28.2",
     "eslint": "^9.39.5",
     "prettier": "^3.9.10",
@@ -1969,5 +1986,8 @@
         "**/.jj": true
       }
     }
+  },
+  "allowScripts": {
+    "node-pty@1.1.0": true
   }
 }

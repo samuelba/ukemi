@@ -11,36 +11,6 @@ const state = vi.hoisted(() => ({
   messages: [] as string[],
 }))
 
-vi.mock('vscode', () => ({
-  workspace: {
-    get isTrusted() {
-      return state.trusted
-    },
-    getConfiguration: () => ({
-      get: (_key: string, fallback: unknown) => fallback,
-      inspect: () => undefined,
-    }),
-    onDidGrantWorkspaceTrust: () => ({ dispose: () => undefined }),
-    onDidChangeConfiguration: () => ({ dispose: () => undefined }),
-  },
-  window: {
-    state: { focused: true },
-    registerUriHandler: () => ({ dispose: () => undefined }),
-    onDidChangeWindowState: () => ({ dispose: () => undefined }),
-    showInformationMessage: async (message: string) => {
-      state.messages.push(message)
-      return undefined
-    },
-    showWarningMessage: async (message: string) => {
-      state.messages.push(message)
-      return undefined
-    },
-  },
-  authentication: { getSession: async () => state.session },
-  env: { uriScheme: 'vscode', openExternal: async () => true },
-  Uri: { parse: (value: string) => value },
-}))
-
 vi.mock('../../src/forge/ghConfig', () => ({
   ghKnowsHost: (host: string) => state.ghHostsKnown.has(host),
   ghHosts: () => [...state.ghHostsKnown],
@@ -60,7 +30,16 @@ vi.mock('../../src/forge/ghApi', async (importOriginal) => ({
   ghGitCredential: async (_host: string, field: 'username' | 'password') => state.ghGit[field],
 }))
 
-import { ForgeService } from '../../src/vscode/forgeService'
+import { ForgeService } from '../../src/app/forgeService'
+import { readSettings } from '../../src/app/settings'
+
+const NO_EVENT = () => ({ dispose: () => undefined })
+
+// The editor account only serves github.com, as without a `github-enterprise.uri`.
+const editorSession = async (host: string) =>
+  host === 'github.com' && state.session
+    ? { username: state.session.account.label, token: state.session.accessToken }
+    : null
 
 function service() {
   const secrets = new Map<string, string>()
@@ -69,9 +48,39 @@ function service() {
     store: async (key: string, value: string) => void secrets.set(key, value),
     delete: async (key: string) => void secrets.delete(key),
   }
-  const registry = { onDidChangeModel: () => ({ dispose: () => undefined }), activeModel: null }
+  const message = async (text: string) => {
+    state.messages.push(text)
+    return undefined
+  }
+  const host = {
+    secrets: store,
+    settings: {
+      read: () => readSettings({ get: (_key, fallback) => fallback }),
+      update: async () => undefined,
+      onDidChange: NO_EVENT,
+    },
+    window: {
+      isFocused: true,
+      onDidFocus: NO_EVENT,
+      get isTrusted() {
+        return state.trusted
+      },
+      onDidGrantTrust: NO_EVENT,
+    },
+    ui: { info: message, warn: message, openExternal: async () => true },
+  }
+  const registry = { onDidChangeModel: NO_EVENT, activeModel: null }
   const logger = { info: () => undefined, warn: () => undefined, error: () => undefined }
-  const forge = new ForgeService(registry as never, store as never, logger, 'samuelba.ukemi-jj')
+  const accounts = {
+    githubSession: editorSession,
+    gitlabRedirect: {
+      prepare: async () => 'test://gitlab-auth',
+      onDidRedirect: NO_EVENT,
+      dispose: () => undefined,
+    },
+    untrustedMessage: 'untrusted',
+  }
+  const forge = new ForgeService(registry as never, host as never, logger, accounts)
   return { forge, secrets }
 }
 

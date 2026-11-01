@@ -7,7 +7,14 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts', 'shared/**/*.ts', 'webview/src/**/*.ts'],
-      exclude: ['src/extension.ts', 'src/**/vscode*.ts'],
+      // Entry points that need a running editor or Electron. The e2e suites cover them.
+      exclude: [
+        'src/extension.ts',
+        'src/**/vscode*.ts',
+        'src/desktop/main.ts',
+        'src/desktop/session.ts',
+        'src/desktop/preload.ts',
+      ],
     },
   },
   resolve: {

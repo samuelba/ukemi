@@ -1,0 +1,15 @@
+name: Install Linux packaging tools
+description: Install what electron-builder needs for the rpm, snap and Flatpak packages.
+
+runs:
+  using: composite
+  steps:
+    - name: Install rpm, Flatpak and snapcraft
+      shell: bash
+      run: |
+        set -euo pipefail
+        sudo apt-get update
+        sudo apt-get install -y rpm flatpak flatpak-builder squashfs-tools
+        sudo snap install snapcraft --classic
+        # electron-builder installs the runtime, SDK and Electron base app from here as the user.
+        flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo

@@ -1,16 +1,26 @@
 import { basename, join } from 'node:path'
 import * as vscode from 'vscode'
 import { z } from 'zod'
-import { sameParents } from '../../shared/evolution'
 import type { ChangedFile, EvolutionEntry } from '../../shared/model'
 import type { CommitView } from '../../shared/protocol'
+import type { RepoRegistry } from '../app/registry'
+import {
+  changeLabel,
+  commitDiffEntries,
+  commitDiffTitle,
+  fileAtRevision,
+  fileDiffSides,
+  interdiffText,
+  revisionText,
+  versionDiffEntries,
+  versionDiffTitle,
+  type DiffEntry,
+  type FileSide,
+} from '../app/revisionContent'
 import type { RepoModel } from '../repo/repoModel'
-import type { RepoRegistry } from './registry'
 
 export const DIFF_SCHEME = 'ukemi'
 export const INTERDIFF_SCHEME = 'ukemi-interdiff'
-const BINARY_PLACEHOLDER = '(binary file)'
-const NO_DIFFERENCES = '(These versions have no differences in files or description.)'
 
 interface DiffQuery {
   root: string
@@ -26,29 +36,21 @@ export function revisionUri(root: string, commitId: string, path: string): vscod
   })
 }
 
+function sideUri(root: string, side: FileSide): vscode.Uri {
+  return side.kind === 'disk'
+    ? vscode.Uri.file(join(root, side.path))
+    : revisionUri(root, side.commitId, side.path)
+}
+
+const diffQuerySchema = z.object({ root: z.string(), commitId: z.string(), path: z.string() })
+
 function parseQuery(uri: vscode.Uri): DiffQuery | null {
   try {
-    const value: unknown = JSON.parse(uri.query)
-    if (
-      typeof value === 'object' &&
-      value !== null &&
-      'root' in value &&
-      'commitId' in value &&
-      'path' in value
-    ) {
-      const { root, commitId, path } = value as Record<string, unknown>
-      if (typeof root === 'string' && typeof commitId === 'string' && typeof path === 'string') {
-        return { root, commitId, path }
-      }
-    }
+    const result = diffQuerySchema.safeParse(JSON.parse(uri.query))
+    return result.success ? result.data : null
   } catch {
     return null
   }
-  return null
-}
-
-function looksBinary(data: Buffer): boolean {
-  return data.subarray(0, 8000).includes(0)
 }
 
 export class RevisionContentProvider implements vscode.TextDocumentContentProvider {
@@ -60,51 +62,37 @@ export class RevisionContentProvider implements vscode.TextDocumentContentProvid
     if (!query || !model) {
       return ''
     }
-    try {
-      const data = await model.repo.fileContent(query.commitId, query.path)
-      return looksBinary(data) ? BINARY_PLACEHOLDER : data.toString('utf8')
-    } catch {
-      return ''
-    }
+    return revisionText(model, query.commitId, query.path)
   }
 }
 
-function changeLabel(commit: CommitView): string {
-  return commit.changeId.slice(0, Math.max(8, commit.changePrefix.length))
-}
-
-function diffSides(model: RepoModel, commit: CommitView, file: ChangedFile) {
-  const parent = commit.parents[0]
-  const left = parent ? revisionUri(model.root, parent, file.sourcePath) : undefined
-  const fileUri = vscode.Uri.file(join(model.root, file.path))
-  const right =
-    commit.isWorkingCopy && file.status !== 'removed'
-      ? fileUri
-      : revisionUri(model.root, commit.commitId, file.path)
-  return { left, right, fileUri }
+function changesResources(root: string, entries: readonly DiffEntry[]) {
+  return entries.map((entry) => [
+    vscode.Uri.file(join(root, entry.path)),
+    entry.left ? sideUri(root, entry.left) : undefined,
+    entry.right ? sideUri(root, entry.right) : undefined,
+  ])
 }
 
 export async function openFileDiff(model: RepoModel, commit: CommitView, file: ChangedFile) {
-  const { left, right } = diffSides(model, commit, file)
+  const { left, right } = fileDiffSides(commit, file)
+  const rightUri = sideUri(model.root, right)
   const title = `${basename(file.path)} (${changeLabel(commit)})`
   if (!left || file.status === 'added') {
-    await vscode.commands.executeCommand('vscode.open', right, { preview: true })
+    await vscode.commands.executeCommand('vscode.open', rightUri, { preview: true })
     return
   }
-  await vscode.commands.executeCommand('vscode.diff', left, right, title, { preview: true })
+  await vscode.commands.executeCommand('vscode.diff', sideUri(model.root, left), rightUri, title, {
+    preview: true,
+  })
 }
 
 export async function openCommitDiff(model: RepoModel, commit: CommitView, files: ChangedFile[]) {
-  const title = `${changeLabel(commit)}: ${commit.description.split('\n')[0] || '(no description)'}`
-  const resources = files.map((file) => {
-    const { left, right, fileUri } = diffSides(model, commit, file)
-    return [
-      fileUri,
-      file.status === 'added' ? undefined : left,
-      file.status === 'removed' ? undefined : right,
-    ]
-  })
-  await vscode.commands.executeCommand('vscode.changes', title, resources)
+  await vscode.commands.executeCommand(
+    'vscode.changes',
+    commitDiffTitle(commit),
+    changesResources(model.root, commitDiffEntries(commit, files)),
+  )
 }
 
 const interdiffQuerySchema = z.object({ root: z.string(), from: z.string(), to: z.string() })
@@ -131,8 +119,7 @@ export class InterdiffContentProvider implements vscode.TextDocumentContentProvi
     if (!model) {
       return ''
     }
-    const patch = await model.repo.interdiff(query.from, query.to)
-    return patch || NO_DIFFERENCES
+    return interdiffText(model, query.from, query.to)
   }
 }
 
@@ -142,26 +129,20 @@ export async function openVersionDiff(
   from: EvolutionEntry,
   to: EvolutionEntry,
 ) {
-  const files = sameParents(from.parents, to.parents)
-    ? await model.repo.diffFiles(from.commitId, to.commitId)
-    : []
-  if (files.length === 0) {
+  const entries = await versionDiffEntries(model, from, to)
+  if (entries.length === 0) {
     const document = await vscode.workspace.openTextDocument(interdiffUri(model.root, from, to))
     await vscode.window.showTextDocument(document, { preview: true })
     return
   }
-  const title = `${changeLabel(commit)}: ${from.commitPrefix} → ${to.commitPrefix}`
-  const resources = files.map((file) => [
-    vscode.Uri.file(join(model.root, file.path)),
-    file.status === 'added' ? undefined : revisionUri(model.root, from.commitId, file.sourcePath),
-    file.status === 'removed' ? undefined : revisionUri(model.root, to.commitId, file.path),
-  ])
-  await vscode.commands.executeCommand('vscode.changes', title, resources)
+  await vscode.commands.executeCommand(
+    'vscode.changes',
+    versionDiffTitle(commit, from, to),
+    changesResources(model.root, entries),
+  )
 }
 
 export async function openFileAtRevision(model: RepoModel, commit: CommitView, path: string) {
-  const uri = commit.isWorkingCopy
-    ? vscode.Uri.file(join(model.root, path))
-    : revisionUri(model.root, commit.commitId, path)
+  const uri = sideUri(model.root, fileAtRevision(commit, path))
   await vscode.commands.executeCommand('vscode.open', uri, { preview: false })
 }
