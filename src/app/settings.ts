@@ -39,6 +39,10 @@ export interface UkemiConfig {
   autoFetchEnabled: boolean
   autoFetchInterval: string
   nativeStacks: boolean
+  suggestTools: string[]
+  suggestModels: Record<string, string>
+  suggestInstructions: string
+  suggestMaxDiffBytes: number
 }
 
 // Reads one `ukemi.*` setting by its key without the prefix.
@@ -95,6 +99,29 @@ function oneOf<T extends string>(value: string, allowed: readonly T[], fallback:
   return (allowed as readonly string[]).includes(value) ? (value as T) : fallback
 }
 
+const SUGGEST_TOOLS = ['claude', 'copilot', 'cursor', 'vscode-lm']
+
+function stringList(value: unknown, fallback: string[]): string[] {
+  return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : fallback
+}
+
+function stringMap(value: unknown): Record<string, string> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return {}
+  }
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, string] => typeof entry[1] === 'string',
+    ),
+  )
+}
+
+function clamp(value: unknown, min: number, max: number, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.min(max, Math.max(min, Math.round(value)))
+    : fallback
+}
+
 export function readSettings(c: SettingsSource): UkemiConfig {
   return {
     jjPath: c.get<string>('jjPath', ''),
@@ -121,6 +148,15 @@ export function readSettings(c: SettingsSource): UkemiConfig {
     autoFetchEnabled: c.get<boolean>('autoFetch.enabled', false),
     autoFetchInterval: text(c.get<unknown>('autoFetch.interval', '10m'), '10m'),
     nativeStacks: c.get<boolean>('forge.nativeStacks', true),
+    suggestTools: stringList(c.get<unknown>('describeSuggest.tools', SUGGEST_TOOLS), SUGGEST_TOOLS),
+    suggestModels: stringMap(c.get<unknown>('describeSuggest.models', {})),
+    suggestInstructions: text(c.get<unknown>('describeSuggest.instructions', ''), ''),
+    suggestMaxDiffBytes: clamp(
+      c.get<unknown>('describeSuggest.maxDiffBytes', 40_000),
+      2_000,
+      100_000,
+      40_000,
+    ),
   }
 }
 

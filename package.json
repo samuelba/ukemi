@@ -2078,6 +2078,57 @@
           "pattern": "^(every\\s+)?(\\d+(\\.\\d+)?|\\.\\d+)\\s*[smhdSMHD]$",
           "patternErrorMessage": "Use a positive number and a unit: s, m, h or d. For example 60s or 5m. The minimum is 10 seconds.",
           "description": "How often to reload merge and pull request status. While one of your pipelines is running, Ukemi checks four times as often, and never under 10 seconds."
+        },
+        "ukemi.describeSuggest.tools": {
+          "scope": "machine",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "claude",
+              "copilot",
+              "cursor",
+              "vscode-lm"
+            ],
+            "enumDescriptions": [
+              "Claude Code (`claude`)",
+              "GitHub Copilot CLI (`copilot`)",
+              "Cursor CLI (`cursor-agent`)",
+              "The language models of VS Code, such as GitHub Copilot Chat. Not available in the desktop app."
+            ]
+          },
+          "uniqueItems": true,
+          "default": [
+            "claude",
+            "copilot",
+            "cursor",
+            "vscode-lm"
+          ],
+          "markdownDescription": "The tools that can suggest a description in the describe dialog, in the order of their buttons. Ukemi shows a button for each one that is installed. Ukemi sends the change's diff, its description and the descriptions of its recent ancestors to the tool, which may send them to its provider. An empty list hides the buttons."
+        },
+        "ukemi.describeSuggest.models": {
+          "scope": "machine",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "markdownDescription": "The model each tool uses to suggest a description, keyed by tool. Example: `{ \"claude\": \"haiku\" }`. A tool without an entry uses its own default."
+        },
+        "ukemi.describeSuggest.instructions": {
+          "scope": "resource",
+          "type": "string",
+          "default": "",
+          "editPresentation": "multilineText",
+          "markdownDescription": "Extra instructions for suggested descriptions, such as `Use Conventional Commits` or `Write in German`."
+        },
+        "ukemi.describeSuggest.maxDiffBytes": {
+          "scope": "resource",
+          "type": "integer",
+          "default": 40000,
+          "minimum": 2000,
+          "maximum": 100000,
+          "description": "How much of a change's diff, in bytes, to send when suggesting a description. Lock files and generated files are left out first; a longer diff is cut off."
         }
       }
     },

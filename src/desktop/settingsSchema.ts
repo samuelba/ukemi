@@ -39,6 +39,7 @@ const GROUPS: ReadonlyArray<readonly [string, (key: string) => boolean]> = [
   ['Workspaces', (key) => key.startsWith('workspaces.')],
   ['Fetching', (key) => key.startsWith('autoFetch.')],
   ['GitHub and GitLab', (key) => /^(github|gitlab|forge)\./.test(key)],
+  ['Descriptions', (key) => key.startsWith('describeSuggest.')],
   ['Graph', () => true],
 ]
 
@@ -125,7 +126,15 @@ const DESKTOP_FIELDS: readonly Omit<
   },
 ]
 
-const GROUP_ORDER = ['General', 'Fonts', 'Graph', 'Workspaces', 'Fetching', 'GitHub and GitLab']
+const GROUP_ORDER = [
+  'General',
+  'Fonts',
+  'Graph',
+  'Descriptions',
+  'Workspaces',
+  'Fetching',
+  'GitHub and GitLab',
+]
 
 function groupOf(key: string): string {
   return GROUPS.find(([, matches]) => matches(key))?.[0] ?? 'Graph'

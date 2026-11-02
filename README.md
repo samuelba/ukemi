@@ -19,6 +19,7 @@ Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/item
 - **Change graph.** See your changes, bookmarks, tags, workspaces and conflicts. The working copy has a red seal. Filter by _Recent_, _Mine_, _My history_, _Stack_ or _Working copy_ (the working copy and its last 5 first parents) and choose the history depth. _Recent_ also shows the last 10 commits on the trunk. Changed files appear as a list or a tree.
 - **Drag and drop.** Drag a change onto another change to rebase it with its descendants. Hold Alt to move only that change. Hold Ctrl to duplicate it onto the target, and hold Ctrl and Alt to duplicate it with its descendants. Drag a file to move its changes, or hold Ctrl to copy them. Drag a bookmark to move it.
 - **Edit history.** Use the context menu or the hover action to describe, create, edit, squash, split, abandon, duplicate and revert changes. Rebase onto the trunk, onto another change, or insert the change before or after another. **Ship to Trunk Now** moves the trunk bookmark to that change and pushes it. **New Change from Trunk** starts a working copy on the trunk. **New Change from Bookmark, Request or Revision** opens a new working copy there. When a local bookmark and a remote bookmark share a name, Ukemi asks which one to use. Click a change to show or hide its files.
+- **Suggested descriptions.** The describe dialog has a button for each AI coding tool you have installed: Claude Code, Cursor CLI or GitHub Copilot CLI, and in VS Code also Copilot Chat. It suggests a description from the change's diff. See [Suggested descriptions](#suggested-descriptions).
 - **Bookmarks.** The Bookmarks panel lists local bookmarks and remote bookmarks. **Filter Bookmarks** in the view title filters that list by bookmark name. Hover a row to open it as the working copy, edit, rename, delete, forget, track, untrack or push it. The context menu can also create a pull or merge request, or a new workspace.
 - **Workspaces.** The Workspaces panel lists workspaces. Open one in this window or a new window, open a terminal, refresh it, reveal it in the graph, or start a new change in it.
 - **Split by hunks.** Select hunks in a split editor. The selected hunks go into a new change before the original. You can also split by files.
@@ -35,6 +36,22 @@ Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/item
 
 - Linux (tested on Ubuntu 24.04 and Fedora 44).
 - jj 0.40 or later. Ukemi downloads jj 0.46 when you agree.
+
+## Suggested descriptions
+
+The describe dialog shows a button for each tool below that is installed and enabled. Ukemi has no AI service or key of its own: it runs your tool, signed in to your account, and uses your plan and tokens. Click a button, then edit the suggestion or select **Undo**. Nothing is saved until you select **Save**.
+
+| Tool                                                                         | Command        | Setup                                                                                                                                       |
+| ---------------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code)                | `claude`       | Install it, run `claude` once and sign in.                                                                                                  |
+| [Cursor CLI](https://cursor.com/cli)                                         | `cursor-agent` | Install it and run `cursor-agent login`.                                                                                                    |
+| [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli) | `copilot`      | Install it, run `copilot` once and sign in with `/login`. You need a Copilot plan.                                                          |
+| VS Code language models                                                      | none           | VS Code only. Install GitHub Copilot Chat or another extension that provides language models. VS Code asks once whether Ukemi may use them. |
+
+- **Detection.** Ukemi looks for the command on `PATH` and shows its button when `<command> --version` succeeds. The desktop app reads `PATH` from your login shell when you start it from the launcher. A tool that you install later appears within a minute.
+- **What is sent.** The change's diff (lock files and generated files are left out, the rest is cut at `ukemi.describeSuggest.maxDiffBytes`), its file summary, its current description, the descriptions of its last 10 ancestors so the suggestion follows the repository's style, and your `ukemi.describeSuggest.instructions`. The tool may send them to its provider.
+- **What the tool can do.** Ukemi runs it once, in an empty temporary folder, with its own tools turned off (Claude Code), in ask mode (Cursor) or without tool permissions (Copilot). It cannot read or change your repository. **Stop** or closing the dialog ends it.
+- **Choose tools and models.** `ukemi.describeSuggest.tools` sets which buttons appear and in which order; an empty list hides them. `ukemi.describeSuggest.models` picks a model per tool, for example `{ "claude": "haiku" }` for faster answers.
 
 ## Desktop app
 
@@ -115,10 +132,14 @@ Select the gear in the title bar of the Ukemi view to open the Ukemi settings.
 | `ukemi.forge.requestLimit`           | How many recently updated merge and pull requests to load. Default: 50. Maximum: 500.              |
 | `ukemi.forge.nativeStacks`           | Group synced GitHub pull request stacks into GitHub's native stack view. Default: on.              |
 | `ukemi.forge.statusInterval`         | How often to reload CI status. Default: `60s`, or 15s while your pipeline runs.                    |
+| `ukemi.describeSuggest.tools`        | Tools that can suggest a description, in button order: `claude`, `copilot`, `cursor`, `vscode-lm`. |
+| `ukemi.describeSuggest.models`       | Model per tool for suggestions, for example `{ "claude": "haiku" }`. Default: the tool's own.      |
+| `ukemi.describeSuggest.instructions` | Extra instructions for suggestions, for example `Use Conventional Commits`.                        |
+| `ukemi.describeSuggest.maxDiffBytes` | How much of the diff to send for a suggestion, in bytes. Default: 40000.                           |
 
 ### Settings per repository
 
-A repository can have its own value for the graph settings (`showGitTags`, `showLineStats`, `defaultFilter`, `historyDepth`), auto fetch, `workspaces.snapshotOnRefresh` and the `forge.*` settings. Every other setting applies to all repositories. Each repository also reopens with the filter and history depth it was left at.
+A repository can have its own value for the graph settings (`showGitTags`, `showLineStats`, `defaultFilter`, `historyDepth`), auto fetch, `workspaces.snapshotOnRefresh`, the `forge.*` settings, `describeSuggest.instructions` and `describeSuggest.maxDiffBytes`. Every other setting applies to all repositories. Each repository also reopens with the filter and history depth it was left at.
 
 - **VS Code:** set them in the folder settings of the workspace folder (**Preferences: Open Folder Settings**). A repository nested inside a workspace folder uses that folder's settings.
 - **Ukemi app:** right-click a repository tab and choose **Repository Settings…**, or switch the settings view to the repository. The values are stored under `repositories` in `settings.json`:

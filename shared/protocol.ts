@@ -116,12 +116,20 @@ export type DropMode = 'source' | 'revision'
 export type DropAction = 'rebase' | 'duplicate'
 export type FileDropAction = 'copy' | 'move'
 
+// A tool that can suggest a change description, like Claude Code or GitHub Copilot.
+export interface SuggesterView {
+  id: string
+  label: string
+}
+
 export type HostMessage =
   | { type: 'state'; state: ViewState }
   | { type: 'reveal'; commitId: string }
   | { type: 'files'; repoId: string; commitId: string; files: ChangedFile[] }
   | { type: 'fileIcons'; theme: FileIconTheme | null }
   | { type: 'describe'; commitId: string; description: string }
+  | { type: 'suggesters'; suggesters: SuggesterView[] }
+  | { type: 'descriptionSuggestion'; requestId: string; text?: string; error?: string }
 
 export type WebviewMessage =
   | { type: 'ready' }
@@ -132,6 +140,9 @@ export type WebviewMessage =
   | { type: 'selectCommit'; commitId: string }
   | { type: 'command'; command: string; context: Record<string, unknown> }
   | { type: 'describe'; commitId: string; message: string; startNew: boolean }
+  | { type: 'listSuggesters' }
+  | { type: 'suggestDescription'; requestId: string; commitId: string; suggester: string }
+  | { type: 'cancelSuggestion'; requestId: string }
   | { type: 'openFile'; commitId: string; path: string; mode: 'diff' | 'file' }
   | {
       type: 'dropCommit'

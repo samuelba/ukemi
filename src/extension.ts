@@ -39,6 +39,8 @@ import { LOG_CHANNEL_NAME, showLog } from './vscode/showLog'
 import { RepoStatusBar } from './vscode/statusBar'
 import { vscodeHost } from './vscode/vscodeHost'
 import { vscodeWorkbench } from './vscode/workbench'
+import { LanguageModelSuggester } from './vscode/languageModelSuggester'
+import { cliSuggesters, DescriptionSuggestions } from './app/describeSuggest/service'
 import { WorkspacesView } from './vscode/workspacesView'
 
 export interface UkemiApi {
@@ -125,6 +127,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
       },
       () => env,
       install,
+    ),
+    suggestions: new DescriptionSuggestions(
+      [...cliSuggesters(settings), new LanguageModelSuggester(settings)],
+      settings,
     ),
   }
   graphView.setHandler(
