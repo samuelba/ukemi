@@ -4,6 +4,7 @@ import { readdir, rm, stat } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 import type {
+  BookmarkTracking,
   ChangedFile,
   Commit,
   EvolutionEntry,
@@ -11,6 +12,7 @@ import type {
   Remote,
   Workspace,
 } from '../../shared/model'
+import { hostSpawn } from '../util/hostProcess'
 import { errorMessage } from '../util/logger'
 import { SerialQueue } from '../util/serialQueue'
 import {
@@ -22,6 +24,7 @@ import {
   parseLog,
   parseOperations,
   parseRemotes,
+  parseTracking,
   parseWorkspaces,
 } from './parse'
 import { rootFileset } from './revsets'
@@ -30,6 +33,7 @@ import { jjString } from './templates'
 import {
   BOOKMARK_LIST_GRAPH_TEMPLATE,
   BOOKMARK_LIST_TEMPLATE,
+  BOOKMARK_TRACKING_TEMPLATE,
   COMMIT_ID_TEMPLATE,
   DIFF_FILES_TEMPLATE,
   EVOLOG_TEMPLATE,
@@ -195,6 +199,20 @@ export class JjRepo {
     return parseBookmarks(stdout)
   }
 
+  // The remote refs of the bookmarks that point into the revset.
+  async bookmarkTracking(revset: string): Promise<BookmarkTracking[]> {
+    const { stdout } = await this.read([
+      'bookmark',
+      'list',
+      '--all-remotes',
+      '-r',
+      revset,
+      '-T',
+      BOOKMARK_TRACKING_TEMPLATE,
+    ])
+    return parseTracking(stdout)
+  }
+
   async pushedBookmarkNames(): Promise<Set<string>> {
     const { stdout } = await this.read([
       'bookmark',
@@ -346,6 +364,26 @@ export class JjRepo {
       '--tool=ukemi-split',
       `--message=${message}`,
     ])
+  }
+
+  // Rewrites the files in place. `--from root()` puts each file in `$right` even when it equals
+  // the merge of the parents, as a conflicted file in a merge commit does, which `-r` would skip.
+  writeFilesWithTool(commitId: string, paths: readonly string[], toolConfig: readonly string[]) {
+    return this.mutate([
+      ...toolConfig,
+      'diffedit',
+      '--from',
+      'root()',
+      '--to',
+      commitId,
+      '--tool=ukemi-split',
+      ...paths.map(rootFileset),
+    ])
+  }
+
+  // `:ours` takes side #1 and `:theirs` side #2. jj refuses conflicts with more than two sides.
+  resolveWithBuiltin(commitId: string, path: string, tool: ':ours' | ':theirs') {
+    return this.mutate(['resolve', '-r', commitId, `--tool=${tool}`, rootFileset(path)])
   }
 
   abandon(revset: string) {
@@ -640,8 +678,9 @@ async function createLocalRepo(
 }
 
 async function remoteHasHeads(runner: JjRunner, url: string): Promise<boolean> {
-  const { stdout } = await execFileAsync('git', ['ls-remote', '--heads', url], {
-    env: runner.spawnEnv(),
+  const host = hostSpawn('git', ['ls-remote', '--heads', url], { env: runner.hostEnv() })
+  const { stdout } = await execFileAsync(host.command, host.args, {
+    env: host.env,
     timeout: NETWORK_TIMEOUT_MS,
     encoding: 'utf8',
   })

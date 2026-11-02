@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type {
+  BookmarkTracking,
   ChangedFile,
   Commit,
   EvolutionEntry,
@@ -229,6 +230,31 @@ export function parseBookmarks(output: string): ParsedBookmark[] {
     description: entry.description,
     inTrunk: entry.in_trunk,
   }))
+}
+
+const trackingSchema = z.object({
+  name: z.string(),
+  remote: z.string().nullable(),
+  tracked: z.boolean(),
+  ahead: z.number().int().nonnegative().nullable(),
+  behind: z.number().int().nonnegative().nullable(),
+})
+
+// Only real remotes: the local row and the git pseudo-remote say nothing about syncing.
+export function parseTracking(output: string): BookmarkTracking[] {
+  return parseLines(output, trackingSchema, 'bookmark tracking').flatMap((entry) =>
+    entry.remote === null || entry.remote === 'git'
+      ? []
+      : [
+          {
+            name: entry.name,
+            remote: entry.remote,
+            tracked: entry.tracked,
+            ahead: entry.ahead ?? 0,
+            behind: entry.behind ?? 0,
+          },
+        ],
+  )
 }
 
 export function parseRemotes(output: string): Remote[] {

@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { homedir } from 'node:os'
 import type { HttpFetch } from './types'
+import { hostSpawn } from '../util/hostProcess'
 
 const CLI_TIMEOUT_MS = 30_000
 const MAX_OUTPUT = 10 * 1024 * 1024
@@ -21,10 +22,14 @@ export function runCli(
   stdin: string | undefined,
 ): Promise<CliRunResult> {
   return new Promise((resolve, reject) => {
-    const child = spawn(binary, args, {
-      // A neutral folder keeps the CLI from picking up a repository's own configuration.
+    // A neutral folder keeps the CLI from picking up a repository's own configuration.
+    const host = hostSpawn(binary, args, {
       cwd: homedir(),
-      env: { ...process.env, GH_PROMPT_DISABLED: '1', GH_NO_UPDATE_NOTIFIER: '1', NO_COLOR: '1' },
+      env: { GH_PROMPT_DISABLED: '1', GH_NO_UPDATE_NOTIFIER: '1', NO_COLOR: '1' },
+    })
+    const child = spawn(host.command, host.args, {
+      cwd: homedir(),
+      env: host.env,
       stdio: ['pipe', 'pipe', 'pipe'],
     })
     const stdout: Buffer[] = []

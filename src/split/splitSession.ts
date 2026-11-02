@@ -1,11 +1,9 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
 import type { ChangedFile } from '../../shared/model'
 import type { SplitFile, SplitRequest, SplitSelection } from '../../shared/split'
 import type { JjRepo } from '../jj/repo'
-import { nodeWrapperScript } from '../util/nodeWrapper'
 import { computeSegments } from './hunks'
 import { buildPlan, type FileContents } from './plan'
+import { withPlanTool, type ToolWrapper } from './toolRun'
 
 const BINARY_PROBE_BYTES = 8000
 
@@ -78,26 +76,13 @@ export class SplitSession {
 
   async apply(
     repo: JjRepo,
-    tool: { wrapperPath: string; workDir: string },
+    tool: ToolWrapper,
     message: string,
     selections: readonly SplitSelection[],
   ): Promise<void> {
     const plan = buildPlan(this.request.files, this.contents, selections)
-    const dir = await mkdtemp(join(tool.workDir, 'split-'))
-    const planPath = join(dir, 'plan.json')
-    try {
-      await writeFile(planPath, JSON.stringify(plan))
-      const config = [
-        `--config=merge-tools.ukemi-split.program=${JSON.stringify(tool.wrapperPath)}`,
-        `--config=merge-tools.ukemi-split.edit-args=${JSON.stringify(['$left', '$right', planPath])}`,
-      ]
-      await repo.splitWithTool(this.request.commitId, config, message)
-    } finally {
-      await rm(dir, { recursive: true, force: true })
-    }
+    await withPlanTool(tool, plan, (config) =>
+      repo.splitWithTool(this.request.commitId, config, message),
+    )
   }
-}
-
-export function wrapperScript(nodePath: string, toolArgs: readonly string[]): string {
-  return nodeWrapperScript(nodePath, toolArgs, 'UKEMI_SPLIT_TOOL')
 }

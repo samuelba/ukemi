@@ -6,6 +6,8 @@ import {
   type FlattenIconThemeOptions,
   type RawIconThemeDocument,
 } from '../../shared/fileIconTheme'
+import languages from '../../webview/src/desktop/fileIcons/languages.json'
+import seti from '../../webview/src/desktop/fileIcons/vs-seti-icon-theme.json'
 
 const options: FlattenIconThemeOptions = {
   languages: { extensions: {}, filenames: {} },
@@ -84,4 +86,18 @@ describe('file icon theme', () => {
     expect(character).toBe('\uE099')
     expect(character).toHaveLength(1)
   })
+})
+
+describe('bundled Seti theme', () => {
+  const bundled = flattenIconTheme(seti as RawIconThemeDocument, 'dark', { ...options, languages })
+  const fallback = iconForPath(bundled, 'LICENSE.unknown-ext')
+
+  test.each(['src/main.ts', 'lib.rs', 'README.md', 'Makefile', 'setup.py', 'go.mod', 'a.yml'])(
+    'has its own icon for %s',
+    (path) => {
+      const icon = iconForPath(bundled, path)
+      expect(icon?.fontCharacter).toBeTruthy()
+      expect(icon).not.toEqual(fallback)
+    },
+  )
 })

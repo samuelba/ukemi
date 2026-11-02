@@ -1,0 +1,324 @@
+/* The editor tab of the desktop app: one file of a change, with jj's conflicts colored like the
+   VS Code extension colors them (`ukemi.conflict.*` in package.json). */
+
+:root {
+  --conflict-marker: rgba(128, 128, 128, 0.2);
+  --conflict-side1-header: rgba(64, 200, 174, 0.4);
+  --conflict-side1: rgba(64, 200, 174, 0.15);
+  --conflict-side2-header: rgba(64, 166, 255, 0.4);
+  --conflict-side2: rgba(64, 166, 255, 0.15);
+  --conflict-side3-header: rgba(163, 113, 247, 0.4);
+  --conflict-side3: rgba(163, 113, 247, 0.15);
+  --conflict-side4-header: rgba(210, 153, 34, 0.4);
+  --conflict-side4: rgba(210, 153, 34, 0.15);
+  --conflict-base-header: rgba(96, 96, 96, 0.4);
+  --conflict-base: rgba(96, 96, 96, 0.16);
+  --conflict-removed: rgba(179, 38, 30, 0.14);
+  --conflict-side1-strong: #2a9d86;
+  --conflict-side2-strong: #2f7fd0;
+  --conflict-side3-strong: #8a5cd6;
+  --conflict-side4-strong: #b7841c;
+  --conflict-base-strong: #8a8377;
+
+  --syntax-keyword: #8a3b8f;
+  --syntax-string: #3f7d34;
+  --syntax-comment: #8a8377;
+  --syntax-number: #b05a00;
+  --syntax-function: #2f5fa8;
+  --syntax-type: #2f6f8f;
+  --syntax-property: #5d574d;
+}
+
+:root.vscode-dark {
+  --conflict-marker: rgba(128, 128, 128, 0.3);
+  --conflict-side1-header: rgba(64, 200, 174, 0.5);
+  --conflict-side1: rgba(64, 200, 174, 0.2);
+  --conflict-side2-header: rgba(64, 166, 255, 0.5);
+  --conflict-side2: rgba(64, 166, 255, 0.2);
+  --conflict-side3-header: rgba(163, 113, 247, 0.5);
+  --conflict-side3: rgba(163, 113, 247, 0.2);
+  --conflict-side4-header: rgba(210, 153, 34, 0.5);
+  --conflict-side4: rgba(210, 153, 34, 0.2);
+  --conflict-base-header: rgba(128, 128, 128, 0.4);
+  --conflict-base: rgba(128, 128, 128, 0.16);
+  --conflict-removed: rgba(255, 110, 100, 0.16);
+  --conflict-side1-strong: #4fd1b6;
+  --conflict-side2-strong: #5aaef5;
+  --conflict-side3-strong: #b08cf5;
+  --conflict-side4-strong: #e0ad44;
+  --conflict-base-strong: #9a9385;
+
+  --syntax-keyword: #d197d9;
+  --syntax-string: #9ccc8b;
+  --syntax-comment: #7d7668;
+  --syntax-number: #f0a868;
+  --syntax-function: #8fb4f0;
+  --syntax-type: #7fc4d8;
+  --syntax-property: #ada594;
+}
+
+.editor-tab {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.editor-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--vscode-widget-border);
+  background: var(--vscode-editorWidget-background);
+}
+
+.editor-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 200px;
+}
+
+.editor-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--vscode-editor-font-size);
+}
+
+.editor-dirty {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+
+.editor-badge {
+  flex: none;
+  padding: 1px 7px;
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.editor-badge.is-working-copy {
+  border-color: var(--shu-ink);
+  color: var(--shu-ink);
+}
+
+.editor-conflicts,
+.editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.editor-count {
+  min-width: 52px;
+  text-align: center;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.editor-conflicts .button {
+  margin-left: 4px;
+}
+
+.editor-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--vscode-widget-border);
+  background: var(--vscode-inputValidation-warningBackground);
+  color: var(--ink);
+}
+
+.editor-banner.is-error {
+  background: var(--vscode-inputValidation-errorBackground);
+}
+
+.editor-banner.is-done {
+  background: var(--kincha-wash);
+}
+
+.editor-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.editor-body[hidden] {
+  display: none;
+}
+
+.editor-files {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  width: 150px;
+  padding: 6px 0;
+  overflow: auto;
+  border-right: 1px solid var(--vscode-widget-border);
+  background: var(--vscode-sideBar-background);
+}
+
+.editor-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.editor-file:hover:not(:disabled) {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.editor-file.is-active {
+  background: var(--vscode-list-activeSelectionBackground);
+}
+
+.editor-file:disabled {
+  color: var(--ink-faint);
+  cursor: default;
+}
+
+.editor-file .codicon-warning {
+  color: var(--vscode-editorWarning-foreground);
+}
+
+.editor-file .codicon-check {
+  color: var(--vscode-gitDecoration-addedResourceForeground);
+}
+
+.editor-host {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Conflict lines. The editor's own styles sit on .cm-line, so these use the same element. */
+
+.cm-line.cm-conflict-marker {
+  background: var(--conflict-marker);
+}
+
+.cm-line.cm-conflict-header.cm-conflict-side1 {
+  background: var(--conflict-side1-header);
+}
+.cm-line.cm-conflict-side.cm-conflict-side1,
+.cm-line.cm-conflict-added.cm-conflict-side1 {
+  background: var(--conflict-side1);
+}
+.cm-line.cm-conflict-header.cm-conflict-side2 {
+  background: var(--conflict-side2-header);
+}
+.cm-line.cm-conflict-side.cm-conflict-side2,
+.cm-line.cm-conflict-added.cm-conflict-side2 {
+  background: var(--conflict-side2);
+}
+.cm-line.cm-conflict-header.cm-conflict-side3 {
+  background: var(--conflict-side3-header);
+}
+.cm-line.cm-conflict-side.cm-conflict-side3,
+.cm-line.cm-conflict-added.cm-conflict-side3 {
+  background: var(--conflict-side3);
+}
+.cm-line.cm-conflict-header.cm-conflict-side4 {
+  background: var(--conflict-side4-header);
+}
+.cm-line.cm-conflict-side.cm-conflict-side4,
+.cm-line.cm-conflict-added.cm-conflict-side4 {
+  background: var(--conflict-side4);
+}
+
+.cm-line.cm-conflict-base {
+  background: var(--conflict-base);
+}
+
+.cm-line.cm-conflict-removed {
+  background: var(--conflict-removed);
+  text-decoration: line-through;
+  text-decoration-color: var(--ink-faint);
+}
+
+.cm-conflict-actions {
+  display: flex;
+  gap: 2px;
+  padding: 2px 0 2px 2px;
+  font-family: var(--vscode-font-family);
+  font-size: 11.5px;
+}
+
+/* A side's color, on its buttons and its heading. */
+.cm-conflict-swatch {
+  display: inline-block;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin-right: 5px;
+  border-radius: 2px;
+  vertical-align: -1px;
+}
+.cm-conflict-swatch.cm-conflict-side1 {
+  background: var(--conflict-side1-strong);
+}
+.cm-conflict-swatch.cm-conflict-side2 {
+  background: var(--conflict-side2-strong);
+}
+.cm-conflict-swatch.cm-conflict-side3 {
+  background: var(--conflict-side3-strong);
+}
+.cm-conflict-swatch.cm-conflict-side4 {
+  background: var(--conflict-side4-strong);
+}
+.cm-conflict-swatch.cm-conflict-base {
+  background: var(--conflict-base-strong);
+}
+
+/* The name of a section, on a row of its own above its header line. */
+.cm-conflict-heading {
+  display: flex;
+  align-items: center;
+  padding: 3px 0 1px 4px;
+  color: var(--ink-soft);
+  font-family: var(--vscode-font-family);
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cm-conflict-actions button {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--vscode-textLink-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+.cm-conflict-actions button:hover {
+  background: var(--ai-wash);
+}
+
+.cm-conflict-actions button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+}

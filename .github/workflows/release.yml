@@ -84,3 +84,37 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ needs.release-please.outputs.tag_name }}" ./*.vsix
+
+  desktop:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - if: runner.os == 'Linux'
+        uses: ./.github/actions/linux-packaging
+      - run: npm ci
+      # Unsigned until signing and notarization are set up.
+      - run: npm run desktop:package
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Attach the installers to the GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          files=(out/desktop-release/*.{AppImage,deb,rpm,snap,flatpak,dmg,exe})
+          if [ ${#files[@]} -eq 0 ]; then
+            echo 'no installers were built' >&2
+            exit 1
+          fi
+          gh release upload "${{ needs.release-please.outputs.tag_name }}" "${files[@]}"

@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { hostSpawn } from '../util/hostProcess'
 import type { Logger } from '../util/logger'
 import { redactUrlCredentials } from '../util/text'
 
@@ -94,13 +95,9 @@ export class JjRunner {
     this.extraEnv = env
   }
 
-  spawnEnv(overrides: Readonly<Record<string, string>> = {}): NodeJS.ProcessEnv {
-    return {
-      ...process.env,
-      ...this.extraEnv,
-      ...overrides,
-      GIT_TERMINAL_PROMPT: '0',
-    }
+  // The variables Ukemi adds for jj and git: askpass, and no terminal prompts.
+  hostEnv(overrides: Readonly<Record<string, string>> = {}): Record<string, string> {
+    return { ...this.extraEnv, ...overrides, GIT_TERMINAL_PROMPT: '0' }
   }
 
   async run(options: RunOptions): Promise<RunResult> {
@@ -133,15 +130,13 @@ export class JjRunner {
     const started = Date.now()
 
     return new Promise((resolve, reject) => {
-      const child = spawn(this.binaryPath, args, {
+      const host = hostSpawn(this.binaryPath, args, {
         cwd: options.cwd,
-        env: {
-          ...process.env,
-          ...this.extraEnv,
-          ...options.env,
-          JJ_EDITOR: 'false',
-          GIT_TERMINAL_PROMPT: '0',
-        },
+        env: this.hostEnv({ ...options.env, JJ_EDITOR: 'false' }),
+      })
+      const child = spawn(host.command, host.args, {
+        cwd: options.cwd,
+        env: host.env,
         stdio: ['pipe', 'pipe', 'pipe'],
       })
       const stdout: Buffer[] = []
@@ -190,7 +185,8 @@ export class JjRunner {
   async runBytes(options: RunOptions): Promise<Buffer> {
     const args = [...GLOBAL_ARGS, '--ignore-working-copy', ...options.args]
     return new Promise((resolve, reject) => {
-      const child = spawn(this.binaryPath, args, { cwd: options.cwd, env: process.env })
+      const host = hostSpawn(this.binaryPath, args, { cwd: options.cwd })
+      const child = spawn(host.command, host.args, { cwd: options.cwd, env: host.env })
       const chunks: Buffer[] = []
       const errors: Buffer[] = []
       child.stdout.on('data', (chunk: Buffer) => chunks.push(chunk))

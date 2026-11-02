@@ -1,6 +1,7 @@
 import { resolve } from 'node:path'
 import { layoutGraph, type GraphNodeInput, type GraphRow } from '../../shared/graphLayout'
 import type {
+  BookmarkTracking,
   ChangedFile,
   Commit,
   GraphFilter,
@@ -263,7 +264,7 @@ export class RepoModel {
       this.lastOperationId = operations[0]?.id ?? null
       return operations
     })
-    const [logged, trunk, operations, workspaces, remotes, listed, currentBookmarks] =
+    const [logged, trunk, operations, workspaces, remotes, listed, currentBookmarks, tracking] =
       await Promise.all([
         this.repo.log(revset),
         this.repo.trunk(),
@@ -272,8 +273,18 @@ export class RepoModel {
         this.repo.remotes(),
         this.repo.bookmarkList({ withTrunk: false }),
         this.repo.bookmarkNames(CURRENT_BOOKMARKS_REVSET),
+        this.repo.bookmarkTracking(`@ | ${CURRENT_BOOKMARKS_REVSET}`),
       ])
-    return { logged, trunk, operations, workspaces, remotes, bookmarks: listed, currentBookmarks }
+    return {
+      logged,
+      trunk,
+      operations,
+      workspaces,
+      remotes,
+      bookmarks: listed,
+      currentBookmarks,
+      tracking,
+    }
   }
 
   private workingCopyFiles(commits: readonly Commit[]): Promise<ChangedFile[]> {
@@ -326,6 +337,8 @@ export class RepoModel {
       canUndo: shared.head !== undefined && !NETWORK_OPERATION.test(shared.head.description),
       canRedo: canRedo(shared.operations.map((op) => op.description)),
       currentBookmarks: shared.currentBookmarks,
+      tracking: shared.tracking,
+      operationId: shared.head?.id ?? null,
       trunkName: shared.trunkName,
       forge: this.forge,
     }
@@ -421,6 +434,7 @@ interface LoadedRepo {
   remotes: Remote[]
   bookmarks: ParsedBookmark[]
   currentBookmarks: string[]
+  tracking: BookmarkTracking[]
 }
 
 interface SharedGraph {
@@ -430,6 +444,7 @@ interface SharedGraph {
   head: Operation | undefined
   operations: Operation[]
   currentBookmarks: string[]
+  tracking: BookmarkTracking[]
   trunkName: string | null
 }
 
@@ -441,6 +456,7 @@ function sharedGraph(loaded: LoadedRepo, workingCopyFiles: ChangedFile[]): Share
     head: loaded.operations[0],
     operations: loaded.operations,
     currentBookmarks: loaded.currentBookmarks,
+    tracking: loaded.tracking,
     trunkName: loaded.trunk.bookmark,
   }
 }

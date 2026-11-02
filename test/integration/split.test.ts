@@ -2,8 +2,9 @@ import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import type { JjRepo } from '../../src/jj/repo'
-import { SplitSession, wrapperScript } from '../../src/split/splitSession'
+import { SplitSession } from '../../src/split/splitSession'
 import { applyPlan } from '../../src/split/splitTool'
+import { wrapperScript } from '../../src/split/toolRun'
 import { initRepo, jj, makeRepo, makeTempDir, writeFile, type Fixture } from '../helpers/jjFixture'
 
 let fixture: Fixture

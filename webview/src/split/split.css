@@ -89,20 +89,20 @@ body.vscode-high-contrast .split {
   background: color-mix(in srgb, currentColor 14%, transparent);
 }
 
-.status-added {
+.split .status-added {
   color: var(--vscode-gitDecoration-addedResourceForeground);
 }
 
-.status-modified {
+.split .status-modified {
   color: var(--vscode-gitDecoration-modifiedResourceForeground);
 }
 
-.status-removed {
+.split .status-removed {
   color: var(--vscode-gitDecoration-deletedResourceForeground);
 }
 
-.status-renamed,
-.status-copied {
+.split .status-renamed,
+.split .status-copied {
   color: var(--vscode-gitDecoration-renamedResourceForeground);
 }
 

@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, test } from 'vitest'
+import { REPOSITORY_KEYS } from '../../shared/settingsScope'
+import { manifest as desktopManifest } from '../../src/desktop/menus'
 
 const root = resolve(__dirname, '../..')
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
@@ -22,22 +24,28 @@ function sources(dir: string): string[] {
   })
 }
 
-const hostSource = sources(join(root, 'src'))
-  .map((file) => readFileSync(file, 'utf8'))
-  .join('\n')
-const webviewSource = sources(join(root, 'webview/src'))
-  .map((file) => readFileSync(file, 'utf8'))
-  .join('\n')
-const registered = new Set([...hostSource.matchAll(/'(ukemi\.[\w.]+)':\s/g)].map((m) => m[1] ?? ''))
+const read = (files: string[]) => files.map((file) => readFileSync(file, 'utf8')).join('\n')
+const registeredIn = (source: string) =>
+  new Set([...source.matchAll(/'(ukemi\.[\w.]+)':\s/g)].map((m) => m[1] ?? ''))
+
+const hostFiles = sources(join(root, 'src'))
+const desktopDir = join(root, 'src', 'desktop')
+const hostSource = read(hostFiles)
+const webviewSource = read(sources(join(root, 'webview/src')))
+const registered = registeredIn(hostSource)
+// What the VS Code extension registers: everything outside the standalone app.
+const extensionRegistered = registeredIn(read(hostFiles.filter((f) => !f.startsWith(desktopDir))))
 const declared = new Set(pkg.contributes.commands.map((c) => c.command))
+// package.json plus the commands only the standalone app has.
+const desktopDeclared = new Set(desktopManifest.commands.map((c) => c.command))
 
 describe('package.json manifest', () => {
   test('declares every registered command', () => {
-    expect([...registered].filter((c) => !declared.has(c))).toEqual([])
+    expect([...registered].filter((c) => !desktopDeclared.has(c))).toEqual([])
   })
 
-  test('registers every declared command', () => {
-    expect([...declared].filter((c) => !registered.has(c))).toEqual([])
+  test('the extension registers every command package.json declares', () => {
+    expect([...declared].filter((c) => !extensionRegistered.has(c))).toEqual([])
   })
 
   test('menus only reference declared commands', () => {
@@ -91,12 +99,19 @@ describe('package.json manifest', () => {
     ])
   })
 
+  test('marks exactly the repository settings as resource scoped', () => {
+    const scoped = Object.entries(pkg.contributes.configuration.properties)
+      .filter(([, schema]) => schema.scope === 'resource')
+      .map(([key]) => key.replace(/^ukemi\./, ''))
+    expect(scoped.sort()).toEqual([...REPOSITORY_KEYS].sort())
+  })
+
   test('declares limited support for untrusted workspaces', () => {
     expect(pkg.capabilities?.untrustedWorkspaces?.supported).toBe('limited')
   })
 
   test('declares every setting the host reads', () => {
-    const config = readFileSync(join(root, 'src/vscode/config.ts'), 'utf8')
+    const config = readFileSync(join(root, 'src/app/settings.ts'), 'utf8')
     const read = [...config.matchAll(/c\.get<[^>]+>\('([\w.]+)'/g)].map((m) => `ukemi.${m[1]}`)
     expect(read.filter((key) => !(key in pkg.contributes.configuration.properties))).toEqual([])
   })

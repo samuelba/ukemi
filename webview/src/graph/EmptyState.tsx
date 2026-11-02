@@ -1,6 +1,6 @@
 import type { RepoSummary, ViewStatus } from '../../../shared/protocol'
 import { LoadingMark } from '../shared/LoadingMark'
-import { postMessage } from '../shared/vscodeApi'
+import { postMessage } from '../shared/hostApi'
 
 interface EmptyStateProps {
   status: ViewStatus

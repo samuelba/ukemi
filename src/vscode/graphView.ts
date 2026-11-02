@@ -1,11 +1,13 @@
 import * as vscode from 'vscode'
 import type { FileIconTheme } from '../../shared/fileIconTheme'
-import type { HostMessage, ViewState, ViewStatus, WebviewMessage } from '../../shared/protocol'
+import type { HostMessage, ViewState, WebviewMessage } from '../../shared/protocol'
+import type { GraphSurface } from '../app/commands/context'
+import type { Operations } from '../app/operations'
+import type { RepoRegistry } from '../app/registry'
+import { buildViewState } from '../app/viewState'
 import { errorMessage, type Logger } from '../util/logger'
 import { readConfig } from './config'
 import { iconThemeResourceRoots, loadFileIconTheme } from './fileIconTheme'
-import type { Operations } from './operations'
-import type { RepoRegistry } from './registry'
 import { createUkemiPanel, webviewHtml } from './webviewPanel'
 
 export const GRAPH_VIEW_ID = 'ukemi.graph'
@@ -21,7 +23,7 @@ export interface JjAvailability {
   isAvailable: boolean
 }
 
-export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable {
+export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable, GraphSurface {
   private readonly webviews = new Set<vscode.Webview>()
   private view: vscode.WebviewView | null = null
   private panel: vscode.WebviewPanel | null = null
@@ -190,46 +192,14 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable 
     }
   }
 
-  private status(): ViewStatus {
-    if (!this.jj.isAvailable) {
-      return 'no-jj'
-    }
-    if ((vscode.workspace.workspaceFolders ?? []).length === 0) {
-      return 'no-folder'
-    }
-    const model = this.registry.activeModel
-    if (!model) {
-      return 'no-repo'
-    }
-    if (model.graph) {
-      return 'ready'
-    }
-    return model.error ? 'error' : 'loading'
-  }
-
   state(): ViewState {
-    const config = readConfig()
-    const model = this.registry.activeModel
-    return {
-      status: this.status(),
-      repos: this.registry.summaries(),
-      activeRepoId: this.registry.activeRepoId,
-      graph: model?.graph ?? null,
-      busy: this.operations.busy,
-      error: this.operations.error ?? model?.error ?? null,
-      settings: {
-        changeIdLength: config.changeIdLength,
-        showFullPaths: config.showFullPaths,
-        showLineStats: config.showLineStats,
-        showGitTags: config.showGitTags,
-        changedFilesView: config.changedFilesView,
-        ciOnlyMine: config.ciOnlyMine,
-      },
-      autoFetch: {
-        enabled: config.autoFetchEnabled,
-        interval: config.autoFetchInterval,
-      },
-    }
+    return buildViewState({
+      isJjAvailable: this.jj.isAvailable,
+      hasFolders: (vscode.workspace.workspaceFolders ?? []).length > 0,
+      registry: this.registry,
+      operations: this.operations,
+      config: readConfig(this.registry.activeModel?.root),
+    })
   }
 
   postState(): void {

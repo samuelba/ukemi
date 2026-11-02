@@ -16,6 +16,16 @@ export interface RemoteBookmark {
   tracked: boolean
 }
 
+// How a local bookmark stands against one remote. Ahead counts commits to push, behind
+// counts commits to pull. Both are 0 for an untracked remote.
+export interface BookmarkTracking {
+  name: string
+  remote: string
+  tracked: boolean
+  ahead: number
+  behind: number
+}
+
 export interface Commit {
   changeId: string
   changePrefix: string

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { DEPTHLESS_FILTERS, type GraphFilter, type HistoryDepth } from '../../../shared/model'
 import type { AutoFetchState, GraphState, RepoSummary } from '../../../shared/protocol'
 import { settingsCommandHref } from '../../../shared/settingsLink'
-import { postMessage } from '../shared/vscodeApi'
+import { isDesktop, postMessage } from '../shared/hostApi'
 
 const FILTERS: ReadonlyArray<{ id: GraphFilter; label: string; hint: string }> = [
   { id: 'recent', label: 'Recent', hint: 'Mutable changes, bookmarks and tags' },
@@ -155,7 +155,8 @@ export function Toolbar({
   const repoId = graph?.repoId
   const ignoresDepth = graph !== null && DEPTHLESS_FILTERS.includes(graph.filter)
   const singleLabel = repos.length === 1 ? (repos[0]?.label ?? '') : ''
-  const showRepoRow = repos.length > 1 || singleLabel !== ''
+  // The standalone app shows repositories as tabs and has its own settings.
+  const showRepoRow = !isDesktop && (repos.length > 1 || singleLabel !== '')
   return (
     <div className="toolbar">
       {showRepoRow && (

@@ -1,5 +1,15 @@
 import { describe, expect, test } from 'vitest'
-import { applyConflicts, parseConflicts, sideName } from '../../src/conflict/markers'
+import {
+  applyConflicts,
+  bothSidesEdit,
+  fileSideLabel,
+  fileSideTitle,
+  labelName,
+  parseConflicts,
+  sharedSideCount,
+  sideHeading,
+  sideName,
+} from '../../shared/conflictMarkers'
 
 function marked(char: string, label = ''): string {
   return `${char.repeat(7)}${label ? ` ${label}` : ''}`
@@ -114,7 +124,7 @@ describe('parseConflicts', () => {
     )
 
     expect(blocks[0]?.sides.map((side) => side.text)).toEqual(['one\n', 'two\n', 'three\n'])
-    expect(sideName(3, 2)).toBe('side 3')
+    expect(sideName(blocks[0]?.sides[2], 2)).toBe('side three')
   })
 
   test('drops the display newline when a side has none', () => {
@@ -303,9 +313,73 @@ describe('conflict line roles', () => {
   })
 })
 
-describe('sideName', () => {
-  test('uses current and incoming for two sides', () => {
-    expect(sideName(2, 0)).toBe('current')
-    expect(sideName(2, 1)).toBe('incoming')
+describe('side names', () => {
+  test('names a jj side by its description, else its change id', () => {
+    expect(labelName('rtsqusxu 2768b0b9 "commit A"')).toBe('"commit A"')
+    expect(labelName('ykupmqwo ffd16115')).toBe('ykupmqwo')
+    expect(labelName('feature')).toBe('feature')
+    expect(labelName('')).toBeNull()
+  })
+
+  test('shortens a long description', () => {
+    const name = labelName(`kkk 1234abcd "${'x'.repeat(60)}"`)
+    expect(name?.length).toBeLessThanOrEqual(42)
+    expect(name?.endsWith('…"')).toBe(true)
+  })
+
+  test('falls back to the side number', () => {
+    expect(sideName({ label: '', text: '' }, 1)).toBe('side 2')
+    expect(sideName({ label: 'abc 12ab "fix"', text: '' }, 0)).toBe('"fix"')
+  })
+
+  test('says which snapshot a diff-style side starts from', () => {
+    const [block] = parseConflicts(diffConflict())
+
+    expect(sideHeading(block?.sides[0], 0)).toBe(
+      'side 1 · "commit A" · shown as changes from "merge base"',
+    )
+    expect(sideHeading(block?.sides[1], 1)).toBe('side 2 · "commit B"')
+  })
+
+  test('names a file-wide side only when every conflict agrees', () => {
+    const blocks = parseConflicts(diffConflict() + diffConflict())
+
+    expect(fileSideTitle(blocks, 1)).toBe('"commit B"')
+  })
+})
+
+describe('file-wide sides', () => {
+  const gitConflict = (ours: string, theirs: string) =>
+    file([marked('<', 'HEAD'), ours, marked('='), theirs, marked('>', 'feature')])
+
+  test('names the sides every conflict shares', () => {
+    const blocks = parseConflicts(gitConflict('a', 'b') + gitConflict('c', 'd'))
+
+    expect(sharedSideCount(blocks)).toBe(2)
+    expect(fileSideTitle(blocks, 1)).toBe('feature')
+    expect(fileSideLabel(blocks, 0)).toBe('HEAD')
+  })
+
+  test('drops a label the conflicts do not agree on', () => {
+    const other = file([marked('<', 'main'), 'x', marked('='), 'y', marked('>', 'feature')])
+    const blocks = parseConflicts(gitConflict('a', 'b') + other)
+
+    expect(fileSideLabel(blocks, 0)).toBe('')
+    expect(fileSideLabel(blocks, 1)).toBe('feature')
+  })
+})
+
+describe('bothSidesEdit', () => {
+  test('keeps every side in order', () => {
+    const text = `keep\n${diffConflict()}tail\n`
+    const [block] = parseConflicts(text)
+    if (!block) {
+      throw new Error('no conflict')
+    }
+    const edit = bothSidesEdit(block)
+
+    expect(text.slice(0, edit.start) + edit.text + text.slice(edit.end)).toBe(
+      'keep\napple\ngrapefruit\norange\nAPPLE\nGRAPE\nORANGE\ntail\n',
+    )
   })
 })

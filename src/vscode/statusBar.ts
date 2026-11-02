@@ -1,5 +1,5 @@
 import * as vscode from 'vscode'
-import type { RepoRegistry } from './registry'
+import type { RepoRegistry } from '../app/registry'
 
 export class RepoStatusBar implements vscode.Disposable {
   private readonly item = vscode.window.createStatusBarItem(

@@ -130,5 +130,17 @@ export const BOOKMARK_LIST_GRAPH_TEMPLATE =
     in_trunk: 'json(false)',
   }) + LINE_END
 
+// The counts are from the remote ref's side: the remote is behind by what we have to push.
+const TRACKED = 'self.remote() && self.tracked()'
+
+export const BOOKMARK_TRACKING_TEMPLATE =
+  jsonObject({
+    name: 'json(self.name())',
+    remote: 'json(self.remote())',
+    tracked: 'json(self.tracked())',
+    ahead: `if(${TRACKED}, json(self.tracking_behind_count().lower()), "null")`,
+    behind: `if(${TRACKED}, json(self.tracking_ahead_count().lower()), "null")`,
+  }) + LINE_END
+
 export const OP_LOG_TEMPLATE =
   'json({"id" => id, "description" => description, "time" => time.end()}) ++ "\\n"'

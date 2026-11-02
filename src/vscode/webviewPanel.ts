@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import * as vscode from 'vscode'
+import type { PanelChannel, PanelHandler } from '../app/panel'
 
 export function webviewRoot(extensionUri: vscode.Uri): vscode.Uri {
   return vscode.Uri.joinPath(extensionUri, 'dist', 'webview')
@@ -54,4 +55,24 @@ export function createUkemiPanel(
     dark: vscode.Uri.joinPath(extensionUri, 'resources', 'activity-dark.svg'),
   }
   return panel
+}
+
+// Wraps a webview panel for an app controller, and routes the panel's messages to it.
+export function connectPanel<H, W>(
+  panel: vscode.WebviewPanel,
+  connect: (channel: PanelChannel<H>) => PanelHandler<W>,
+): void {
+  let closed = false
+  panel.onDidDispose(() => {
+    closed = true
+  })
+  const channel: PanelChannel<H> = {
+    post: (message) => panel.webview.postMessage(message),
+    close: () => panel.dispose(),
+    get isClosed() {
+      return closed
+    },
+  }
+  const handler = connect(channel)
+  panel.webview.onDidReceiveMessage((message: W) => handler(message))
 }

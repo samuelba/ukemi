@@ -10,7 +10,7 @@ import {
   workspaceTooltipLines,
   type WorkspaceTreeElement,
 } from '../repo/workspaceItems'
-import type { RepoRegistry } from './registry'
+import type { RepoRegistry } from '../app/registry'
 
 export class WorkspacesView
   implements vscode.TreeDataProvider<WorkspaceTreeElement>, vscode.Disposable

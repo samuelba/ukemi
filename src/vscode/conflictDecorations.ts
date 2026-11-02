@@ -1,13 +1,13 @@
 import * as vscode from 'vscode'
 import {
   parseConflicts,
-  sideName,
+  sideHeading,
   type ConflictBlock,
   type ConflictLine,
-} from '../conflict/markers'
-import type { Handler } from './commands/context'
+} from '../../shared/conflictMarkers'
+import type { Handler } from '../app/commands/context'
 import { modelForFile } from './conflictLens'
-import type { RepoRegistry } from './registry'
+import type { RepoRegistry } from '../app/registry'
 
 const SIDE_SLOTS = 4
 const REFRESH_DELAY_MS = 150
@@ -81,7 +81,7 @@ function roleName(block: ConflictBlock, line: ConflictLine): string {
   if (line.sideIndex === null) {
     return line.line === block.startLine ? `${block.sides.length}-sided conflict` : 'base'
   }
-  return sideName(block.sides.length, line.sideIndex)
+  return sideHeading(block.sides[line.sideIndex], line.sideIndex)
 }
 
 function headerOption(block: ConflictBlock, line: ConflictLine): vscode.DecorationOptions {

@@ -6,9 +6,9 @@ import { evolutionVersionNodes, type EvolutionVersionNode } from '../repo/evolut
 import { resolveSelectedCommit, type SelectedChange } from '../repo/selection'
 import type { Logger } from '../util/logger'
 import { errorMessage } from '../util/logger'
-import type { ChangeSelection } from './changeSelection'
+import type { ChangeSelection } from '../app/changeSelection'
 import { readConfig } from './config'
-import type { RepoRegistry } from './registry'
+import type { RepoRegistry } from '../app/registry'
 
 export class EvolutionView
   implements vscode.TreeDataProvider<EvolutionVersionNode>, vscode.Disposable

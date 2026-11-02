@@ -2,7 +2,7 @@ import { useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { CiCheck, RequestBadge } from '../../../shared/protocol'
 import { stackLabel } from '../../../shared/stack'
-import { postMessage } from '../shared/vscodeApi'
+import { postMessage } from '../shared/hostApi'
 import { CiStatusIcon, REQUEST_LABEL } from './requestMeta'
 
 const CLOSE_DELAY_MS = 120

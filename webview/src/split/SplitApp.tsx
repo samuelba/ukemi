@@ -10,13 +10,11 @@ import type {
 import { changeIds } from '../../../shared/split'
 import { useElementHeight, useHostMessages } from '../shared/hooks'
 import { LoadingScreen } from '../shared/LoadingMark'
-import { postMessage } from '../shared/vscodeApi'
+import { useSend } from '../shared/hostChannel'
 
 const CONTEXT_LINES = 3
 
 type FileChoice = ReadonlySet<number> | 'whole'
-
-const send = (message: SplitWebviewMessage) => postMessage(message)
 
 function lines(text: string): string[] {
   const parts = text.split('\n')
@@ -195,6 +193,7 @@ function FileSection({
 }
 
 export function SplitApp() {
+  const send = useSend<SplitWebviewMessage>()
   const [request, setRequest] = useState<SplitRequest | null>(null)
   const [choices, setChoices] = useState<ReadonlyMap<string, FileChoice>>(new Map())
   const [message, setMessage] = useState('')

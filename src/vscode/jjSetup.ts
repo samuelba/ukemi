@@ -1,38 +1,13 @@
 import { dirname } from 'node:path'
 import * as vscode from 'vscode'
-import {
-  downloadJj,
-  MIN_JJ_VERSION,
-  PINNED_RELEASE,
-  resolveJj,
-  type ResolvedJj,
-} from '../jj/binary'
+import { locateJj as locateAnyJj, versionText } from '../app/jjSetup'
+import { downloadJj, MIN_JJ_VERSION, PINNED_RELEASE, type ResolvedJj } from '../jj/binary'
 import { errorMessage, type Logger } from '../util/logger'
 import { readConfig } from './config'
 import { openSettings } from './openSettings'
 
-const versionText = (v: { major: number; minor: number; patch: number }) =>
-  `${v.major}.${v.minor}.${v.patch}`
-
-export async function locateJj(storageDir: string, logger: Logger): Promise<ResolvedJj | null> {
-  const result = await resolveJj({ configuredPath: readConfig().jjPath, storageDir })
-  switch (result.kind) {
-    case 'found':
-      logger.info(
-        `using jj ${versionText(result.jj.version)} from ${result.jj.path} (${result.jj.source})`,
-      )
-      return result.jj
-    case 'too-old':
-      logger.warn(
-        `jj ${versionText(result.version)} at ${result.path} is older than ${versionText(MIN_JJ_VERSION)}`,
-      )
-      return null
-    case 'missing':
-      if (result.configuredPathInvalid) {
-        logger.warn('the configured ukemi.jjPath does not point to a working jj')
-      }
-      return null
-  }
+export function locateJj(storageDir: string, logger: Logger): Promise<ResolvedJj | null> {
+  return locateAnyJj(readConfig().jjPath, storageDir, logger)
 }
 
 export async function offerInstall(storageDir: string, logger: Logger): Promise<boolean> {

@@ -6,7 +6,7 @@ import {
   type BookmarkGroupElement,
   type BookmarkRowElement,
 } from '../repo/bookmarkItems'
-import type { RepoRegistry } from './registry'
+import type { RepoRegistry } from '../app/registry'
 
 const FILTERING_CONTEXT = 'ukemi.bookmarks.filtering'
 

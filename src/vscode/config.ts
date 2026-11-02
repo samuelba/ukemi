@@ -1,95 +1,67 @@
 import * as vscode from 'vscode'
+import { Emitter } from '../app/events'
 import {
-  GRAPH_FILTERS,
-  HISTORY_DEPTHS,
-  type GraphFilter,
-  type HistoryDepth,
-} from '../../shared/model'
-import type { ChangedFilesView } from '../../shared/protocol'
-import type { HostLists } from '../forge/detect'
-import { ghHosts } from '../forge/ghConfig'
-import { clampRequestLimit } from '../forge/requestLimit'
-import { DEFAULT_EXCLUDES } from '../repo/discovery'
+  readSettings,
+  type SettingScope,
+  type Settings,
+  type SettingsChange,
+  type UkemiConfig,
+} from '../app/settings'
 
-export type SourceControlMode = 'auto' | 'always' | 'never'
+export type { SourceControlMode, UkemiConfig } from '../app/settings'
 
-export interface UkemiConfig {
-  jjPath: string
-  showSourceControl: SourceControlMode
-  showInPanel: boolean
-  followActiveEditor: boolean
-  repoScanDepth: number
-  repoScanExclude: string[]
-  historyDepth: HistoryDepth
-  defaultFilter: GraphFilter
-  changeIdLength: number
-  showFullPaths: boolean
-  showLineStats: boolean
-  showGitTags: boolean
-  changedFilesView: ChangedFilesView
-  snapshotOnRefresh: boolean
-  addJjToTerminalPath: boolean
-  gitlabHosts: string[]
-  githubHosts: string[]
-  gitlabOAuthApplications: Record<string, string>
-  ciOnlyMine: boolean
-  requestLimit: number
-  statusInterval: string
-  autoFetchEnabled: boolean
-  autoFetchInterval: string
-  nativeStacks: boolean
+function configuration(root?: string): vscode.WorkspaceConfiguration {
+  return vscode.workspace.getConfiguration('ukemi', root ? vscode.Uri.file(root) : undefined)
 }
 
-export async function updateUkemiSetting<T>(key: string, value: T): Promise<void> {
-  const config = vscode.workspace.getConfiguration('ukemi')
-  const inspected = config.inspect<T>(key)
+// With a root, folder settings of the workspace folder that holds the repository apply too.
+export function readConfig(root?: string): UkemiConfig {
+  return readSettings(configuration(root))
+}
+
+async function updateSetting(key: string, value: unknown, scope: SettingScope): Promise<void> {
+  if (typeof scope === 'object') {
+    await configuration(scope.root).update(key, value, vscode.ConfigurationTarget.WorkspaceFolder)
+    return
+  }
+  const config = configuration()
+  const inspected = config.inspect(key)
   const target =
-    inspected?.workspaceFolderValue !== undefined
-      ? vscode.ConfigurationTarget.WorkspaceFolder
-      : inspected?.workspaceValue !== undefined
-        ? vscode.ConfigurationTarget.Workspace
-        : vscode.ConfigurationTarget.Global
+    scope === 'user'
+      ? vscode.ConfigurationTarget.Global
+      : inspected?.workspaceFolderValue !== undefined
+        ? vscode.ConfigurationTarget.WorkspaceFolder
+        : inspected?.workspaceValue !== undefined
+          ? vscode.ConfigurationTarget.Workspace
+          : vscode.ConfigurationTarget.Global
   await config.update(key, value, target)
 }
 
-const CHANGED_FILES_VIEWS = ['list', 'tree'] as const satisfies readonly ChangedFilesView[]
-
-function oneOf<T extends string>(value: string, allowed: readonly T[], fallback: T): T {
-  return (allowed as readonly string[]).includes(value) ? (value as T) : fallback
-}
-
-// Hosts that the user logged in to with `gh` count as GitHub hosts. That file is user-level, not workspace-level.
-export function readHostLists(): HostLists {
-  const config = readConfig()
-  return { gitlabHosts: config.gitlabHosts, githubHosts: [...config.githubHosts, ...ghHosts()] }
-}
-
-export function readConfig(): UkemiConfig {
-  const c = vscode.workspace.getConfiguration('ukemi')
+// The `ukemi.*` settings of VS Code, with their change events.
+export function vscodeSettings(): Settings & vscode.Disposable {
+  const emitter = new Emitter<SettingsChange>()
+  const subscription = vscode.workspace.onDidChangeConfiguration((event) => {
+    if (event.affectsConfiguration('ukemi')) {
+      emitter.fire({
+        affects: (key, root) =>
+          event.affectsConfiguration(`ukemi.${key}`, root ? vscode.Uri.file(root) : undefined),
+      })
+    }
+  })
   return {
-    jjPath: c.get<string>('jjPath', ''),
-    showSourceControl: c.get<SourceControlMode>('showSourceControl', 'auto'),
-    showInPanel: c.get<boolean>('showInPanel', false),
-    followActiveEditor: c.get<boolean>('followActiveEditor', true),
-    repoScanDepth: c.get<number>('repoScanDepth', 4),
-    repoScanExclude: c.get<string[]>('repoScanExclude', DEFAULT_EXCLUDES),
-    historyDepth: oneOf(c.get<string>('historyDepth', '7d'), HISTORY_DEPTHS, '7d'),
-    defaultFilter: oneOf(c.get<string>('defaultFilter', 'recent'), GRAPH_FILTERS, 'recent'),
-    changeIdLength: c.get<number>('changeIdLength', 4),
-    showFullPaths: c.get<boolean>('showFullPaths', false),
-    showLineStats: c.get<boolean>('showLineStats', false),
-    showGitTags: c.get<boolean>('showGitTags', true),
-    changedFilesView: oneOf(c.get<string>('changedFilesView', 'list'), CHANGED_FILES_VIEWS, 'list'),
-    snapshotOnRefresh: c.get<boolean>('workspaces.snapshotOnRefresh', false),
-    addJjToTerminalPath: c.get<boolean>('addJjToTerminalPath', true),
-    gitlabHosts: c.get<string[]>('gitlab.hosts', []),
-    githubHosts: c.get<string[]>('github.hosts', []),
-    gitlabOAuthApplications: c.get<Record<string, string>>('gitlab.oauthApplications', {}),
-    ciOnlyMine: c.get<boolean>('forge.ciOnlyMine', true),
-    requestLimit: clampRequestLimit(c.get<number>('forge.requestLimit', 50)),
-    statusInterval: c.get<string>('forge.statusInterval', '60s'),
-    autoFetchEnabled: c.get<boolean>('autoFetch.enabled', false),
-    autoFetchInterval: c.get<string>('autoFetch.interval', '10m'),
-    nativeStacks: c.get<boolean>('forge.nativeStacks', true),
+    read: readConfig,
+    inspect: (key, root) => {
+      const inspected = configuration(root).inspect(key)
+      return {
+        globalValue: inspected?.workspaceValue ?? inspected?.globalValue,
+        repoValue: inspected?.workspaceFolderValue,
+      }
+    },
+    update: (key, value, scope = 'default') => updateSetting(key, value, scope),
+    onDidChange: emitter.event,
+    dispose: () => {
+      subscription.dispose()
+      emitter.dispose()
+    },
   }
 }

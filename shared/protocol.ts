@@ -1,6 +1,13 @@
 import type { FileIconTheme } from './fileIconTheme'
 import type { GraphRow } from './graphLayout'
-import type { ChangedFile, Commit, GraphFilter, HistoryDepth, Workspace } from './model'
+import type {
+  BookmarkTracking,
+  ChangedFile,
+  Commit,
+  GraphFilter,
+  HistoryDepth,
+  Workspace,
+} from './model'
 
 export type RequestState = 'draft' | 'open' | 'reviewed' | 'approved' | 'merged' | 'closed'
 export type CiState = 'pending' | 'success' | 'failure' | 'manual' | 'skipped' | 'none'
@@ -56,6 +63,9 @@ export interface GraphState {
   canUndo: boolean
   canRedo: boolean
   currentBookmarks: string[]
+  // The remote refs of the bookmarks on @ and of the current bookmarks.
+  tracking: BookmarkTracking[]
+  operationId: string | null
   trunkName: string | null
   forge: ForgeState | null
 }
@@ -65,6 +75,9 @@ export interface RepoSummary {
   label: string
   kind: 'jj' | 'git'
   changedFiles: number
+  // Only in the app, where a tab can have a custom name: the folder name it replaces.
+  folderLabel?: string
+  isPinned?: boolean
 }
 
 export type ViewStatus = 'loading' | 'ready' | 'no-folder' | 'no-repo' | 'no-jj' | 'error'
@@ -83,6 +96,9 @@ export interface ViewSettings {
 export interface AutoFetchState {
   enabled: boolean
   interval: string
+  isRunning: boolean
+  // When the active repository last fetched in the background, in epoch ms.
+  lastFetch: number | null
 }
 
 export interface ViewState {

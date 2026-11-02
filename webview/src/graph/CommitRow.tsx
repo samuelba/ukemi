@@ -3,7 +3,7 @@ import { parseFileDrag } from '../../../shared/fileUri'
 import type { ChangedFile } from '../../../shared/model'
 import type { CommitView, ViewSettings } from '../../../shared/protocol'
 import { relativeTime, splitId, title } from '../shared/format'
-import { postMessage, vscodeContext } from '../shared/vscodeApi'
+import { postMessage, vscodeContext } from '../shared/hostApi'
 import { BOOKMARK_MIME, Badges, RequestRow } from './Badges'
 import { canSquashIntoParent } from './canSquashIntoParent'
 import { dropCommitAction, fileDropAction } from './dropCommit'
@@ -190,6 +190,7 @@ export function CommitRow(props: CommitRowProps) {
         isWorkingCopy: commit.isWorkingCopy,
         isImmutable: commit.isImmutable,
         isEmpty: commit.isEmpty,
+        hasConflict: commit.hasConflict,
         isTrunk: commit.isTrunk,
         hasRemotes: props.hasRemotes,
         hasForge: props.hasForge,
