@@ -6,13 +6,18 @@
   <img src="resources/icon.png" alt="Ukemi logo" width="128">
 </p>
 
-Ukemi is a visual interface for [Jujutsu (jj)](https://jj-vcs.github.io/jj/) in VS Code. In judo, _ukemi_ is the art of falling safely. With jj and `undo`, every change is safe to try.
+Ukemi is a visual interface for [Jujutsu (jj)](https://jj-vcs.github.io/jj/) in VS Code, Cursor, or its own window. In judo, _ukemi_ is the art of falling safely. With jj and `undo`, every change is safe to try.
 
-Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=samuelba.ukemi-jj) or [Open VSX](https://open-vsx.org/extension/samuelba/ukemi-jj) (Cursor).
+There are two ways to use Ukemi:
+
+- **Extension.** For VS Code, Cursor, VSCodium, Windsurf and other editors built on VS Code. Ukemi sits in the sidebar next to your files. Install it from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=samuelba.ukemi-jj) or [Open VSX](https://open-vsx.org/extension/samuelba/ukemi-jj).
+- **Desktop app.** For JetBrains IDEs, other editors, or when you want jj in a separate window. Open several repositories in tabs, with a built-in terminal and a log of every jj command. Download it from the [GitHub releases](https://github.com/samuelba/ukemi/releases/latest) for Linux, macOS and Windows. See [Desktop app](#desktop-app).
 
 | Extension overview                         | Stacked pull request hover                                     |
 | ------------------------------------------ | -------------------------------------------------------------- |
 | ![Extension overview](images/overview.png) | ![Stacked pull request hover](images/pr-stacked-ci-status.png) |
+
+![Ukemi desktop app: repository tabs, change graph, evolution and a built-in terminal](images/desktop-graph.png)
 
 ## Features
 
@@ -55,7 +60,18 @@ The describe dialog shows a button for each tool below that is installed and ena
 
 ## Desktop app
 
-Ukemi also runs as an app of its own, without VS Code. Every [GitHub release](https://github.com/samuelba/ukemi/releases) has these files:
+Ukemi also runs as an app of its own, without VS Code. It has the same change graph and actions as the extension, and adds:
+
+- **Repository tabs.** Open several repositories in one window, each in its own tab.
+- **Terminal.** A built-in terminal in the panel at the bottom, opened in the repository.
+- **Command log.** The **Log** tab lists every jj command Ukemi ran, with its time and exit code. **Problems only** hides everything but warnings and errors.
+- **Diffs and conflicts.** Diffs open next to the change details. Resolve conflicts in an editor that accepts one side, or all sides, even when more than two revisions conflict.
+
+| Diffs and the jj command log                            | Resolve conflicts with many sides                                           |
+| ------------------------------------------------------- | --------------------------------------------------------------------------- |
+| ![Diff and the jj command log](images/desktop-diff.png) | ![Resolving a conflict between four revisions](images/desktop-conflict.png) |
+
+Every [GitHub release](https://github.com/samuelba/ukemi/releases) has these files:
 
 | System  | File                             | Install                                                                   |
 | ------- | -------------------------------- | ------------------------------------------------------------------------- |
