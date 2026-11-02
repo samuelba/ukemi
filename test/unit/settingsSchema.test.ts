@@ -43,6 +43,7 @@ describe('settingFields', () => {
       'General',
       'Fonts',
       'Graph',
+      'Descriptions',
       'Workspaces',
       'Fetching',
       'GitHub and GitLab',
@@ -76,7 +77,7 @@ describe('settingFields', () => {
       isRepositoryScoped: false,
       overriddenIn: [],
     })
-    expect(scoped.filter((f) => f.isRepositoryScoped)).toHaveLength(11)
+    expect(scoped.filter((f) => f.isRepositoryScoped)).toHaveLength(13)
   })
 
   test('marks unset values as undefined', () => {

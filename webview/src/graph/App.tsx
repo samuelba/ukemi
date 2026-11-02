@@ -1,12 +1,18 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { FileIconTheme } from '../../../shared/fileIconTheme'
 import type { ChangedFile } from '../../../shared/model'
-import type { CommitView, HostMessage, ViewState, WebviewMessage } from '../../../shared/protocol'
+import type {
+  CommitView,
+  HostMessage,
+  SuggesterView,
+  ViewState,
+  WebviewMessage,
+} from '../../../shared/protocol'
 import { title } from '../shared/format'
 import { useHostMessages } from '../shared/hooks'
 import { postMessage } from '../shared/hostApi'
 import { CommitRow } from './CommitRow'
-import { DescribeDialog } from './DescribeDialog'
+import { DescribeDialog, type SuggestionReply } from './DescribeDialog'
 import { EmptyState } from './EmptyState'
 import { FileIconFonts, FileIconThemeContext } from './FileIcon'
 import { selectedRow, type Selection } from './selection'
@@ -33,6 +39,8 @@ export function App() {
   const announced = useRef<string | null>(null)
   const [revealId, setRevealId] = useState<string | null>(null)
   const [describing, setDescribing] = useState<Describing | null>(null)
+  const [suggesters, setSuggesters] = useState<SuggesterView[]>([])
+  const [suggestionReply, setSuggestionReply] = useState<SuggestionReply | null>(null)
   const [now, setNow] = useState(() => Date.now())
 
   useHostMessages<HostMessage>(
@@ -57,6 +65,16 @@ export function App() {
         case 'fileIcons':
           setFileIcons(message.theme)
           return
+        case 'suggesters':
+          setSuggesters(message.suggesters)
+          return
+        case 'descriptionSuggestion':
+          setSuggestionReply({
+            requestId: message.requestId,
+            text: message.text,
+            error: message.error,
+          })
+          return
         case 'describe': {
           const commit = state?.graph?.commits.find((c) => c.commitId === message.commitId)
           setDescribing({
@@ -70,6 +88,14 @@ export function App() {
     },
     { type: 'ready' } satisfies WebviewMessage,
   )
+
+  // Tools get installed and settings change, so the list is asked for each time.
+  const isDescribing = describing !== null
+  useEffect(() => {
+    if (isDescribing) {
+      postMessage({ type: 'listSuggesters' } satisfies WebviewMessage)
+    }
+  }, [isDescribing])
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60_000)
@@ -249,8 +275,11 @@ export function App() {
           <DescribeDialog
             key={describing.commitId}
             heading={`Describe ${title(describing.description) || describing.commitId.slice(0, 8)}`}
+            commitId={describing.commitId}
             initial={describing.description}
             canStartNew={describing.isWorkingCopy}
+            suggesters={suggesters}
+            suggestionReply={suggestionReply}
             onCancel={() => setDescribing(null)}
             onSave={(message, startNew) => {
               postMessage({ type: 'describe', commitId: describing.commitId, message, startNew })

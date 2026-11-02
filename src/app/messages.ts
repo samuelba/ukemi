@@ -2,6 +2,7 @@ import type { WebviewMessage } from '../../shared/protocol'
 import { isAllowedForgeUrl } from '../forge/hostName'
 import type { RepoModel } from '../repo/repoModel'
 import type { CommandEnv } from './commands/context'
+import { SuggestionCancelled } from './describeSuggest/suggesters'
 import { initRepo } from './commands/globalCommands'
 
 const ALLOWED_COMMAND = /^ukemi\./
@@ -32,6 +33,12 @@ export function createMessageHandler(env: CommandEnv, dispatch: CommandDispatche
         return
       case 'openFolder':
         await env.workbench.openFolder()
+        return
+      case 'listSuggesters':
+        env.graphView.post({ type: 'suggesters', suggesters: await env.suggestions.list() })
+        return
+      case 'cancelSuggestion':
+        env.suggestions.cancel(message.requestId)
         return
     }
     if (!model) {
@@ -78,6 +85,9 @@ export function createMessageHandler(env: CommandEnv, dispatch: CommandDispatche
         })
         return
       }
+      case 'suggestDescription':
+        await suggestDescription(env, model, message)
+        return
       case 'openFile': {
         const commit = model.findCommit(message.commitId)
         if (!commit) {
@@ -162,4 +172,31 @@ async function copyPaths(model: RepoModel, commitId: string, path: string): Prom
     return [file.sourcePath, path]
   }
   return [path]
+}
+
+type SuggestRequest = Extract<WebviewMessage, { type: 'suggestDescription' }>
+
+async function suggestDescription(
+  env: CommandEnv,
+  model: RepoModel,
+  message: SuggestRequest,
+): Promise<void> {
+  const { requestId } = message
+  const reply = (result: { text: string } | { error: string }) =>
+    env.graphView.post({ type: 'descriptionSuggestion', requestId, ...result })
+  const commit = model.findCommit(message.commitId)
+  if (!commit) {
+    reply({ error: 'The change is no longer in the graph.' })
+    return
+  }
+  try {
+    reply({ text: await env.suggestions.suggest(model, commit, message.suggester, requestId) })
+  } catch (error: unknown) {
+    if (error instanceof SuggestionCancelled) {
+      return
+    }
+    const text = error instanceof Error ? error.message : String(error)
+    env.logger.error(`suggest description with ${message.suggester} failed: ${text}`)
+    reply({ error: text })
+  }
 }

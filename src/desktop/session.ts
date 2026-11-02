@@ -54,6 +54,7 @@ import { settingFields } from './settingsSchema'
 import { foldersAfterClosing } from './startup'
 import { Terminals } from './terminals'
 import { desktopWorkbench, type PanelEntry } from './workbench'
+import { cliSuggesters, DescriptionSuggestions } from '../app/describeSuggest/service'
 
 const COMMAND_ID = /^ukemi\.[\w.]+$/
 const STATE_DEBOUNCE_MS = 16
@@ -365,6 +366,7 @@ export class DesktopSession implements Disposable {
         },
         () => this.env,
       ),
+      suggestions: new DescriptionSuggestions(cliSuggesters(context.settings), context.settings),
     }
   }
 

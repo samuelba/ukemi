@@ -6,6 +6,7 @@ import type { RepoModel } from '../../repo/repoModel'
 import type { Logger } from '../../util/logger'
 import type { AutoFetcher } from '../autoFetch'
 import type { ChangeSelection } from '../changeSelection'
+import type { DescriptionSuggestions } from '../describeSuggest/service'
 import type { ForgeService } from '../forgeService'
 import type { FolderSource } from '../host'
 import type { Operations } from '../operations'
@@ -64,6 +65,7 @@ export interface CommandEnv {
   settings: Settings
   folders: FolderSource
   workbench: Workbench
+  suggestions: DescriptionSuggestions
 }
 
 const contextSchema = z

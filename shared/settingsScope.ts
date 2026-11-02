@@ -12,6 +12,8 @@ export const REPOSITORY_KEYS: ReadonlySet<string> = new Set([
   'forge.requestLimit',
   'forge.nativeStacks',
   'forge.statusInterval',
+  'describeSuggest.instructions',
+  'describeSuggest.maxDiffBytes',
 ])
 
 export function isRepositoryKey(key: string): boolean {

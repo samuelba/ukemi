@@ -683,6 +683,48 @@ div.files {
 
 .dialog-buttons {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
+}
+
+/* The suggestion buttons get a row of their own, above the buttons that close the dialog. */
+.suggest-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.suggest-note {
+  flex-basis: 100%;
+}
+
+.suggest-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dialog-error {
+  padding: 4px 6px;
+  border: 1px solid var(--vscode-inputValidation-errorBorder);
+  background: var(--vscode-inputValidation-errorBackground);
+  font-size: 0.88em;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.link-button {
+  padding: 0;
+  border: none;
+  color: var(--vscode-textLink-foreground);
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.link-button:hover,
+.link-button:focus-visible {
+  color: var(--vscode-textLink-activeForeground);
+  text-decoration: underline;
 }

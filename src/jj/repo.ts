@@ -170,6 +170,34 @@ export class JjRepo {
     return stdout
   }
 
+  // What one change does, as a git patch.
+  async diffGit(commitId: string): Promise<string> {
+    const { stdout } = await this.read(['diff', '-r', commitId, '--git'])
+    return stdout
+  }
+
+  async diffStat(commitId: string): Promise<string> {
+    const { stdout } = await this.read(['diff', '-r', commitId, '--stat'])
+    return stdout
+  }
+
+  // The descriptions of the nearest ancestors, newest first, without empty ones.
+  async ancestorDescriptions(commitId: string, limit: number): Promise<string[]> {
+    const { stdout } = await this.read([
+      'log',
+      '--no-graph',
+      '-r',
+      `::${commitId}- ~ root()`,
+      `--limit=${limit}`,
+      '-T',
+      'description ++ "\\0"',
+    ])
+    return stdout
+      .split('\0')
+      .map((description) => description.trim())
+      .filter((description) => description !== '')
+  }
+
   async workspaces(): Promise<Workspace[]> {
     const { stdout } = await this.read(['workspace', 'list', '-T', WORKSPACE_TEMPLATE])
     return parseWorkspaces(stdout)

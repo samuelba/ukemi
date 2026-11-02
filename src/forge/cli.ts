@@ -1,7 +1,6 @@
-import { spawn } from 'node:child_process'
 import { homedir } from 'node:os'
 import type { HttpFetch } from './types'
-import { hostSpawn } from '../util/hostProcess'
+import { runTool } from '../util/runTool'
 
 const CLI_TIMEOUT_MS = 30_000
 const MAX_OUTPUT = 10 * 1024 * 1024
@@ -16,44 +15,20 @@ export interface CliRunResult {
 
 export type CliRun = (args: readonly string[], stdin: string | undefined) => Promise<CliRunResult>
 
-export function runCli(
+export async function runCli(
   binary: CliBinary,
   args: readonly string[],
   stdin: string | undefined,
 ): Promise<CliRunResult> {
-  return new Promise((resolve, reject) => {
-    // A neutral folder keeps the CLI from picking up a repository's own configuration.
-    const host = hostSpawn(binary, args, {
-      cwd: homedir(),
-      env: { GH_PROMPT_DISABLED: '1', GH_NO_UPDATE_NOTIFIER: '1', NO_COLOR: '1' },
-    })
-    const child = spawn(host.command, host.args, {
-      cwd: homedir(),
-      env: host.env,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    })
-    const stdout: Buffer[] = []
-    let size = 0
-    const timer = setTimeout(() => child.kill(), CLI_TIMEOUT_MS)
-    child.stdout.on('data', (chunk: Buffer) => {
-      size += chunk.length
-      if (size > MAX_OUTPUT) {
-        child.kill()
-        return
-      }
-      stdout.push(chunk)
-    })
-    child.on('error', (error) => {
-      clearTimeout(timer)
-      reject(error)
-    })
-    child.on('close', (code) => {
-      clearTimeout(timer)
-      resolve({ stdout: Buffer.concat(stdout).toString('utf8'), code: code ?? 1 })
-    })
-    child.stdin.on('error', () => undefined)
-    child.stdin.end(stdin ?? '')
+  // A neutral folder keeps the CLI from picking up a repository's own configuration.
+  const { stdout, code } = await runTool(binary, args, {
+    cwd: homedir(),
+    stdin,
+    env: { GH_PROMPT_DISABLED: '1', GH_NO_UPDATE_NOTIFIER: '1', NO_COLOR: '1' },
+    timeoutMs: CLI_TIMEOUT_MS,
+    maxOutput: MAX_OUTPUT,
   })
+  return { stdout, code }
 }
 
 const availability = new Map<string, { ok: boolean; at: number }>()
