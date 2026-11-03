@@ -34,7 +34,7 @@ import { TO_MAIN, type DesktopContext, type DesktopPaths, type Page } from './co
 import { fileLogger } from './fileLogger'
 import { detectSystemFont, resolveFonts, type SystemFont } from './fonts'
 import { LogBuffer } from './logBuffer'
-import { appMenuTemplate } from './menus'
+import { appMenuTemplate, KEYBINDINGS, shortcutKeys } from './menus'
 import { DesktopSession } from './session'
 import {
   desktopFileName,
@@ -150,6 +150,9 @@ class DesktopApp implements DesktopContext {
     this.settings.onDidChange((change) => {
       if (affectsJj(change)) {
         void this.reloadJj()
+      }
+      if (change.affects(KEYBINDINGS)) {
+        this.installMenu()
       }
       if (change.affects(THEME)) {
         this.applyTheme()
@@ -398,8 +401,10 @@ class DesktopApp implements DesktopContext {
       openRecent: (root) => void this.openRecent(root),
       clearRecent: () => void this.recentRepos.clear(),
       zoom: { percent: zoomPercent(this.zoomFactor()), step: (step) => this.zoom(step) },
+      keys: shortcutKeys(this.settings.values()[KEYBINDINGS]),
       newWindow: () => this.openWindow([]),
       openSettings: () => this.focusedSession()?.showSettings(),
+      openKeyboardShortcuts: () => this.focusedSession()?.showSettings('keyboardShortcuts'),
       openLog: () => this.focusedSession()?.shell('showLog'),
       about: () => this.focusedSession()?.showAbout(),
       openExternal: (url) => void shell.openExternal(url),

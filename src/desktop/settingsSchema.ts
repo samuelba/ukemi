@@ -8,6 +8,7 @@ import {
   TERMINAL_FONT_FAMILY,
   TERMINAL_FONT_SIZE,
 } from './fonts'
+import { KEYBINDINGS, SHORTCUT_ACTIONS } from './menus'
 import { RESTORE_REPOSITORIES, THEME } from './startup'
 
 interface PropertySchema {
@@ -124,11 +125,27 @@ const DESKTOP_FIELDS: readonly Omit<
     maximum: 72,
     default: null,
   },
+  {
+    key: KEYBINDINGS,
+    group: 'Keyboard Shortcuts',
+    title: 'Keyboard Shortcuts',
+    description:
+      'The keys of the menu commands. Click a shortcut and press the new keys, or remove it. F1 for the command palette and Ctrl+Z and Ctrl+Shift+Z for undo and redo always work.',
+    type: 'shortcuts',
+    default: {},
+    shortcuts: SHORTCUT_ACTIONS.map(({ id, menu, title, key }) => ({
+      id,
+      menu,
+      title,
+      default: key,
+    })),
+  },
 ]
 
 const GROUP_ORDER = [
   'General',
   'Fonts',
+  'Keyboard Shortcuts',
   'Graph',
   'Descriptions',
   'Workspaces',
