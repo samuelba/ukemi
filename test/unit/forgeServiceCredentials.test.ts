@@ -272,6 +272,20 @@ describe('request refresh and rate limits', () => {
     vi.unstubAllGlobals()
   })
 
+  test('shows another forge error once', async () => {
+    const { forge } = await signedIn()
+    answer(200, {}, { errors: [{ type: 'NOT_FOUND', message: 'Could not resolve o/r.' }] })
+    const { model } = githubModel()
+
+    await forge.refreshRequests(model, { force: true })
+    await forge.refreshRequests(model, { force: true })
+    expect(state.messages).toEqual([
+      'Ukemi could not load the requests. GitHub: Could not resolve o/r.',
+    ])
+    forge.dispose()
+    vi.unstubAllGlobals()
+  })
+
   test('still reports an expired login', async () => {
     const { forge } = await signedIn()
     answer(401, {}, { message: 'Bad credentials' })

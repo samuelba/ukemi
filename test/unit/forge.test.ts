@@ -305,6 +305,57 @@ function openedMergeRequest() {
   }
 }
 
+describe('GithubClient GraphQL errors', () => {
+  async function listError(graphql: unknown): Promise<ForgeError> {
+    const client = new GithubClient('github.com', 'o/r', 'token', fakeFetch({ graphql }))
+    const error = await client.listRequests(['x']).catch((caught: unknown) => caught)
+    expect(error).toBeInstanceOf(ForgeError)
+    return error as ForgeError
+  }
+
+  test('reports the errors GitHub sends with HTTP 200', async () => {
+    const error = await listError({
+      data: null,
+      errors: [
+        { type: 'NOT_FOUND', message: "Could not resolve to a Repository with the name 'o/r'." },
+      ],
+    })
+
+    expect(error.message).toBe("GitHub: Could not resolve to a Repository with the name 'o/r'.")
+    expect(error.status).toBe(404)
+  })
+
+  test('counts a GraphQL rate limit as a rate limit', async () => {
+    const error = await listError({
+      errors: [{ type: 'RATE_LIMITED', message: 'API rate limit exceeded' }],
+    })
+
+    expect(error.isRateLimited).toBe(true)
+  })
+
+  test('says so when the repository cannot be read', async () => {
+    const error = await listError({ data: { viewer: { login: 'sam' }, repository: null } })
+
+    expect(error.message).toBe('GitHub has no repository o/r for this login')
+  })
+
+  test('keeps the data when only part of it failed', async () => {
+    const client = new GithubClient(
+      'github.com',
+      'o/r',
+      'token',
+      fakeFetch({
+        graphql: {
+          data: { viewer: { login: 'sam' }, repository: { pullRequests: { nodes: [] } } },
+          errors: [{ type: 'FORBIDDEN', message: 'Resource not accessible by integration' }],
+        },
+      }),
+    )
+
+    await expect(client.listRequests(['x'])).resolves.toEqual([])
+  })
+})
+
 describe('GitlabClient', () => {
   test('lists merge requests with jobs for the current author', async () => {
     const calls: string[] = []

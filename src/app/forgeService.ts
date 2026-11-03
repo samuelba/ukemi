@@ -99,6 +99,7 @@ export class ForgeService implements Disposable {
   // refreshes in a row it refused.
   private readonly rateLimit = new Map<string, { until: number; refusals: number }>()
   private readonly reportedMissing = new Set<string>()
+  private readonly reportedErrors = new Set<string>()
   private readonly disposables: Disposable[] = []
   private readonly github: GithubCredentials
   private readonly gitlabAuth: GitlabAuth
@@ -388,7 +389,17 @@ export class ForgeService implements Disposable {
         this.pauseForRateLimit(model, error)
       } else if (error instanceof ForgeError && error.isAuthError) {
         void this.host.ui.warn('Ukemi: the forge login has expired. Sign in again.')
+      } else if (error instanceof ForgeError) {
+        this.reportOnce(`Ukemi could not load the requests. ${error.message}`)
       }
+    }
+  }
+
+  // The forge's answer does not change until the user does something, so it is shown once.
+  private reportOnce(message: string): void {
+    if (!this.reportedErrors.has(message)) {
+      this.reportedErrors.add(message)
+      void this.host.ui.warn(message)
     }
   }
 
