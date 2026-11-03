@@ -71,7 +71,7 @@ async function restoreVersion(env: CommandEnv, arg: unknown): Promise<void> {
 
 async function entriesFor(env: CommandEnv, model: RepoModel, commitId: string) {
   try {
-    return await model.repo.evolution(commitId)
+    return await model.evolutionFor(commitId)
   } catch (error: unknown) {
     env.logger.warn(`Evolution of ${commitId} failed: ${errorMessage(error)}`)
     return []
