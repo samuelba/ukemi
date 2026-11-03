@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, resolve, sep } from 'node:path'
 
 interface PlanEntry {
@@ -27,13 +27,26 @@ export function applyPlan(rightDir: string, entries: readonly PlanEntry[]): void
   }
 }
 
+// A plan that asks for a copy of `$left` instead of writing into `$right`.
+function leftCopyTarget(plan: unknown): string | null {
+  if (typeof plan !== 'object' || plan === null || !('copyLeftTo' in plan)) {
+    return null
+  }
+  return typeof plan.copyLeftTo === 'string' ? plan.copyLeftTo : null
+}
+
 function main(argv: readonly string[]): number {
-  const [, right, planFile] = argv
-  if (!right || !planFile) {
+  const [left, right, planFile] = argv
+  if (!left || !right || !planFile) {
     process.stderr.write('usage: splitTool <left> <right> <plan.json>\n')
     return 2
   }
   const plan: unknown = JSON.parse(readFileSync(planFile, 'utf8'))
+  const copyTo = leftCopyTarget(plan)
+  if (copyTo !== null) {
+    cpSync(left, copyTo, { recursive: true })
+    return 0
+  }
   if (!Array.isArray(plan)) {
     process.stderr.write('invalid split plan\n')
     return 2

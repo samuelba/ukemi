@@ -1,4 +1,5 @@
 import { writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { basename } from 'node:path'
 import type { ViewState } from '../../shared/protocol'
 import { JjRepo } from '../../src/jj/repo'
@@ -46,8 +47,10 @@ async function main(root: string, output: string): Promise<void> {
   const split = target
     ? await SplitSession.load(
         model.repo,
-        { commitId: target.commitId, parentId: target.parents[0], description: target.description },
+        { commitId: target.commitId, parentIds: target.parents, description: target.description },
         await model.filesFor(target.commitId),
+        // The diff tool only runs for a merge, which the preview repo does not split.
+        { wrapperPath: 'ukemi-split', workDir: tmpdir() },
       )
     : null
   const evolution = await model.repo.evolution('@')

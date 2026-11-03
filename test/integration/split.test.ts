@@ -42,8 +42,9 @@ async function sessionFor(revset: string) {
     commit,
     session: await SplitSession.load(
       repo,
-      { commitId: commit.commitId, parentId: commit.parents[0], description: commit.description },
+      { commitId: commit.commitId, parentIds: commit.parents, description: commit.description },
       files,
+      tool,
     ),
   }
 }
@@ -55,6 +56,28 @@ describe('applyPlan', () => {
 })
 
 describe('SplitSession', () => {
+  test('splits a merge against the merge of its parents', async () => {
+    writeFile(root, 'a.txt', 'one\ntwo\nthree\nfour\nfive\nsix\nseven\n')
+    jj(root, 'describe', '-m', 'base')
+    jj(root, 'new', '-m', 'left')
+    writeFile(root, 'a.txt', 'ONE\ntwo\nthree\nfour\nfive\nsix\nseven\n')
+    jj(root, 'new', '@-', '-m', 'right')
+    writeFile(root, 'a.txt', 'one\ntwo\nthree\nfour\nfive\nsix\nSEVEN\n')
+    jj(root, 'new', 'description(exact:"left\n")', '@', '-m', 'merge')
+    writeFile(root, 'a.txt', 'ONE\ntwo\nthree\nFOUR\nfive\nsix\nSEVEN\n')
+    writeFile(root, 'b.txt', 'b\n')
+    const { session } = await sessionFor('@')
+    const fileA = session.request.files.find((f) => f.path === 'a.txt')
+    expect(fileA?.segments.filter((s) => s.kind === 'change')).toHaveLength(1)
+
+    await session.apply(repo, tool, 'just b', [{ path: 'b.txt', hunks: [], isWholeFile: true }])
+
+    const [bottom] = await repo.log('@-')
+    expect(bottom?.parents).toHaveLength(2)
+    expect((await repo.files(bottom?.commitId ?? '')).map((f) => f.path)).toEqual(['b.txt'])
+    expect((await repo.files('@')).map((f) => f.path)).toEqual(['a.txt'])
+  })
+
   test('moves one selected hunk into a new change below', async () => {
     writeFile(root, 'a.txt', 'one\ntwo\nthree\nfour\nfive\nsix\nseven\n')
     jj(root, 'new')

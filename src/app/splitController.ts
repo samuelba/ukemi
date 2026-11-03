@@ -36,8 +36,9 @@ export function splitController(
       }
       session = await SplitSession.load(
         model.repo,
-        { commitId: commit.commitId, parentId: commit.parents[0], description: commit.description },
+        { commitId: commit.commitId, parentIds: commit.parents, description: commit.description },
         files,
+        await ensureWrapper(paths),
       )
       if (panel.isClosed) {
         return

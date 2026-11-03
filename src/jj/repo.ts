@@ -448,6 +448,19 @@ export class JjRepo {
     ])
   }
 
+  // Runs the configured diff tool on the commit's diff. For a merge, jj diffs against the merge
+  // of the parents.
+  async diffWithTool(commitId: string, paths: readonly string[], toolConfig: readonly string[]) {
+    await this.read([
+      ...toolConfig,
+      'diff',
+      '-r',
+      commitId,
+      '--tool=ukemi-split',
+      ...paths.map(rootFileset),
+    ])
+  }
+
   // Rewrites the files in place. `--from root()` puts each file in `$right` even when it equals
   // the merge of the parents, as a conflicted file in a merge commit does, which `-r` would skip.
   writeFilesWithTool(commitId: string, paths: readonly string[], toolConfig: readonly string[]) {
