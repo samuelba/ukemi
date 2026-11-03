@@ -217,3 +217,68 @@ describe('refreshRequests', () => {
     expect(remotes).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('request refresh and rate limits', () => {
+  function githubModel() {
+    const states: unknown[] = []
+    const model = {
+      root: '/repo',
+      remotes: [{ name: 'origin', url: 'https://github.com/o/r.git' }],
+      graph: {
+        commits: [{ localBookmarks: [{ name: 'feature' }], remoteBookmarks: [], requests: [] }],
+      },
+      setForge: (state: unknown) => states.push(state),
+    }
+    return { model: model as never, states }
+  }
+
+  function answer(status: number, headers: Record<string, string>, body: unknown) {
+    const calls: string[] = []
+    vi.stubGlobal('fetch', async (url: string) => {
+      calls.push(url)
+      return new Response(JSON.stringify(body), { status, headers })
+    })
+    return calls
+  }
+
+  async function signedIn() {
+    const setup = service()
+    setup.secrets.set(
+      'ukemi.github.credential.github.com',
+      JSON.stringify({ username: 'u', token: 't' }),
+    )
+    return setup
+  }
+
+  test('reports a used-up rate limit instead of an expired login, and waits', async () => {
+    const { forge } = await signedIn()
+    const { model } = githubModel()
+    const reset = Math.floor(Date.now() / 1000) + 590
+    const calls = answer(
+      403,
+      { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': String(reset) },
+      { message: 'API rate limit exceeded for user.' },
+    )
+
+    await forge.refreshRequests(model, { force: true })
+    expect(state.messages).toEqual([
+      "Ukemi: the forge's rate limit is used up. Request status refreshes again in 10 min.",
+    ])
+    const afterFirst = calls.length
+
+    await forge.refreshRequests(model)
+    expect(calls).toHaveLength(afterFirst)
+    forge.dispose()
+    vi.unstubAllGlobals()
+  })
+
+  test('still reports an expired login', async () => {
+    const { forge } = await signedIn()
+    answer(401, {}, { message: 'Bad credentials' })
+
+    await forge.refreshRequests(githubModel().model, { force: true })
+    expect(state.messages).toEqual(['Ukemi: the forge login has expired. Sign in again.'])
+    forge.dispose()
+    vi.unstubAllGlobals()
+  })
+})

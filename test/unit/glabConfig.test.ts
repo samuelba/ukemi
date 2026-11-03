@@ -173,6 +173,17 @@ describe('glab api', () => {
     expect(response.status).toBe(401)
   })
 
+  test('keeps the headers, such as the rate limit', () => {
+    const response = responseFromCli(
+      'HTTP/2.0 429 Too Many Requests\r\nRetry-After: 30\r\nRateLimit-Remaining: 0\r\n\r\n{}',
+      1,
+      'glab',
+    )
+    expect(response.status).toBe(429)
+    expect(response.headers.get('retry-after')).toBe('30')
+    expect(response.headers.get('ratelimit-remaining')).toBe('0')
+  })
+
   test('refuses a url that is not the configured host', () => {
     expect(() => glabEndpoint('git.anybotics.com', 'https://gitlab.com/api/v4/user')).toThrow(
       'Refusing GitLab URL',

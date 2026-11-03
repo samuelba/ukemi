@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import { ForgeError, requestJson, type HttpFetch } from '../../src/forge/types'
+import { rateLimitPause } from '../../src/forge/refreshInterval'
+import { ForgeError, requestJson, retryAfterMs, type HttpFetch } from '../../src/forge/types'
 
 function redirect(status: number, location: string): Response {
   return new Response(null, { status, headers: { location } })
@@ -71,5 +72,50 @@ describe('requestJson redirects', () => {
     })
     expect(drops.calls[1]?.init.method).toBe('GET')
     expect(drops.calls[1]?.init.body).toBeNull()
+  })
+})
+
+describe('rate limits', () => {
+  test('reads a used-up GitHub limit and tells it apart from a login problem', async () => {
+    const { fetchImpl } = recorder([
+      new Response('{"message":"API rate limit exceeded"}', {
+        status: 403,
+        headers: { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1100' },
+      }),
+    ])
+    const error = await requestJson(fetchImpl, 'https://api.github.com/x', AUTH).catch(
+      (caught: unknown) => caught,
+    )
+
+    expect(error).toBeInstanceOf(ForgeError)
+    const forgeError = error as ForgeError
+    expect(forgeError.isRateLimited).toBe(true)
+    expect(forgeError.isAuthError).toBe(false)
+  })
+
+  test('reads Retry-After in seconds or as a date', () => {
+    expect(retryAfterMs(new Headers({ 'retry-after': '30' }), 0)).toBe(30_000)
+    expect(retryAfterMs(new Headers({ 'retry-after': 'Thu, 01 Jan 1970 00:01:00 GMT' }), 0)).toBe(
+      60_000,
+    )
+    expect(
+      retryAfterMs(new Headers({ 'ratelimit-remaining': '0', 'ratelimit-reset': '5' }), 0),
+    ).toBe(5_000)
+    expect(retryAfterMs(new Headers({ 'x-ratelimit-remaining': '10' }), 0)).toBeNull()
+  })
+
+  test('counts a GitLab 429 and a GitHub secondary limit as rate limits', () => {
+    expect(new ForgeError('HTTP 429', 429).isRateLimited).toBe(true)
+    expect(
+      new ForgeError('HTTP 403: You have exceeded a secondary rate limit', 403).isRateLimited,
+    ).toBe(true)
+    expect(new ForgeError('HTTP 403: Resource not accessible', 403).isAuthError).toBe(true)
+  })
+
+  test('pauses for the time the forge asks, or longer with each refusal', () => {
+    expect(rateLimitPause(120_000, 1)).toBe(120_000)
+    expect(rateLimitPause(null, 1)).toBe(60_000)
+    expect(rateLimitPause(null, 3)).toBe(240_000)
+    expect(rateLimitPause(null, 20)).toBe(60 * 60_000)
   })
 })

@@ -68,7 +68,23 @@ export function responseFromCli(stdout: string, code: number, name: string): Res
   }
   const separator = /\r?\n\r?\n/.exec(stdout)
   const body = separator ? stdout.slice(separator.index + separator[0].length) : ''
-  return new Response(body, { status: Number(statusLine[1]) })
+  const head = separator ? stdout.slice(0, separator.index) : stdout
+  return new Response(body, { status: Number(statusLine[1]), headers: cliHeaders(head) })
+}
+
+function cliHeaders(head: string): Headers {
+  const headers = new Headers()
+  for (const line of head.split(/\r?\n/).slice(1)) {
+    const colon = line.indexOf(':')
+    if (colon > 0) {
+      try {
+        headers.append(line.slice(0, colon).trim(), line.slice(colon + 1).trim())
+      } catch {
+        // A header name that fetch does not accept carries nothing Ukemi reads.
+      }
+    }
+  }
+  return headers
 }
 
 // Sends an HttpFetch request through `gh api` or `glab api`; `endpoint` maps and checks the URL.
