@@ -504,16 +504,25 @@ class DesktopApp implements DesktopContext {
   }
 }
 
+// A process that stays up without a window would keep the single-instance lock, and every later
+// launch would hand its arguments to it and exit silently. So a failed start says why and quits.
+function failStartup(error: unknown, desktop: DesktopApp | null): void {
+  const message = errorMessage(error)
+  desktop?.logger.error(`startup failed: ${message}`)
+  dialog.showErrorBox('Ukemi could not start', message)
+  app.exit(1)
+}
+
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   void app.whenReady().then(async () => {
-    const desktop = new DesktopApp()
+    let desktop: DesktopApp | null = null
     try {
+      desktop = new DesktopApp()
       await desktop.start()
     } catch (error: unknown) {
-      desktop.logger.error(`startup failed: ${errorMessage(error)}`)
-      throw error
+      failStartup(error, desktop)
     }
   })
   app.on('window-all-closed', () => {
