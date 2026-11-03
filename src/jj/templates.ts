@@ -1,12 +1,6 @@
-export function jjString(text: string): string {
-  const escaped = text
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, '\\n')
-    .replace(/\r/g, '\\r')
-    .replace(/\t/g, '\\t')
-  return `"${escaped}"`
-}
+import { jjString } from '../../shared/revsetText'
+
+export { jjString }
 
 export function jsonObject(fields: Record<string, string>): string {
   const parts = Object.entries(fields).map(

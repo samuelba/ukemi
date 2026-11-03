@@ -46,6 +46,7 @@ function graph(overrides: Partial<GraphState> = {}): GraphState {
     workspaces: [],
     filter: 'recent',
     depth: '7d',
+    revset: null,
     hasRemotes: true,
     hasUnpushed: false,
     canUndo: true,

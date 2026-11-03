@@ -323,6 +323,55 @@ test('lists the operation log in the sidebar, with restore on earlier operations
   }
 })
 
+test('filters the graph by a typed revset and reports a bad one', async () => {
+  const { app, page } = await launch(fixtureRepo())
+  try {
+    await page.getByRole('combobox', { name: 'Filter' }).selectOption('custom')
+    const input = page.getByRole('textbox', { name: 'Revset' })
+    await input.fill('nosuch(')
+    await input.press('Enter')
+    await expect(page.locator('.revset-error')).toContainText('parse')
+
+    await input.fill('description(substring:"cart")')
+    await input.press('Enter')
+    await expect(
+      page.locator('.commit .summary', { hasText: 'docs: explain the setup' }),
+    ).toHaveCount(0)
+    await expect(
+      page.locator('.commit .summary', { hasText: 'feat: add the cart total' }),
+    ).toBeVisible()
+    await expect(page.getByRole('combobox', { name: 'Filter' })).toHaveValue('custom')
+
+    await page.getByRole('button', { name: 'Clear revset' }).click()
+    await expect(page.getByRole('textbox', { name: 'Revset' })).toHaveCount(0)
+    await expect(
+      page.locator('.commit .summary', { hasText: 'docs: explain the setup' }),
+    ).toBeVisible()
+  } finally {
+    await app.close()
+  }
+})
+
+test('search dims the changes that do not match and steps through matches', async () => {
+  const { app, page } = await launch(fixtureRepo())
+  try {
+    await page.getByRole('button', { name: 'Search changes (Ctrl+F)' }).click()
+    const search = page.getByRole('textbox', { name: 'Search changes' })
+    await search.fill('cart')
+    await expect(page.locator('.graph-search-count')).toHaveText('1')
+    await search.press('Enter')
+    const match = page.locator('.commit', { hasText: 'feat: add the cart total' })
+    await expect(match).toHaveClass(/is-selected/)
+    await expect(match).not.toHaveClass(/is-dimmed/)
+    await expect(page.locator('.commit.is-dimmed').first()).toBeVisible()
+    await expect(page.locator('.graph-search-count')).toHaveText('1 of 1')
+    await search.press('Escape')
+    await expect(page.locator('.commit.is-dimmed')).toHaveCount(0)
+  } finally {
+    await app.close()
+  }
+})
+
 test('shows line stats as soon as they are switched on', async () => {
   const { app, page } = await launch(fixtureRepo())
   try {

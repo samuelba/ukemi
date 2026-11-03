@@ -110,6 +110,16 @@ export class JjRepo {
     return this.mutations.run(() => this.runner.run({ cwd: this.root, args, ...options }))
   }
 
+  // Why jj cannot evaluate the revset, or null when it can.
+  async revsetError(revset: string): Promise<string | null> {
+    try {
+      await this.read(['log', '--no-graph', '--limit=1', '-r', revset, '-T', '""'])
+      return null
+    } catch (error: unknown) {
+      return error instanceof Error ? error.message : String(error)
+    }
+  }
+
   snapshot(): Promise<RunResult> {
     return this.mutate(['util', 'snapshot'], { background: true })
   }

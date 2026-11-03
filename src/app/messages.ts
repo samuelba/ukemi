@@ -57,6 +57,17 @@ export function createMessageHandler(env: CommandEnv, dispatch: CommandDispatche
         await env.registry.rememberView(model.root, view)
         return
       }
+      case 'setRevset': {
+        await applyRevset(env, model, message.revset.trim())
+        return
+      }
+      case 'listRevsets':
+        env.graphView.post({
+          type: 'revsetHistory',
+          repoId: model.root,
+          history: env.registry.revsetHistory(model.root),
+        })
+        return
       case 'loadFiles': {
         const files = await model.filesFor(message.commitId)
         env.graphView.post({ type: 'files', repoId: model.root, commitId: message.commitId, files })
@@ -229,5 +240,32 @@ async function descriptionNotSaved(env: CommandEnv, text: string): Promise<void>
   )
   if (choice === copy) {
     await env.ui.copy(text)
+  }
+}
+
+// Checks the typed revset before the graph switches to it, so a typo keeps the current graph and
+// is not remembered. An empty revset goes back to the filter.
+async function applyRevset(env: CommandEnv, model: RepoModel, revset: string): Promise<void> {
+  const graph = model.graph
+  const filter = graph?.filter ?? 'recent'
+  const depth = graph?.depth ?? '7d'
+  const error = revset === '' ? null : await model.repo.revsetError(revset)
+  env.graphView.post({ type: 'revsetResult', revset, error })
+  if (error !== null) {
+    return
+  }
+  const custom = revset === '' ? null : revset
+  await env.operations.track('Loading', () => model.setView(filter, depth, custom))
+  await env.registry.rememberView(
+    model.root,
+    custom ? { filter, depth, revset } : { filter, depth },
+  )
+  if (custom) {
+    await env.registry.rememberRevset(model.root, custom)
+    env.graphView.post({
+      type: 'revsetHistory',
+      repoId: model.root,
+      history: env.registry.revsetHistory(model.root),
+    })
   }
 }

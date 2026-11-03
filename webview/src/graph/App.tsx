@@ -16,7 +16,10 @@ import { CommitRow } from './CommitRow'
 import { DescribeDialog, type SuggestionReply } from './DescribeDialog'
 import { EmptyState } from './EmptyState'
 import { FileIconFonts, FileIconThemeContext } from './FileIcon'
+import { GraphSearch } from './GraphSearch'
 import { withUnchangedObjects } from './keepUnchanged'
+import { searchCommits, stepMatch } from './matchCommit'
+import { RevsetBar, type RevsetReply } from './RevsetBar'
 import { selectedRow, type Selection } from './selection'
 import { Toolbar } from './Toolbar'
 
@@ -44,6 +47,12 @@ export function App() {
   const [describing, setDescribing] = useState<Describing | null>(null)
   const [suggesters, setSuggesters] = useState<SuggesterView[]>([])
   const [suggestionReply, setSuggestionReply] = useState<SuggestionReply | null>(null)
+  const [isEditingRevset, setIsEditingRevset] = useState(false)
+  const [revsetHistory, setRevsetHistory] = useState<string[]>([])
+  const [revsetReply, setRevsetReply] = useState<RevsetReply | null>(null)
+  const replyCount = useRef(0)
+  const [isSearching, setIsSearching] = useState(false)
+  const [searchText, setSearchText] = useState('')
 
   useHostMessages<HostMessage>(
     (message) => {
@@ -75,6 +84,13 @@ export function App() {
             text: message.text,
             error: message.error,
           })
+          return
+        case 'revsetHistory':
+          setRevsetHistory(message.history)
+          return
+        case 'revsetResult':
+          replyCount.current += 1
+          setRevsetReply({ id: replyCount.current, revset: message.revset, error: message.error })
           return
         case 'describe': {
           const commit = state?.graph?.commits.find((c) => c.commitId === message.commitId)
@@ -190,6 +206,52 @@ export function App() {
     setSelection(null)
   }, [repoId])
 
+  const closeRevset = useCallback(() => setIsEditingRevset(false), [])
+
+  // Once a revset shows, the bar stays for it. Picking a filter later then closes the bar.
+  const shownRevset = graph?.revset ?? null
+  useEffect(() => {
+    if (shownRevset !== null) {
+      setIsEditingRevset(false)
+    }
+  }, [shownRevset])
+
+  const matches = useMemo(
+    () => (isSearching && graph ? searchCommits(graph.commits, searchText) : null),
+    [isSearching, graph, searchText],
+  )
+  const matchSet = useMemo(() => (matches ? new Set(matches) : null), [matches])
+  const matchIndex = matches && selected ? matches.indexOf(selected) : -1
+
+  const stepSearch = (direction: 1 | -1) => {
+    const next = matches ? stepMatch(matches, selected, direction) : null
+    if (next) {
+      selectCommit(next)
+      setRevealId(next)
+    }
+  }
+
+  const closeSearch = () => {
+    setIsSearching(false)
+    setSearchText('')
+  }
+
+  const openSearch = useCallback(() => {
+    setIsSearching(true)
+    document.querySelector<HTMLInputElement>('.graph-search-input')?.focus()
+  }, [])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'f') {
+        event.preventDefault()
+        openSearch()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [openSearch])
+
   // The host learns about the working copy chosen by default, so its views show the same change.
   useEffect(() => {
     if (selection === null && selected && announced.current !== repoId) {
@@ -216,7 +278,30 @@ export function App() {
           isBusy={state.busy !== null}
           autoFetch={state.autoFetch}
           showGitTags={state.settings.showGitTags}
-        />
+          isSearching={isSearching}
+          onCustomRevset={() => setIsEditingRevset(true)}
+          onSearch={() => (isSearching ? closeSearch() : openSearch())}
+        >
+          {graph && (graph.revset !== null || isEditingRevset) && (
+            <RevsetBar
+              key={`${graph.repoId}\n${graph.revset ?? ''}`}
+              graph={graph}
+              history={revsetHistory}
+              reply={revsetReply}
+              onClose={closeRevset}
+            />
+          )}
+          {isSearching && (
+            <GraphSearch
+              text={searchText}
+              matchCount={matches?.length ?? null}
+              position={matchIndex >= 0 ? matchIndex + 1 : null}
+              onChange={setSearchText}
+              onStep={stepSearch}
+              onClose={closeSearch}
+            />
+          )}
+        </Toolbar>
         {state.busy && (
           <div className="busy" role="status">
             <div className="busy-bar" />
@@ -248,6 +333,7 @@ export function App() {
                 files={filesFor(commit)}
                 isExpanded={isExpanded(commit)}
                 isSelected={selected === commit.commitId}
+                isDimmed={matchSet !== null && !matchSet.has(commit.commitId)}
                 hasRemotes={graph.hasRemotes}
                 hasForge={graph.forge !== null}
                 settings={state.settings}

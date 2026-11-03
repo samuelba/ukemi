@@ -1,16 +1,11 @@
 import type { GraphFilter, HistoryDepth } from '../../shared/model'
+import { revsetSymbol } from '../../shared/revsetText'
 import { jjString } from './templates'
+
+export { revsetSymbol }
 
 export function quoteRevsetString(text: string): string {
   return jjString(text)
-}
-
-// jj reads `ok|main`, `rel-` or `a,b` as expressions, not as names. Git allows such branch names,
-// so a fetch can bring them in. Plain names stay bare, so pickers and labels look as jj shows them.
-const PLAIN_SYMBOL = /^[\p{L}\p{N}_/]+(?:[.+-][\p{L}\p{N}_/]+)*$/u
-
-export function revsetSymbol(name: string): string {
-  return PLAIN_SYMBOL.test(name) ? name : jjString(name)
 }
 
 export function bookmarkRevision(name: string, remote?: string | null): string {
@@ -67,6 +62,12 @@ export function graphRevset(filter: GraphFilter, depth: HistoryDepth): string {
   }
   const base = graphBase(filter, depth)
   return `(${ANCHORS} | (${base}) | (roots((${base}) & mutable())-)) ~ root()`
+}
+
+// A revset the user typed. The working copy and trunk stay in view, as with the presets, so the
+// graph keeps its bearings.
+export function customGraphRevset(revset: string): string {
+  return `(${ANCHORS} | (${revset})) ~ root()`
 }
 
 function graphBase(filter: Exclude<GraphFilter, 'working'>, depth: HistoryDepth): string {

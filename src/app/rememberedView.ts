@@ -9,7 +9,11 @@ import type { KeyValueStore } from './host'
 export interface GraphView {
   filter: GraphFilter
   depth: HistoryDepth
+  // A revset the user typed, shown instead of the filter.
+  revset?: string
 }
+
+const REVSET_HISTORY_LIMIT = 20
 
 // UI state, not a setting: a repository reopens with the filter and depth it was left at.
 function viewKey(root: string): string {
@@ -20,9 +24,11 @@ function isView(value: unknown): value is GraphView {
   if (typeof value !== 'object' || value === null) {
     return false
   }
-  const { filter, depth } = value as Record<string, unknown>
+  const { filter, depth, revset } = value as Record<string, unknown>
   return (
-    GRAPH_FILTERS.includes(filter as GraphFilter) && HISTORY_DEPTHS.includes(depth as HistoryDepth)
+    GRAPH_FILTERS.includes(filter as GraphFilter) &&
+    HISTORY_DEPTHS.includes(depth as HistoryDepth) &&
+    (revset === undefined || (typeof revset === 'string' && revset.trim() !== ''))
   )
 }
 
@@ -42,7 +48,11 @@ export function readView(
     isView(storedDefaults) &&
     storedDefaults.filter === defaults.filter &&
     storedDefaults.depth === defaults.depth
-  return isCurrent ? { filter: stored.filter, depth: stored.depth } : null
+  if (!isCurrent) {
+    return null
+  }
+  const view: GraphView = { filter: stored.filter, depth: stored.depth }
+  return stored.revset === undefined ? view : { ...view, revset: stored.revset }
 }
 
 export function rememberView(
@@ -52,4 +62,25 @@ export function rememberView(
   defaults: GraphView,
 ): PromiseLike<void> {
   return store.update(viewKey(root), { ...view, defaults })
+}
+
+function historyKey(root: string): string {
+  return `ukemi.revsetHistory:${root}`
+}
+
+// The revsets typed for a repository, the latest first.
+export function readRevsetHistory(store: KeyValueStore, root: string): string[] {
+  const stored = store.get<unknown>(historyKey(root))
+  return Array.isArray(stored)
+    ? stored.filter((entry): entry is string => typeof entry === 'string')
+    : []
+}
+
+export function rememberRevset(
+  store: KeyValueStore,
+  root: string,
+  revset: string,
+): PromiseLike<void> {
+  const others = readRevsetHistory(store, root).filter((entry) => entry !== revset)
+  return store.update(historyKey(root), [revset, ...others].slice(0, REVSET_HISTORY_LIMIT))
 }
