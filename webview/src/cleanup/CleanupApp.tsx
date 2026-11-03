@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type ReactNode } from 'react'
+import { useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import {
   UNDESCRIBED_LIMIT,
   type CleanupDeletedBookmark,
@@ -14,6 +14,7 @@ import { FILE_STATUS_LETTER, type ChangedFile } from '../../../shared/model'
 import { relativeTime } from '../shared/format'
 import { useElementHeight, useHostMessages } from '../shared/hooks'
 import { LoadingScreen } from '../shared/LoadingMark'
+import { carriedChoices, type CleanupChoices } from './carriedSelection'
 import { useSend } from '../shared/hostChannel'
 
 interface Column {
@@ -91,25 +92,44 @@ function revisionNote(revision: CleanupRevision): string {
   return notes.join(', ')
 }
 
-function initialDrops(snapshot: CleanupSnapshot): Set<string> {
-  return new Set(
-    snapshot.divergent.flatMap((group) =>
-      group.revisions.filter((revision) => revision.checked).map((revision) => revision.commitId),
-    ),
-  )
+const NO_CHOICES: CleanupChoices = {
+  bookmarks: new Set(),
+  abandonCommits: new Set(),
+  deleted: new Set(),
+  deleteRemote: new Set(),
+  workspaces: new Set(),
+  deleteFiles: new Set(),
+  drops: new Set(),
+  undescribedDrops: new Set(),
 }
 
 export function CleanupApp() {
   const send = useSend<CleanupWebviewMessage>()
   const [snapshot, setSnapshot] = useState<CleanupSnapshot | null>(null)
-  const [bookmarks, setBookmarks] = useState<ReadonlySet<string>>(new Set())
-  const [abandonCommits, setAbandonCommits] = useState<ReadonlySet<string>>(new Set())
-  const [deleted, setDeleted] = useState<ReadonlySet<string>>(new Set())
-  const [deleteRemote, setDeleteRemote] = useState<ReadonlySet<string>>(new Set())
-  const [workspaces, setWorkspaces] = useState<ReadonlySet<string>>(new Set())
-  const [deleteFiles, setDeleteFiles] = useState<ReadonlySet<string>>(new Set())
-  const [drops, setDrops] = useState<ReadonlySet<string>>(new Set())
-  const [undescribedDrops, setUndescribedDrops] = useState<ReadonlySet<string>>(new Set())
+  const snapshotRef = useRef<CleanupSnapshot | null>(null)
+  const [choices, setChoices] = useState<CleanupChoices>(NO_CHOICES)
+  const {
+    bookmarks,
+    abandonCommits,
+    deleted,
+    deleteRemote,
+    workspaces,
+    deleteFiles,
+    drops,
+    undescribedDrops,
+  } = choices
+  const choose =
+    (key: keyof CleanupChoices) =>
+    (value: ReadonlySet<string>): void =>
+      setChoices((current) => ({ ...current, [key]: value }))
+  const setBookmarks = choose('bookmarks')
+  const setAbandonCommits = choose('abandonCommits')
+  const setDeleted = choose('deleted')
+  const setDeleteRemote = choose('deleteRemote')
+  const setWorkspaces = choose('workspaces')
+  const setDeleteFiles = choose('deleteFiles')
+  const setDrops = choose('drops')
+  const setUndescribedDrops = choose('undescribedDrops')
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const [filesByCommit, setFilesByCommit] = useState<Readonly<Record<string, ChangedFile[]>>>({})
   const [headerRef, headerHeight] = useElementHeight()
@@ -124,24 +144,12 @@ export function CleanupApp() {
       if (message.type !== 'load') {
         return
       }
+      // The host also sends a snapshot after a refresh, so the user's choices carry over.
       const next = message.snapshot
+      const previous = snapshotRef.current
+      snapshotRef.current = next
       setSnapshot(next)
-      setBookmarks(
-        new Set(next.bookmarks.filter((bookmark) => bookmark.checked).map((b) => b.name)),
-      )
-      setAbandonCommits(new Set())
-      setDeleted(
-        new Set(next.deletedBookmarks.filter((bookmark) => bookmark.checked).map((b) => b.name)),
-      )
-      setDeleteRemote(new Set())
-      setWorkspaces(
-        new Set(next.workspaces.filter((workspace) => workspace.checked).map((w) => w.name)),
-      )
-      setDeleteFiles(new Set())
-      setDrops(initialDrops(next))
-      setUndescribedDrops(new Set())
-      setExpanded(new Set())
-      setFilesByCommit({})
+      setChoices((current) => carriedChoices(current, previous, next))
     },
     { type: 'ready' } satisfies CleanupWebviewMessage,
   )
