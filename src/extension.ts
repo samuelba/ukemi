@@ -1,4 +1,5 @@
 import * as vscode from 'vscode'
+import { answerPrompt } from './app/askpassPrompts'
 import { AutoFetcher } from './app/autoFetch'
 import { ChangeSelection } from './app/changeSelection'
 import { commitCommands } from './app/commands/commitCommands'
@@ -83,6 +84,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
     process.execPath,
     [vscode.Uri.joinPath(context.extensionUri, 'dist', 'askpass.js').fsPath],
     (request) => runner.whilePrompting(() => forge.gitCredential(request)),
+    (request) => runner.whilePrompting(() => answerPrompt(host.ui, request)),
   )
   try {
     await askpass.start()

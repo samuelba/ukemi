@@ -13,6 +13,7 @@ import { isDesktopMessage } from '../../shared/desktopProtocol'
 import type { MenuEntry } from '../../shared/menus'
 import type { CommitView, WebviewMessage } from '../../shared/protocol'
 import { isRepositoryKey } from '../../shared/settingsScope'
+import { answerPrompt } from '../app/askpassPrompts'
 import { AutoFetcher } from '../app/autoFetch'
 import { ChangeSelection } from '../app/changeSelection'
 import { commitCommands } from '../app/commands/commitCommands'
@@ -134,6 +135,7 @@ export class DesktopSession implements Disposable {
       process.execPath,
       [context.paths.helper('askpass.js')],
       (request) => this.runner.whilePrompting(() => this.forge.gitCredential(request)),
+      (request) => this.runner.whilePrompting(() => answerPrompt(this.ui, request)),
     )
 
     const host = this.host()
