@@ -121,6 +121,53 @@ describe('RepoModel', () => {
     expect(watched.error).toBeNull()
   })
 
+  test('reloads the working copy only when the snapshot records an operation', async () => {
+    const lines: string[] = []
+    const logger: Logger = {
+      info: (message) => {
+        lines.push(message)
+      },
+      warn: () => undefined,
+      error: () => undefined,
+    }
+    const watched = new RepoModel(new JjRepo(root, new JjRunner(JJ_BINARY, logger)), logger)
+    await watched.refresh()
+    const graphLoads = () => lines.filter((line) => line.includes('--limit=2000')).length
+    const before = graphLoads()
+
+    await watched.refreshWorkingCopy()
+    expect(graphLoads()).toBe(before)
+
+    writeFile(root, 'a.txt', 'a\n')
+    await watched.refreshWorkingCopy()
+    expect(graphLoads()).toBe(before + 1)
+    expect(watched.graph?.workingCopyFiles.map((file) => file.path)).toEqual(['a.txt'])
+
+    await watched.refresh()
+    expect(graphLoads()).toBe(before + 2)
+  })
+
+  test('reloads the graph once for a burst of operation events', async () => {
+    const lines: string[] = []
+    const logger: Logger = {
+      info: (message) => {
+        lines.push(message)
+      },
+      warn: () => undefined,
+      error: () => undefined,
+    }
+    const watched = new RepoModel(new JjRepo(root, new JjRunner(JJ_BINARY, logger)), logger)
+    await watched.refresh()
+    const graphLoads = () => lines.filter((line) => line.includes('--limit=2000')).length
+    const before = graphLoads()
+    jj(root, 'describe', '-m', 'external')
+
+    await Promise.all([1, 2, 3, 4].map(() => watched.refreshIfOperationChanged()))
+
+    expect(graphLoads()).toBe(before + 1)
+    expect(watched.graph?.commits[0]?.description).toBe('external\n')
+  })
+
   test('refreshes after an external jj command', async () => {
     await model.refresh()
     jj(root, 'describe', '-m', 'external')

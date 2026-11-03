@@ -41,10 +41,7 @@ export class RepoRegistry implements Disposable {
     this.disposables.push(
       host.folders.onDidChangeFolders(() => void this.discover()),
       host.folders.onDidChangeActiveFile((path) => void this.followFile(path)),
-      host.window.onDidFocus(() => {
-        this.activeModel?.markDirty()
-        void this.activeModel?.refresh()
-      }),
+      host.window.onDidFocus(() => void this.activeModel?.refreshWorkingCopy()),
     )
   }
 
@@ -251,7 +248,7 @@ export class RepoRegistry implements Disposable {
       entry.root === this.activeRoot ? ACTIVE_REFRESH_DELAY_MS : BACKGROUND_REFRESH_DELAY_MS
     entry.timer = setTimeout(() => {
       entry.timer = null
-      void model.refresh()
+      void model.refreshWorkingCopy()
     }, delay)
   }
 
