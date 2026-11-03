@@ -42,6 +42,12 @@ linux:
   # Names the .desktop file and its StartupWMClass after desktopName.
   syncDesktopName: true
   synopsis: Jujutsu (jj) GUI
+  # App launchers search these too, so typing jj, jujutsu or git finds Ukemi. Every Linux target
+  # builds its .desktop file from this.
+  desktop:
+    entry:
+      GenericName: Jujutsu Client
+      Keywords: jj;jujutsu;git;vcs;version control;source control;
   # deb and rpm need a maintainer. The GitHub noreply address keeps a private one out of packages.
   maintainer: Samuel Bachmann <samuelba@users.noreply.github.com>
   vendor: Samuel Bachmann
