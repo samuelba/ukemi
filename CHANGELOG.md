@@ -1,22 +1,30 @@
 # Changelog
 
+## [0.10.0](https://github.com/samuelba/ukemi/compare/v0.9.0...v0.10.0) (2026-11-03)
+
+
+### Features
+
+* operation log view with restore and revert (M1) ([f647b25](https://github.com/samuelba/ukemi/commit/f647b25768579a369399e269f2f8cbe064dc760c))
+
+
+### Bug Fixes
+
+* drop rebased copies of commits from the release notes ([5c978e5](https://github.com/samuelba/ukemi/commit/5c978e5ffb365992b2e10b88bf060f511730c405))
+
 ## [0.9.0](https://github.com/samuelba/ukemi/compare/v0.8.0...v0.9.0) (2026-11-03)
 
 
 ### Features
 
 * change the keyboard shortcuts of the desktop app ([f51ca0b](https://github.com/samuelba/ukemi/commit/f51ca0b6e097b8dd21e1a0c4b4690ac4fa8c0dd8))
-* change the keyboard shortcuts of the desktop app ([2a2d73c](https://github.com/samuelba/ukemi/commit/2a2d73c2c0e2bdb2eca17adc71957c825b1ce0cb))
 * desktop version ([3a4ccf6](https://github.com/samuelba/ukemi/commit/3a4ccf664f2fca9e10081ea8304ef8ad885b7f23))
 * find the desktop app by jj, jujutsu and git in Linux launchers ([f136e16](https://github.com/samuelba/ukemi/commit/f136e16294485ac1253f5c01047270f0f25b465a))
-* find the desktop app by jj, jujutsu and git in Linux launchers ([74a6ef6](https://github.com/samuelba/ukemi/commit/74a6ef697ca0e27f993c86f70d9a5e384b0391db))
 * list recently used repositories under File &gt; Open Recent ([463a42c](https://github.com/samuelba/ukemi/commit/463a42c5a9af68664877b4a951eed8d9ab57d8d5))
-* list recently used repositories under File &gt; Open Recent ([1d20137](https://github.com/samuelba/ukemi/commit/1d20137ec0332f091904b86440c1fa58630a1267))
 * resolve editor in desktop app ([8f5b644](https://github.com/samuelba/ukemi/commit/8f5b644067f6199be75dbd688cae4c48789f2194))
 * suggest change descriptions with installed AI tools ([dbef4ea](https://github.com/samuelba/ukemi/commit/dbef4eaa2f6a9c409f4a4125460d6ebef081e58e))
 * tell the app's users when a newer release is out ([9e2c6fc](https://github.com/samuelba/ukemi/commit/9e2c6fc64a43fc38e0a8bfd69837ad9fbfbc2c5d))
 * zoom from the View menu, the mouse wheel and the status bar ([318a6f3](https://github.com/samuelba/ukemi/commit/318a6f38853b2ab64b62b9c482bb8a3a77fc052d))
-* zoom from the View menu, the mouse wheel and the status bar ([8ae88f0](https://github.com/samuelba/ukemi/commit/8ae88f0af00067317d47b266d5db363d9edab500))
 
 
 ### Bug Fixes
