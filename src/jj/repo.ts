@@ -595,6 +595,16 @@ export class JjRepo {
     return this.mutate(['redo'])
   }
 
+  // Sets the repository back to how it was after the operation, as a new operation.
+  async restoreOperation(id: string) {
+    return this.mutate(['op', 'restore', operationId(id)])
+  }
+
+  // Applies the inverse of one operation and keeps the later ones.
+  async revertOperation(id: string) {
+    return this.mutate(['op', 'revert', operationId(id)])
+  }
+
   addWorkspace(path: string, name: string, revision: string) {
     return this.mutate(['workspace', 'add', '--name', name, '-r', revision, path])
   }
@@ -824,4 +834,12 @@ async function pathExists(path: string): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+// An operation id is hex. Anything else would be read as an operation expression such as `@-`.
+function operationId(id: string): string {
+  if (!/^[0-9a-f]+$/.test(id)) {
+    throw new Error(`not an operation id: ${id}`)
+  }
+  return id
 }

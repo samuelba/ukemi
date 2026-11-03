@@ -160,6 +160,13 @@
           "name": "Evolution",
           "icon": "$(versions)",
           "initialSize": 15
+        },
+        {
+          "id": "ukemi.operations",
+          "name": "Operation Log",
+          "icon": "$(history)",
+          "initialSize": 15,
+          "visibility": "collapsed"
         }
       ]
     },
@@ -809,6 +816,22 @@
         "icon": "$(target)"
       },
       {
+        "command": "ukemi.operation.restore",
+        "title": "Restore the Repository to This Operation",
+        "category": "Ukemi",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "ukemi.operation.revert",
+        "title": "Revert This Operation",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.operation.copyId",
+        "title": "Copy Operation ID",
+        "category": "Ukemi"
+      },
+      {
         "command": "ukemi.bookmarks.filter",
         "title": "Filter Bookmarks",
         "category": "Ukemi",
@@ -1240,6 +1263,26 @@
           "command": "ukemi.evolution.restore",
           "group": "inline@2",
           "when": "view == ukemi.evolution && viewItem =~ /restorable/"
+        },
+        {
+          "command": "ukemi.operation.restore",
+          "group": "inline@1",
+          "when": "view == ukemi.operations && viewItem =~ /^operation(?!.*\\+current\\b)/"
+        },
+        {
+          "command": "ukemi.operation.restore",
+          "group": "1_operation@1",
+          "when": "view == ukemi.operations && viewItem =~ /^operation(?!.*\\+current\\b)/"
+        },
+        {
+          "command": "ukemi.operation.revert",
+          "group": "1_operation@2",
+          "when": "view == ukemi.operations && viewItem =~ /^operation(?!.*\\+current\\b)/"
+        },
+        {
+          "command": "ukemi.operation.copyId",
+          "group": "2_copy@1",
+          "when": "view == ukemi.operations && viewItem =~ /^operation/"
         },
         {
           "command": "ukemi.bookmark.newChange",
@@ -1746,6 +1789,18 @@
         },
         {
           "command": "ukemi.evolution.follow",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.operation.restore",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.operation.revert",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.operation.copyId",
           "when": "false"
         },
         {

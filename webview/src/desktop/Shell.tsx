@@ -151,7 +151,11 @@ function useWheelZoom(): void {
 export function Shell() {
   const fileIcons = useBundledFileIcons()
   const [layout, setLayout] = useState<Layout>(readLayout)
-  const [panels, setPanels] = useState<SidePanels>({ bookmarks: [], workspaces: [] })
+  const [panels, setPanels] = useState<SidePanels>({
+    bookmarks: [],
+    workspaces: [],
+    operations: [],
+  })
   const [detail, setDetail] = useState<ChangeDetail | null>(null)
   const [diff, setDiff] = useState<DiffDocument | null>(null)
   const [commands, setCommands] = useState<readonly PaletteCommand[]>([])

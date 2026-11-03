@@ -446,6 +446,11 @@ describe('mutations', () => {
     expect((await current()).description).toBe('')
   })
 
+  test('restore and revert take only operation ids', async () => {
+    await expect(repo.restoreOperation('@-')).rejects.toThrow('not an operation id')
+    await expect(repo.revertOperation('@')).rejects.toThrow('not an operation id')
+  })
+
   test('push and fetch work against a local bare remote', async () => {
     const remote = join(fixture.dir, 'remote.git')
     execFileSync('git', ['init', '--bare', '-q', remote])

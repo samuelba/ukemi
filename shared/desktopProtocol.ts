@@ -59,7 +59,7 @@ export interface SidePanelRow {
   icon: string
   // Matches `viewItem` in the `view/item/context` menus of package.json.
   contextValue: string
-  view: 'ukemi.bookmarks' | 'ukemi.workspaces' | 'ukemi.evolution'
+  view: 'ukemi.bookmarks' | 'ukemi.workspaces' | 'ukemi.evolution' | 'ukemi.operations'
   // Handed to the commands of the row's menu, as the tree item is in VS Code.
   arg: unknown
   defaultCommand?: string
@@ -77,6 +77,7 @@ export interface SidePanelGroup {
 export interface SidePanels {
   bookmarks: SidePanelGroup[]
   workspaces: SidePanelRow[]
+  operations: SidePanelRow[]
 }
 
 export interface DiffSideText {

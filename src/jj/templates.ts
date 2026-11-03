@@ -143,4 +143,4 @@ export const BOOKMARK_TRACKING_TEMPLATE =
   }) + LINE_END
 
 export const OP_LOG_TEMPLATE =
-  'json({"id" => id, "description" => description, "time" => time.end()}) ++ "\\n"'
+  'json({"id" => id, "description" => description, "user" => user, "time" => time.end()}) ++ "\\n"'

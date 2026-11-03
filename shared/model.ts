@@ -81,6 +81,7 @@ export interface Workspace {
 export interface Operation {
   id: string
   description: string
+  user: string
   time: string
 }
 

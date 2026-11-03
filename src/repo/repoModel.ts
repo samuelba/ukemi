@@ -48,6 +48,7 @@ export class RepoModel {
   private isDirty = true
   private mustReload = false
   private lastOperationId: string | null = null
+  private loadedOperations: readonly Operation[] = []
   private loadedRemotes: Remote[] | null = null
   private tail: Promise<void> | null = null
   private isRefreshQueued = false
@@ -93,6 +94,11 @@ export class RepoModel {
   // Rows come from the graph load, which skips in_trunk (always false); use repo.bookmarkList() when it matters.
   get bookmarks(): readonly ParsedBookmark[] {
     return this.listedBookmarks
+  }
+
+  // The newest operations, newest first, as of the shown graph.
+  get operations(): readonly Operation[] {
+    return this.loadedOperations
   }
 
   get error(): string | null {
@@ -355,6 +361,7 @@ export class RepoModel {
     operations: readonly Operation[],
   ): Promise<LoadedRepo> {
     this.lastOperationId = operations[0]?.id ?? null
+    this.loadedOperations = operations
     const [logged, trunk, workspaces, remotes, listed, currentBookmarks, tracking] =
       await Promise.all([
         reader.log(revset),
