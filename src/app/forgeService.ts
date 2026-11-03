@@ -96,7 +96,7 @@ export class ForgeService implements Disposable {
   private readonly github: GithubCredentials
   private readonly gitlabAuth: GitlabAuth
   private timer: ReturnType<typeof setTimeout> | null = null
-  private refreshing = false
+  private running: Promise<void> | null = null
   private disposed = false
   private readonly readIdleInterval: (text: string) => number
 
@@ -340,7 +340,16 @@ export class ForgeService implements Disposable {
   }
 
   async refreshRequests(model: RepoModel, options: { force?: boolean } = {}): Promise<void> {
-    if (this.disposed || this.refreshing) {
+    if (this.disposed) {
+      return
+    }
+    if (this.running) {
+      // A forced refresh follows a create, merge or sync, and the running one may have read the
+      // requests before it. So it runs again once that one ends, and the caller waits for it.
+      if (options.force) {
+        await this.running
+        await this.refreshRequests(model, options)
+      }
       return
     }
     if (!options.force && !this.host.window.isFocused) {
@@ -352,8 +361,15 @@ export class ForgeService implements Disposable {
       this.schedule(model)
       return
     }
-    this.refreshing = true
     this.lastRefresh.set(model.root, Date.now())
+    this.running = this.loadReportingErrors(model).finally(() => {
+      this.running = null
+      this.schedule(model)
+    })
+    await this.running
+  }
+
+  private async loadReportingErrors(model: RepoModel): Promise<void> {
     try {
       await this.loadRequests(model)
     } catch (error: unknown) {
@@ -362,9 +378,6 @@ export class ForgeService implements Disposable {
       if (isAuth) {
         void this.host.ui.warn('Ukemi: the forge login has expired. Sign in again.')
       }
-    } finally {
-      this.refreshing = false
-      this.schedule(model)
     }
   }
 
