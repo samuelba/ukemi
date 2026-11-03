@@ -28,7 +28,7 @@ import {
   parseWorkspaces,
 } from './parse'
 import { bookmarkRevision, exactBookmark, rootFileset } from './revsets'
-import { JjError, JjRunner, NETWORK_TIMEOUT_MS, type RunResult } from './runner'
+import { JjError, JjRunner, NETWORK_TIMEOUT_MS, type RunOptions, type RunResult } from './runner'
 import { jjString } from './templates'
 import {
   BOOKMARK_LIST_GRAPH_TEMPLATE,
@@ -102,7 +102,7 @@ export class JjRepo {
 
   private mutate(
     args: readonly string[],
-    options: { stdin?: string; timeoutMs?: number; env?: Readonly<Record<string, string>> } = {},
+    options: Pick<RunOptions, 'stdin' | 'timeoutMs' | 'env' | 'background'> = {},
   ) {
     if (this.operationId !== null) {
       throw new Error('jj commands cannot run at an old operation')
@@ -111,7 +111,7 @@ export class JjRepo {
   }
 
   snapshot(): Promise<RunResult> {
-    return this.mutate(['util', 'snapshot'])
+    return this.mutate(['util', 'snapshot'], { background: true })
   }
 
   async log(revset: string, limit = MAX_LOG_ENTRIES): Promise<Commit[]> {
@@ -563,7 +563,11 @@ export class JjRepo {
       branches.length > 0
         ? ['git', 'fetch', ...branches.flatMap((name) => ['--branch', exactBookmark(name)])]
         : ['git', 'fetch', '--all-remotes']
-    return this.mutate(args, { timeoutMs: NETWORK_TIMEOUT_MS, env })
+    return this.mutate(args, {
+      timeoutMs: NETWORK_TIMEOUT_MS,
+      env,
+      background: options.interactive === false,
+    })
   }
 
   push(bookmarks?: string | readonly string[]) {
@@ -605,8 +609,9 @@ export class JjRepo {
 
   snapshotWorkspace(workspaceRoot: string): Promise<void> {
     return this.mutations.run(async () => {
-      await this.runner.run({ cwd: workspaceRoot, args: ['workspace', 'update-stale'] })
-      await this.runner.run({ cwd: workspaceRoot, args: ['status'] })
+      const background = { cwd: workspaceRoot, background: true }
+      await this.runner.run({ ...background, args: ['workspace', 'update-stale'] })
+      await this.runner.run({ ...background, args: ['status'] })
     })
   }
 

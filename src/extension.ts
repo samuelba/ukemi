@@ -63,6 +63,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
 
   const located = await locateJj(storageDir, logger)
   const runner = new JjRunner(located?.path ?? 'jj', logger)
+  runner.onWarning((warning) => void host.ui.warn(`jj: ${warning.text}`))
   const availability = { isAvailable: located !== null }
   updateTerminalPath(context, located)
 

@@ -2,7 +2,13 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { describe, expect, test } from 'vitest'
-import { describeArgs, JjRunner, summarizeStderr } from '../../src/jj/runner'
+import {
+  describeArgs,
+  JjRunner,
+  stderrWarnings,
+  summarizeStderr,
+  type JjWarning,
+} from '../../src/jj/runner'
 import { NULL_LOGGER } from '../../src/util/logger'
 
 describe('JjRunner environment', () => {
@@ -37,6 +43,62 @@ describe('JjRunner environment', () => {
     const name = basename(dir)
     expect(lines[0]).toMatch(new RegExp(`^\\[${name}\\] jj status \\(\\d+ ms, exit 1\\)$`))
     expect(lines[1]).toBe(`[${name}] Error: boom`)
+  })
+})
+
+describe('JjRunner warnings', () => {
+  async function warningsOf(options: { background?: boolean; ignoreWorkingCopy?: boolean }) {
+    const dir = mkdtempSync(join(tmpdir(), 'ukemi-runner-'))
+    const fake = join(dir, 'jj')
+    writeFileSync(
+      fake,
+      '#!/bin/sh\necho "Warning: No matching bookmarks for names: nope" >&2\necho "No bookmarks to delete." >&2\n',
+      { mode: 0o700 },
+    )
+    const logged: string[] = []
+    const shown: JjWarning[] = []
+    const runner = new JjRunner(fake, { ...NULL_LOGGER, warn: (message) => logged.push(message) })
+    runner.onWarning((warning) => shown.push(warning))
+    try {
+      await runner.run({ cwd: dir, args: ['bookmark', 'delete'], ...options })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+    return { logged, shown: shown.map((warning) => warning.text) }
+  }
+
+  test('logs and reports the warnings of a command that succeeds', async () => {
+    const { logged, shown } = await warningsOf({})
+    expect(shown).toEqual(['No matching bookmarks for names: nope'])
+    expect(logged).toHaveLength(1)
+    expect(logged[0]).toMatch(/\] No matching bookmarks for names: nope$/)
+  })
+
+  test('only logs the warnings of reads and background commands', async () => {
+    expect((await warningsOf({ background: true })).shown).toEqual([])
+    expect((await warningsOf({ ignoreWorkingCopy: true })).shown).toEqual([])
+    expect((await warningsOf({ background: true })).logged).toHaveLength(1)
+  })
+})
+
+describe('stderrWarnings', () => {
+  test('keeps the lines and hints that belong to each warning', () => {
+    const stderr = [
+      'Warning: Refused to snapshot some files:',
+      '  big.bin: 2.0MiB (2097152 bytes); the maximum size allowed is 1.0MiB',
+      'Hint: Run `jj file track` to track them.',
+      'Working copy  (@) now at: abc',
+      'Warning: No matching remotes for names: origin',
+      '',
+    ].join('\n')
+    expect(stderrWarnings(stderr)).toEqual([
+      'Refused to snapshot some files:\n  big.bin: 2.0MiB (2097152 bytes); the maximum size allowed is 1.0MiB\nHint: Run `jj file track` to track them.',
+      'No matching remotes for names: origin',
+    ])
+  })
+
+  test('ignores output that is not a warning', () => {
+    expect(stderrWarnings('Nothing changed.\n')).toEqual([])
   })
 })
 

@@ -129,6 +129,7 @@ export class DesktopSession implements Disposable {
     this.ui = new RendererUi((message) => this.post(message), this.nativeUi())
     this.terminals = new Terminals((message) => this.post(message), logger)
     this.runner = new JjRunner(context.jj.path ?? 'jj', logger)
+    this.runner.onWarning((warning) => void this.ui.warn(`jj: ${warning.text}`))
     this.askpass = new AskpassServer(
       process.execPath,
       [context.paths.helper('askpass.js')],
