@@ -11,10 +11,12 @@ import type {
 import { title } from '../shared/format'
 import { useHostMessages } from '../shared/hooks'
 import { postMessage } from '../shared/hostApi'
+import { canSquashIntoParent } from './canSquashIntoParent'
 import { CommitRow } from './CommitRow'
 import { DescribeDialog, type SuggestionReply } from './DescribeDialog'
 import { EmptyState } from './EmptyState'
 import { FileIconFonts, FileIconThemeContext } from './FileIcon'
+import { withUnchangedObjects } from './keepUnchanged'
 import { selectedRow, type Selection } from './selection'
 import { Toolbar } from './Toolbar'
 
@@ -42,14 +44,12 @@ export function App() {
   const [describing, setDescribing] = useState<Describing | null>(null)
   const [suggesters, setSuggesters] = useState<SuggesterView[]>([])
   const [suggestionReply, setSuggestionReply] = useState<SuggestionReply | null>(null)
-  const [now, setNow] = useState(() => Date.now())
 
   useHostMessages<HostMessage>(
     (message) => {
       switch (message.type) {
         case 'state':
-          setState(message.state)
-          setNow(Date.now())
+          setState((previous) => withUnchangedObjects(previous, message.state))
           return
         case 'reveal': {
           const commit = state?.graph?.commits.find((c) => c.commitId === message.commitId)
@@ -99,11 +99,6 @@ export function App() {
     }
   }, [isDescribing])
 
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 60_000)
-    return () => window.clearInterval(timer)
-  }, [])
-
   const graph = state?.graph ?? null
   const repoId = graph?.repoId ?? ''
 
@@ -120,7 +115,7 @@ export function App() {
   }, [revealId, graph])
 
   const lanes = useMemo(
-    () => Math.max(1, ...(graph?.commits ?? []).map((c) => c.row.width)),
+    () => (graph?.commits ?? []).reduce((widest, c) => Math.max(widest, c.row.width), 1),
     [graph],
   )
 
@@ -175,14 +170,15 @@ export function App() {
     })
   }, [])
 
-  const selectCommit = useCallback(
-    (commitId: string) => {
-      const commit = graph?.commits.find((c) => c.commitId === commitId)
-      setSelection({ commitId, changeId: commit?.changeId ?? '' })
-      postMessage({ type: 'selectCommit', commitId })
-    },
-    [graph],
-  )
+  // Reads the graph through a ref, so the callback, and with it the memoized rows, stays the same
+  // across refreshes.
+  const graphRef = useRef(graph)
+  graphRef.current = graph
+  const selectCommit = useCallback((commitId: string) => {
+    const commit = graphRef.current?.commits.find((c) => c.commitId === commitId)
+    setSelection({ commitId, changeId: commit?.changeId ?? '' })
+    postMessage({ type: 'selectCommit', commitId })
+  }, [])
 
   const selected = useMemo(
     () => (graph ? selectedRow(graph.commits, selection) : null),
@@ -246,7 +242,7 @@ export function App() {
               <CommitRow
                 key={commit.commitId}
                 commit={commit}
-                commitsById={commitsById}
+                canSquash={canSquashIntoParent(commit, commitsById)}
                 repoId={repoId}
                 lanes={lanes}
                 files={filesFor(commit)}
@@ -255,7 +251,6 @@ export function App() {
                 hasRemotes={graph.hasRemotes}
                 hasForge={graph.forge !== null}
                 settings={state.settings}
-                now={now}
                 onToggle={toggle}
                 onSelect={selectCommit}
                 onDescribe={startDescribe}
