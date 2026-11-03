@@ -1,8 +1,8 @@
-import { rm } from 'node:fs/promises'
-import { bookmarkRevision } from '../../jj/revsets'
 import { basename, dirname, join } from 'node:path'
 import type { Workspace } from '../../../shared/model'
+import { bookmarkRevision } from '../../jj/revsets'
 import type { RepoModel } from '../../repo/repoModel'
+import { canDeleteWorkspaceFolder, deleteWorkspaceFolder } from '../../repo/workspaceFolder'
 import { isBookmarkTreeElement } from '../../repo/bookmarkItems'
 import {
   defaultWorkspaceName,
@@ -179,7 +179,7 @@ async function deleteWorkspace(env: CommandEnv, model: RepoModel, name: string):
   if (!workspace || name === 'default') {
     return
   }
-  const canDeleteFiles = workspace.root !== null && workspace.root !== model.root
+  const canDeleteFiles = canDeleteWorkspaceFolder(model.root, workspace.root)
   const choice = await env.ui.ask(
     'warning',
     `Delete workspace "${name}"?`,
@@ -192,10 +192,15 @@ async function deleteWorkspace(env: CommandEnv, model: RepoModel, name: string):
   if (!choice) {
     return
   }
+  const deleteFiles = choice === 'Forget and Delete Files' && workspace.root !== null
   const forgotten = await env.operations.run('Delete workspace', model, async () => {
+    // Keeps edits that were not snapshotted yet in the workspace's change, see cleanupSteps.
+    if (deleteFiles && workspace.root) {
+      await model.repo.snapshotWorkspace(workspace.root)
+    }
     await model.repo.forgetWorkspace(name)
-    if (choice === 'Forget and Delete Files' && workspace.root) {
-      await rm(workspace.root, { recursive: true, force: true })
+    if (deleteFiles && workspace.root) {
+      await deleteWorkspaceFolder(model.root, workspace.root)
     }
     return true
   })

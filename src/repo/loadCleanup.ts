@@ -1,5 +1,4 @@
 import { existsSync } from 'node:fs'
-import { rm } from 'node:fs/promises'
 import {
   UNDESCRIBED_LIMIT,
   type CleanupBookmark,
@@ -15,12 +14,12 @@ import {
   classifyUndescribed,
   classifyWorkspaces,
   cleanupSteps,
-  removableWorkspaceFolder,
   type CleanupStep,
   type DivergentCommit,
   type UndescribedCommit,
 } from './cleanupItems'
 import { isCurrentWorkspace, isWorkspaceOpen } from './workspaceItems'
+import { deleteWorkspaceFolder, holdsRepositoryStore } from './workspaceFolder'
 
 const DIVERGENT_REVSET = 'divergent() | children(divergent())'
 // jj string escapes `\\` to one backslash, so the regex is `^\s*$`.
@@ -128,6 +127,7 @@ export async function loadCleanup(
         isCurrent: isCurrentWorkspace(workspace, repo.root),
         isOpen: workspace.root !== null && isWorkspaceOpen(workspace.root, openFolders),
         rootMissing: workspace.root === null || !existsSync(workspace.root),
+        holdsRepository: workspace.root !== null && holdsRepositoryStore(workspace.root),
         root: workspace.root,
       })),
       repo.root,
@@ -156,16 +156,15 @@ export async function applyCleanupSteps(
       case 'abandon':
         await repo.abandon(step.revset)
         break
+      case 'snapshotWorkspace':
+        await repo.snapshotWorkspace(step.root)
+        break
       case 'forgetWorkspace':
         await repo.forgetWorkspace(step.name)
         break
-      case 'deleteWorkspaceFiles': {
-        const target = removableWorkspaceFolder(repo.root, step.root)
-        if (target !== null && existsSync(target)) {
-          await rm(target, { recursive: true, force: true })
-        }
+      case 'deleteWorkspaceFiles':
+        await deleteWorkspaceFolder(repo.root, step.root)
         break
-      }
     }
   }
 }
