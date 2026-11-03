@@ -200,6 +200,9 @@ export type ShellAction =
   | 'showLog'
   | 'toggleTerminal'
 
+// View > Zoom In, Zoom Out and Reset Zoom.
+export type ZoomStep = 'in' | 'out' | 'reset'
+
 export type DesktopHostMessage =
   | { type: 'desktop.ui'; id: number; request: UiRequest }
   | { type: 'desktop.uiUpdate'; id: number; items: UiPickItem[] }
@@ -227,6 +230,8 @@ export type DesktopHostMessage =
   | { type: 'desktop.terminalData'; id: string; data: string }
   | { type: 'desktop.terminalExit'; id: string; code: number }
   | { type: 'desktop.fonts'; fonts: Fonts }
+  // The zoom of every window, as a percentage.
+  | { type: 'desktop.zoom'; percent: number }
   | { type: 'desktop.about'; info: AboutInfo; text: string }
 
 export type DesktopRendererMessage =
@@ -248,6 +253,7 @@ export type DesktopRendererMessage =
   | { type: 'desktop.setSetting'; key: string; value: unknown; repoId?: string }
   | { type: 'desktop.openSettingsFile' }
   | { type: 'desktop.openRepo' }
+  | { type: 'desktop.zoom'; step: ZoomStep }
   | { type: 'desktop.closeRepo'; repoId: string }
   | { type: 'desktop.clearLog' }
   | { type: 'desktop.copy'; text: string }

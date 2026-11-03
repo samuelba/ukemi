@@ -18,7 +18,7 @@ import {
 import { locateJj, versionText } from '../app/jjSetup'
 import { affectsJj } from '../app/settingsEffects'
 import type { Ui } from '../app/ui'
-import type { AboutInfo, Fonts, LogLine } from '../../shared/desktopProtocol'
+import type { AboutInfo, Fonts, LogLine, ZoomStep } from '../../shared/desktopProtocol'
 import { aboutInfo } from './about'
 import { downloadJj, MIN_JJ_VERSION, PINNED_RELEASE } from '../jj/binary'
 import { findRepoRootUpwards } from '../repo/discovery'
@@ -44,11 +44,13 @@ import {
   themeSource,
   windowsToRemember,
 } from './startup'
+import { readZoom, stepZoom, zoomPercent } from './zoom'
 
 const SCHEME = 'ukemi'
 const PAGE_HOST = 'app'
 const OPEN_FOLDERS_KEY = 'openFolders'
 const BOUNDS_KEY = 'windowBounds'
+const ZOOM_KEY = 'zoomFactor'
 const DEFAULT_BOUNDS = { width: 1280, height: 860 }
 const isDevelopment = !app.isPackaged
 
@@ -208,6 +210,24 @@ class DesktopApp implements DesktopContext {
 
   backgroundColor(): string {
     return nativeTheme.shouldUseDarkColors ? '#1c1b19' : '#f7f3ec'
+  }
+
+  zoomFactor(): number {
+    return readZoom(this.state.get<unknown>(ZOOM_KEY))
+  }
+
+  zoom(step: ZoomStep): void {
+    const before = this.zoomFactor()
+    const after = stepZoom(before, step)
+    if (after === before) {
+      return
+    }
+    void this.state.update(ZOOM_KEY, after === 1 ? undefined : after)
+    for (const session of this.sessions) {
+      session.setZoom(after)
+    }
+    // The menu shows the zoom in the label of Reset Zoom.
+    this.installMenu()
   }
 
   windowBounds(): { width: number; height: number } {
@@ -377,6 +397,7 @@ class DesktopApp implements DesktopContext {
       recent: { roots: this.recentRepos.read(), home: homedir() },
       openRecent: (root) => void this.openRecent(root),
       clearRecent: () => void this.recentRepos.clear(),
+      zoom: { percent: zoomPercent(this.zoomFactor()), step: (step) => this.zoom(step) },
       newWindow: () => this.openWindow([]),
       openSettings: () => this.focusedSession()?.showSettings(),
       openLog: () => this.focusedSession()?.shell('showLog'),

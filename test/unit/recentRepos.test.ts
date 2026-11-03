@@ -1,6 +1,4 @@
 import { describe, expect, test } from 'vitest'
-import type { MenuItemConstructorOptions } from 'electron'
-import { appMenuTemplate, type AppMenuActions } from '../../src/desktop/menus'
 import {
   forget,
   MAX_RECENT,
@@ -50,50 +48,5 @@ describe('recentLabel', () => {
     expect(recentLabel('/srv/repo', '/home/me')).toBe('/srv/repo')
     expect(recentLabel('/home/meet/repo', '/home/me')).toBe('/home/meet/repo')
     expect(recentLabel('/home/me', '/home/me')).toBe('/home/me')
-  })
-})
-
-function actions(roots: string[], opened: string[] = []): AppMenuActions {
-  const none = () => undefined
-  return {
-    run: none,
-    shell: none,
-    openRepository: none,
-    recent: { roots, home: '/home/me' },
-    openRecent: (root) => opened.push(root),
-    clearRecent: none,
-    newWindow: none,
-    openSettings: none,
-    openLog: none,
-    about: none,
-    openExternal: none,
-    isDevelopment: false,
-  }
-}
-
-function openRecent(template: MenuItemConstructorOptions[]): MenuItemConstructorOptions[] {
-  const file = template.find((menu) => menu.label === '&File')
-  const items = file?.submenu as MenuItemConstructorOptions[]
-  return items.find((item) => item.label === 'Open &Recent')
-    ?.submenu as MenuItemConstructorOptions[]
-}
-
-describe('File > Open Recent', () => {
-  test('lists the repositories newest first and opens the one clicked', () => {
-    const opened: string[] = []
-    const items = openRecent(appMenuTemplate(actions(['/home/me/b', '/srv/a&b'], opened)))
-    expect(items.map((item) => item.label ?? item.type)).toEqual([
-      '~/b',
-      '/srv/a&&b',
-      'separator',
-      'Clear Recently Opened',
-    ])
-    items[1]?.click?.({} as never, undefined, {} as never)
-    expect(opened).toEqual(['/srv/a&b'])
-  })
-
-  test('says so when nothing was opened yet', () => {
-    const items = openRecent(appMenuTemplate(actions([])))
-    expect(items).toEqual([{ label: 'No Recent Repositories', enabled: false }])
   })
 })

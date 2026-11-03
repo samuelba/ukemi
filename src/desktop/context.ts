@@ -1,5 +1,5 @@
 import type { BrowserWindow, Rectangle } from 'electron'
-import type { AboutInfo, Fonts } from '../../shared/desktopProtocol'
+import type { AboutInfo, Fonts, ZoomStep } from '../../shared/desktopProtocol'
 import type { Ui } from '../app/ui'
 import type { KeyValueFile } from './adapters/keyValueFile'
 import type { SecretsFile } from './adapters/secretsFile'
@@ -48,6 +48,9 @@ export interface DesktopContext {
   saveWindowBounds(bounds: Rectangle): void
   guardNavigation(window: BrowserWindow): void
   openWindow(folders: string[]): void
+  // The zoom factor of every window, and a change of it from the menu, a key or the status bar.
+  zoomFactor(): number
+  zoom(step: ZoomStep): void
   closeSession(session: DesktopSession): void
   // A window opened or closed a repository tab.
   foldersChanged(): void
