@@ -9,12 +9,15 @@ import {
 import { isAllowedForgeUrl } from '../../forge/hostName'
 import type { MergeMethod } from '../../forge/types'
 import {
+  type ChangeRef,
   changeRevision,
   bookmarkRevision,
   confirmedRevset,
+  exactBookmark,
   quoteRevsetString,
   requestCleanupRevset,
 } from '../../jj/revsets'
+import type { JjRepo } from '../../jj/repo'
 import type { RepoModel } from '../../repo/repoModel'
 import { isBookmarkTreeElement } from '../../repo/bookmarkItems'
 import { bodyAfterTitle, bookmarkSlug, firstLine, validateBookmarkName } from '../../util/text'
@@ -162,6 +165,40 @@ async function pushBaseIfNeeded(model: RepoModel, base: string, head: string): P
   }
 }
 
+// Whether a local bookmark with this name sits on a change other than the commit's.
+export async function bookmarkPointsElsewhere(
+  repo: JjRepo,
+  name: string,
+  commit: ChangeRef,
+): Promise<boolean> {
+  const others = `bookmarks(${exactBookmark(name)}) ~ ${changeRevision(commit)}`
+  return (await repo.commitIds(others)).length > 0
+}
+
+// The request sets its bookmark even when it moves backwards, and then pushes it. A name that is
+// already in use elsewhere would take that bookmark, and its branch on the remote, away.
+async function confirmBookmarkMove(
+  env: CommandEnv,
+  model: RepoModel,
+  commit: Commit,
+  name: string,
+  trunk: string,
+): Promise<boolean> {
+  if (name === trunk) {
+    void env.ui.warn(`Ukemi: "${name}" is the trunk. Pick another branch name for the request.`)
+    return false
+  }
+  if (!(await bookmarkPointsElsewhere(model.repo, name, commit))) {
+    return true
+  }
+  return confirm(
+    env.ui,
+    `Move bookmark "${name}" to ${shortId(commit)}?`,
+    'Move Bookmark',
+    'The bookmark points to another change. The request moves it here and pushes it.',
+  )
+}
+
 interface NewRequestChoice {
   name: string
   base: string
@@ -178,7 +215,7 @@ async function askNewRequest(
   const trunk = model.graph?.trunkName ?? 'main'
   const existing = bookmarkName ?? reusableBookmark(commit, trunk)
   const name = askName || !existing ? await askBookmarkName(env, commit) : existing
-  if (!name) {
+  if (!name || !(await confirmBookmarkMove(env, model, commit, name, trunk))) {
     return undefined
   }
   const base = await askTargetBranch(env, model, commit, trunk, name)

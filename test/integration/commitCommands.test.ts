@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { commitCommands } from '../../src/app/commands/commitCommands'
+import { bookmarkPointsElsewhere } from '../../src/app/commands/refCommands'
 import type { CommandEnv } from '../../src/app/commands/context'
 import { Operations } from '../../src/app/operations'
 import { RepoModel } from '../../src/repo/repoModel'
@@ -59,5 +60,26 @@ describe('squash', () => {
 
     expect(warnings).toEqual([])
     expect(description('@-')).toBe('parent\n\nchild\n')
+  })
+})
+
+describe('request bookmark', () => {
+  test('tells a bookmark on another change from one on the change', async () => {
+    jj(root, 'describe', '-m', 'old')
+    jj(root, 'bookmark', 'set', 'feature', '-r', '@')
+    jj(root, 'new', '-m', 'new')
+    writeFile(root, 'n.txt', 'n\n')
+    await model.refresh()
+    const commit = model.graph?.commits.find((c) => c.isWorkingCopy)
+    if (!commit) {
+      throw new Error('no working copy')
+    }
+
+    expect(await bookmarkPointsElsewhere(model.repo, 'feature', commit)).toBe(true)
+    expect(await bookmarkPointsElsewhere(model.repo, 'other', commit)).toBe(false)
+
+    jj(root, 'bookmark', 'set', 'feature', '-r', '@')
+    writeFile(root, 'n.txt', 'edited after the refresh\n')
+    expect(await bookmarkPointsElsewhere(model.repo, 'feature', commit)).toBe(false)
   })
 })
