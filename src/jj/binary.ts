@@ -18,18 +18,40 @@ export interface ReleaseAsset {
   sha256: string
 }
 
+// The official builds, by Node's `${process.platform}-${process.arch}`. The digests are the ones
+// GitHub lists for the release assets.
 export const PINNED_RELEASE = {
   version: '0.46.0',
   assets: {
-    x64: {
+    'linux-x64': {
       name: 'jj-v0.46.0-x86_64-unknown-linux-musl.tar.gz',
       sha256: 'fce0271158e665ceb82dc66c5eb95b1728649094e9133074f3b5baece345fc08',
     },
-    arm64: {
+    'linux-arm64': {
       name: 'jj-v0.46.0-aarch64-unknown-linux-musl.tar.gz',
       sha256: '80e28f7501c11e50e0ca06cd6a1fa1d982cff9cc59bfe4411a9d36aa501d867e',
     },
+    'darwin-x64': {
+      name: 'jj-v0.46.0-x86_64-apple-darwin.tar.gz',
+      sha256: '10d941de276c7c5074ef5d395312813b4575f4ce92cb9c0b05738efb90bd3b60',
+    },
+    'darwin-arm64': {
+      name: 'jj-v0.46.0-aarch64-apple-darwin.tar.gz',
+      sha256: '43daa37ce0f9716cdf6fb65a29cbcae74a3160aef048cf3cb3d166d41cb4ab58',
+    },
+    'win32-x64': {
+      name: 'jj-v0.46.0-x86_64-pc-windows-msvc.zip',
+      sha256: 'c42316b10df04611bc65029a18bcb2d92636edddb6871d511f7bb4233e999b83',
+    },
+    'win32-arm64': {
+      name: 'jj-v0.46.0-aarch64-pc-windows-msvc.zip',
+      sha256: 'f6f0552d0e292e3e62aa7fd21f4b15e9b6644d4939db908ed6d6b04b5b0a7907',
+    },
   } as Record<string, ReleaseAsset>,
+}
+
+export function currentTarget(): string {
+  return `${process.platform}-${process.arch}`
 }
 
 export type JjSource = 'setting' | 'path' | 'managed'
@@ -45,8 +67,12 @@ export type ResolveResult =
   | { kind: 'too-old'; path: string; version: JjVersion }
   | { kind: 'missing'; configuredPathInvalid: boolean }
 
-export function managedBinaryPath(storageDir: string): string {
-  return join(storageDir, `jj-${PINNED_RELEASE.version}`, 'jj')
+export function managedBinaryPath(storageDir: string, platform: string = process.platform): string {
+  return join(storageDir, `jj-${PINNED_RELEASE.version}`, binaryName(platform))
+}
+
+function binaryName(platform: string): string {
+  return platform === 'win32' ? 'jj.exe' : 'jj'
 }
 
 export function candidatePaths(pathEnv: string | undefined, home: string): string[] {
@@ -116,8 +142,8 @@ export async function resolveJj(options: {
   return { kind: 'missing', configuredPathInvalid: configured.length > 0 }
 }
 
-export function releaseAssetFor(arch: string): ReleaseAsset | null {
-  return PINNED_RELEASE.assets[arch] ?? null
+export function releaseAssetFor(target: string): ReleaseAsset | null {
+  return PINNED_RELEASE.assets[target] ?? null
 }
 
 export function releaseUrl(asset: ReleaseAsset): string {
@@ -140,13 +166,14 @@ export const fetchBytes: FetchBytes = async (url) => {
 
 export async function downloadJj(
   storageDir: string,
-  arch: string,
+  target = currentTarget(),
   download: FetchBytes = fetchBytes,
 ): Promise<string> {
-  const asset = releaseAssetFor(arch)
+  const asset = releaseAssetFor(target)
   if (!asset) {
-    throw new Error(`No official jj build for architecture "${arch}". Install jj manually.`)
+    throw new Error(`No official jj build for ${target}. Install jj manually.`)
   }
+  const platform = target.slice(0, target.indexOf('-'))
   const data = await download(releaseUrl(asset))
   const digest = sha256(data)
   if (digest !== asset.sha256) {
@@ -158,16 +185,18 @@ export async function downloadJj(
   try {
     const archive = join(workDir, asset.name)
     await writeFile(archive, data)
-    await execFileAsync('tar', ['-xzf', archive, '-C', workDir])
-    const extracted = await findFile(workDir, 'jj')
+    // The tar of macOS and Windows 10 and later also reads the Windows zip.
+    const flags = asset.name.endsWith('.zip') ? '-xf' : '-xzf'
+    await execFileAsync('tar', [flags, archive, '-C', workDir])
+    const extracted = await findFile(workDir, binaryName(platform))
     if (!extracted) {
       throw new Error(`The archive ${asset.name} does not contain a jj binary`)
     }
-    const target = managedBinaryPath(storageDir)
-    await mkdir(join(target, '..'), { recursive: true })
+    const binary = managedBinaryPath(storageDir, platform)
+    await mkdir(join(binary, '..'), { recursive: true })
     await chmod(extracted, 0o755)
-    await rename(extracted, target)
-    return target
+    await rename(extracted, binary)
+    return binary
   } finally {
     await rm(workDir, { recursive: true, force: true })
   }

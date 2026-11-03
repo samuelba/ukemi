@@ -311,7 +311,7 @@ class DesktopApp implements DesktopContext {
   async installJj(ui: Ui): Promise<void> {
     try {
       const path = await ui.progress(`Downloading jj ${PINNED_RELEASE.version}`, () =>
-        downloadJj(this.paths.userData, process.arch),
+        downloadJj(this.paths.userData),
       )
       this.logger.info(`installed jj to ${path}`)
       await this.reloadJj()
