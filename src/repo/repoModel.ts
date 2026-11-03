@@ -17,7 +17,12 @@ import { graphFromAncestors } from '../graph/buildGraph'
 import { ElisionCache } from '../graph/elisionCache'
 import type { ParsedBookmark } from '../jj/parse'
 import { JjRepo, type TrunkRef } from '../jj/repo'
-import { CURRENT_BOOKMARKS_REVSET, graphRevset } from '../jj/revsets'
+import {
+  changeRevision,
+  CURRENT_BOOKMARKS_REVSET,
+  graphRevset,
+  type ChangeRef,
+} from '../jj/revsets'
 import type { Logger } from '../util/logger'
 import { errorMessage } from '../util/logger'
 import { placeBookmark as moveLocalBookmark } from './placeBookmark'
@@ -33,6 +38,9 @@ export class RepoModel {
   private filter: GraphFilter = 'recent'
   private depth: HistoryDepth = '7d'
   private current: GraphState | null = null
+  // The commits of the graph before the current one, so ids that a view sent just before a
+  // refresh still find their change.
+  private previousChanges = new Map<string, ChangeRef>()
   private lastError: string | null = null
   private isDirty = true
   private mustReload = false
@@ -159,6 +167,27 @@ export class RepoModel {
 
   findCommit(commitId: string): CommitView | undefined {
     return this.current?.commits.find((c) => c.commitId === commitId)
+  }
+
+  // The commit a view or menu named, or the commit its change has now if a snapshot or another
+  // command rewrote it since.
+  latestCommit(commitId: string): CommitView | undefined {
+    const found = this.findCommit(commitId)
+    if (found) {
+      return found
+    }
+    const known = this.previousChanges.get(commitId)
+    if (!known || known.isDivergent) {
+      return undefined
+    }
+    const same = this.current?.commits.filter((c) => c.changeId === known.changeId) ?? []
+    return same.length === 1 ? same[0] : undefined
+  }
+
+  // The revision to pass to a jj command for a commit a view named. See changeRevision.
+  revisionFor(commitId: string): string {
+    const known = this.findCommit(commitId) ?? this.previousChanges.get(commitId)
+    return known ? changeRevision(known) : commitId
   }
 
   commitFor(commitId: string, changeId: string): CommitView | null {
@@ -395,6 +424,7 @@ export class RepoModel {
       return false
     }
     this.listedBookmarks = [...bookmarks]
+    this.previousChanges = changesOf(this.current)
     this.current = state
     this.emit()
     return true
@@ -571,4 +601,17 @@ function markNeverPushed(commits: readonly Commit[], pushed: ReadonlySet<string>
 
 function hasUnsyncedBookmarks(commits: readonly Commit[]): boolean {
   return commits.some((c) => c.localBookmarks.some((b) => !b.synced))
+}
+
+function changesOf(state: GraphState | null): Map<string, ChangeRef> {
+  const changes = new Map<string, ChangeRef>()
+  for (const commit of state?.commits ?? []) {
+    changes.set(commit.commitId, {
+      commitId: commit.commitId,
+      changeId: commit.changeId,
+      isDivergent: commit.isDivergent,
+      isHidden: commit.isHidden,
+    })
+  }
+  return changes
 }

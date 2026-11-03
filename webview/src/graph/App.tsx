@@ -20,6 +20,7 @@ import { Toolbar } from './Toolbar'
 
 interface Describing {
   commitId: string
+  changeId: string
   description: string
   isWorkingCopy: boolean
 }
@@ -79,6 +80,7 @@ export function App() {
           const commit = state?.graph?.commits.find((c) => c.commitId === message.commitId)
           setDescribing({
             commitId: message.commitId,
+            changeId: message.changeId,
             description: message.description,
             isWorkingCopy: commit?.isWorkingCopy ?? false,
           })
@@ -167,6 +169,7 @@ export function App() {
   const startDescribe = useCallback((commit: CommitView) => {
     setDescribing({
       commitId: commit.commitId,
+      changeId: commit.changeId,
       description: commit.description,
       isWorkingCopy: commit.isWorkingCopy,
     })
@@ -282,7 +285,13 @@ export function App() {
             suggestionReply={suggestionReply}
             onCancel={() => setDescribing(null)}
             onSave={(message, startNew) => {
-              postMessage({ type: 'describe', commitId: describing.commitId, message, startNew })
+              postMessage({
+                type: 'describe',
+                commitId: describing.commitId,
+                changeId: describing.changeId,
+                message,
+                startNew,
+              })
               setDescribing(null)
             }}
           />

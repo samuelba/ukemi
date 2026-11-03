@@ -47,6 +47,35 @@ describe('RepoModel', () => {
     expect(graph?.hasRemotes).toBe(false)
   })
 
+  test('a commit id from before a snapshot still names its change', async () => {
+    await model.refresh()
+    const before = model.graph?.commits.find((c) => c.isWorkingCopy)
+    writeFile(root, 'late.txt', 'x\n')
+    model.markDirty()
+    await model.refresh()
+
+    const after = model.graph?.commits.find((c) => c.isWorkingCopy)
+    expect(after?.commitId).not.toBe(before?.commitId)
+    expect(model.latestCommit(before?.commitId ?? '')?.commitId).toBe(after?.commitId)
+    expect(model.revisionFor(before?.commitId ?? '')).toBe(after?.changeId)
+    expect(model.latestCommit('0'.repeat(40))).toBeUndefined()
+  })
+
+  test('describing a working copy that changed since the refresh keeps one change', async () => {
+    await model.refresh()
+    const before = model.graph?.commits.find((c) => c.isWorkingCopy)
+    writeFile(root, 'late.txt', 'x\n')
+
+    await model.repo.describe(model.revisionFor(before?.commitId ?? ''), 'late')
+    model.markDirty()
+    await model.refresh()
+
+    const same = model.graph?.commits.filter((c) => c.changeId === before?.changeId) ?? []
+    expect(same).toHaveLength(1)
+    expect(same[0]?.isDivergent).toBe(false)
+    expect(same[0]?.description).toBe('late\n')
+  })
+
   test('picks up file changes only after markDirty', async () => {
     await model.refresh()
     writeFile(root, 'late.txt', 'x\n')

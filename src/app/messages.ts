@@ -1,5 +1,6 @@
 import type { WebviewMessage } from '../../shared/protocol'
 import { isAllowedForgeUrl } from '../forge/hostName'
+import { changeRevision } from '../jj/revsets'
 import type { RepoModel } from '../repo/repoModel'
 import type { CommandEnv } from './commands/context'
 import { SuggestionCancelled } from './describeSuggest/suggesters'
@@ -73,12 +74,16 @@ export function createMessageHandler(env: CommandEnv, dispatch: CommandDispatche
         return
       }
       case 'describe': {
-        const commit = model.findCommit(message.commitId)
+        // The dialog stays open across refreshes, so the change may have a new commit by now.
+        const commit =
+          model.commitFor(message.commitId, message.changeId) ??
+          model.latestCommit(message.commitId)
         if (!commit) {
+          await descriptionNotSaved(env, message.message)
           return
         }
         await env.operations.run('Describe', model, async () => {
-          await model.repo.describe(message.commitId, message.message)
+          await model.repo.describe(changeRevision(commit), message.message)
           if (message.startNew) {
             await model.repo.newChange(['@'])
           }
@@ -108,9 +113,10 @@ export function createMessageHandler(env: CommandEnv, dispatch: CommandDispatche
       }
       case 'dropCommit': {
         if (message.action === 'duplicate') {
-          const revset = message.mode === 'source' ? `${message.sourceId}::` : message.sourceId
+          const source = model.revisionFor(message.sourceId)
+          const revset = message.mode === 'source' ? `${source}::` : source
           await env.operations.run('Duplicate', model, () =>
-            model.repo.duplicate(revset, message.targetId),
+            model.repo.duplicate(revset, model.revisionFor(message.targetId)),
           )
           return
         }
@@ -121,7 +127,11 @@ export function createMessageHandler(env: CommandEnv, dispatch: CommandDispatche
           return
         }
         await env.operations.run('Rebase', model, () =>
-          model.repo.rebase(message.sourceId, message.targetId, message.mode),
+          model.repo.rebase(
+            model.revisionFor(message.sourceId),
+            model.revisionFor(message.targetId),
+            message.mode,
+          ),
         )
         return
       }
@@ -137,7 +147,11 @@ export function createMessageHandler(env: CommandEnv, dispatch: CommandDispatche
         if (message.action === 'copy') {
           await env.operations.run('Copy file', model, async () => {
             const paths = await copyPaths(model, message.fromCommitId, message.path)
-            await model.repo.copyFiles(message.fromCommitId, message.targetId, paths)
+            await model.repo.copyFiles(
+              model.revisionFor(message.fromCommitId),
+              model.revisionFor(message.targetId),
+              paths,
+            )
           })
           return
         }
@@ -145,13 +159,17 @@ export function createMessageHandler(env: CommandEnv, dispatch: CommandDispatche
           return
         }
         await env.operations.run('Move file', model, () =>
-          model.repo.moveFiles(message.fromCommitId, message.targetId, [message.path]),
+          model.repo.moveFiles(
+            model.revisionFor(message.fromCommitId),
+            model.revisionFor(message.targetId),
+            [message.path],
+          ),
         )
         return
       }
       case 'dropBookmark':
         await env.operations.run('Move bookmark', model, async () => {
-          await model.repo.setBookmark(message.name, message.targetId)
+          await model.repo.setBookmark(message.name, model.revisionFor(message.targetId))
           model.placeBookmark(message.name, message.targetId)
         })
         return
@@ -198,5 +216,18 @@ async function suggestDescription(
     const text = error instanceof Error ? error.message : String(error)
     env.logger.error(`suggest description with ${message.suggester} failed: ${text}`)
     reply({ error: text })
+  }
+}
+
+// The change was abandoned, or rewritten into several, while the dialog was open. The text is the
+// user's work, so it is offered for copying instead of being dropped.
+async function descriptionNotSaved(env: CommandEnv, text: string): Promise<void> {
+  const copy = 'Copy Description'
+  const choice = await env.ui.warn(
+    'Ukemi: the change was rewritten or abandoned while you described it, so the description was not saved.',
+    copy,
+  )
+  if (choice === copy) {
+    await env.ui.copy(text)
   }
 }

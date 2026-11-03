@@ -105,7 +105,7 @@ export function contextCommit(env: CommandEnv, arg: unknown): Target | null {
     return null
   }
   const commit = ctx.commitId
-    ? model.findCommit(ctx.commitId)
+    ? model.latestCommit(ctx.commitId)
     : model.graph?.commits.find((c) => c.isWorkingCopy)
   if (!commit) {
     void env.ui.warn('Ukemi: the change is no longer visible. Refresh and try again.')

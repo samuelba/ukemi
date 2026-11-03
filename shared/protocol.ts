@@ -127,7 +127,7 @@ export type HostMessage =
   | { type: 'reveal'; commitId: string }
   | { type: 'files'; repoId: string; commitId: string; files: ChangedFile[] }
   | { type: 'fileIcons'; theme: FileIconTheme | null }
-  | { type: 'describe'; commitId: string; description: string }
+  | { type: 'describe'; commitId: string; changeId: string; description: string }
   | { type: 'suggesters'; suggesters: SuggesterView[] }
   | { type: 'descriptionSuggestion'; requestId: string; text?: string; error?: string }
 
@@ -139,7 +139,7 @@ export type WebviewMessage =
   | { type: 'loadFiles'; commitId: string }
   | { type: 'selectCommit'; commitId: string }
   | { type: 'command'; command: string; context: Record<string, unknown> }
-  | { type: 'describe'; commitId: string; message: string; startNew: boolean }
+  | { type: 'describe'; commitId: string; changeId: string; message: string; startNew: boolean }
   | { type: 'listSuggesters' }
   | { type: 'suggestDescription'; requestId: string; commitId: string; suggester: string }
   | { type: 'cancelSuggestion'; requestId: string }

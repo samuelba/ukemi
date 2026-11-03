@@ -21,6 +21,21 @@ export function exactBookmark(name: string): string {
   return `exact:${jjString(name)}`
 }
 
+export interface ChangeRef {
+  commitId: string
+  changeId: string
+  isDivergent: boolean
+  isHidden: boolean
+}
+
+// jj snapshots the working copy before each command, which gives it a new commit id. A commit id
+// from the last refresh can then name the hidden predecessor, and rewriting that one makes the
+// change divergent. The change id follows the snapshot. Only a divergent or hidden commit needs
+// its commit id, since its change id names other commits too.
+export function changeRevision(commit: ChangeRef): string {
+  return commit.isDivergent || commit.isHidden ? commit.commitId : commit.changeId
+}
+
 export function rootFileset(path: string): string {
   return `root-file:${quoteRevsetString(path)}`
 }

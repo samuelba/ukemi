@@ -8,7 +8,7 @@ import {
 } from '../../forge/requestBase'
 import { isAllowedForgeUrl } from '../../forge/hostName'
 import type { MergeMethod } from '../../forge/types'
-import { bookmarkRevision, quoteRevsetString } from '../../jj/revsets'
+import { changeRevision, bookmarkRevision, quoteRevsetString } from '../../jj/revsets'
 import type { RepoModel } from '../../repo/repoModel'
 import { isBookmarkTreeElement } from '../../repo/bookmarkItems'
 import { bodyAfterTitle, bookmarkSlug, firstLine, validateBookmarkName } from '../../util/text'
@@ -214,7 +214,7 @@ async function createRequest(
   }
   const created = await env.operations.run('Create request', model, async () => {
     await pushBaseIfNeeded(model, request.base, request.name)
-    await model.repo.setBookmark(request.name, commit.commitId)
+    await model.repo.setBookmark(request.name, changeRevision(commit))
     await model.repo.push(request.name)
     return client.createRequest({
       head: request.name,
@@ -228,7 +228,9 @@ async function createRequest(
     return
   }
   if (commit.isWorkingCopy) {
-    await env.operations.run('New change', model, () => model.repo.newChange([commit.commitId]))
+    await env.operations.run('New change', model, () =>
+      model.repo.newChange([changeRevision(commit)]),
+    )
   }
   await env.forge.refreshRequests(model, { force: true })
   if (request.base !== (model.graph?.trunkName ?? 'main')) {
@@ -446,8 +448,8 @@ async function editBookmark(env: CommandEnv, target: BookmarkTarget): Promise<vo
   }
   const label = commit.isImmutable ? 'New change' : 'Edit'
   const task = commit.isImmutable
-    ? () => target.model.repo.newChange([commit.commitId])
-    : () => target.model.repo.edit(commit.commitId)
+    ? () => target.model.repo.newChange([changeRevision(commit)])
+    : () => target.model.repo.edit(changeRevision(commit))
   await env.operations.run(label, target.model, task)
 }
 
