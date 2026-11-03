@@ -14,6 +14,7 @@ let remote: string
 let model: RepoModel
 let answers: (string | undefined)[]
 let asked: string[]
+let infos: string[]
 
 beforeEach(() => {
   fixture = makeTempDir()
@@ -33,11 +34,12 @@ beforeEach(() => {
   model = new RepoModel(makeRepo(root), NULL_LOGGER)
   answers = []
   asked = []
+  infos = []
 })
 
 afterEach(() => fixture.cleanup())
 
-async function pushAll(): Promise<void> {
+async function run(command: string): Promise<void> {
   const env = {
     registry: { modelFor: () => model, activeModel: model },
     operations: new Operations(NULL_LOGGER),
@@ -47,11 +49,14 @@ async function pushAll(): Promise<void> {
         asked.push(text)
         return answers.shift()
       },
-      info: async () => undefined,
+      info: async (text: string) => {
+        infos.push(text)
+        return undefined
+      },
       warn: async () => undefined,
     },
   } as unknown as CommandEnv
-  await globalCommands(env)['ukemi.push']?.()
+  await globalCommands(env)[command]?.()
 }
 
 function remoteBranches(): string[] {
@@ -64,7 +69,7 @@ function remoteBranches(): string[] {
 describe('push all', () => {
   test('asks before it publishes a bookmark no remote has', async () => {
     answers.push('Only Published Ones')
-    await pushAll()
+    await run('ukemi.push')
 
     expect(asked).toEqual(['Also push 1 bookmark that no remote has yet?'])
     expect(remoteBranches()).toEqual(['shared'])
@@ -72,15 +77,41 @@ describe('push all', () => {
 
   test('pushes the new bookmarks when the user agrees', async () => {
     answers.push('Push All')
-    await pushAll()
+    await run('ukemi.push')
 
     expect(remoteBranches().sort()).toEqual(['shared', 'wip'])
   })
 
   test('pushes nothing when the question is dismissed', async () => {
     const before = execFileSync('git', ['ls-remote', remote], { encoding: 'utf8' })
-    await pushAll()
+    await run('ukemi.push')
 
     expect(execFileSync('git', ['ls-remote', remote], { encoding: 'utf8' })).toBe(before)
+  })
+})
+
+describe('undo', () => {
+  function head(): string {
+    return jj(root, 'op', 'log', '--no-graph', '--limit=1', '-T', 'description')
+  }
+
+  test('does not undo a push', async () => {
+    jj(root, 'git', 'push', '--bookmark', 'shared')
+    const before = head()
+    await model.refresh()
+
+    await run('ukemi.undo')
+
+    expect(head()).toBe(before)
+    expect(infos).toHaveLength(1)
+  })
+
+  test('undoes a local operation', async () => {
+    await model.refresh()
+
+    await run('ukemi.undo')
+
+    expect(head()).toMatch(/^undo/)
+    expect(infos).toEqual([])
   })
 })

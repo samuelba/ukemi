@@ -343,9 +343,16 @@ export function globalCommands(env: CommandEnv): Record<string, Handler> {
       }
       await env.operations.run(`Push ${names.join(', ')}`, model, () => model.repo.push(names))
     }),
-    'ukemi.undo': withModel(env, (model) =>
-      env.operations.run('Undo', model, () => model.repo.undo()),
-    ),
+    'ukemi.undo': withModel(env, async (model) => {
+      await model.settled()
+      if (model.graph?.canUndo === false) {
+        void env.ui.info(
+          'Ukemi: the last operation was a fetch or push. Undo would not change the remote.',
+        )
+        return
+      }
+      await env.operations.run('Undo', model, () => model.repo.undo())
+    }),
     'ukemi.redo': withModel(env, async (model) => {
       await model.settled()
       if (model.graph?.canRedo === false) {
