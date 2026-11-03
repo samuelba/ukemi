@@ -1,3 +1,4 @@
+import type { Commit } from '../../../shared/model'
 import type { CommitView } from '../../../shared/protocol'
 import { changeRevision, bookmarkRevision } from '../../jj/revsets'
 import type { Placement, RebaseMode } from '../../jj/repo'
@@ -22,7 +23,7 @@ function withTarget(env: CommandEnv, fn: (target: Target) => Promise<unknown>): 
   }
 }
 
-function mutable(env: CommandEnv, commit: CommitView): boolean {
+function mutable(env: CommandEnv, commit: Commit): boolean {
   if (commit.isImmutable) {
     void env.ui.warn(`Ukemi: ${shortId(commit)} is immutable.`)
     return false
@@ -262,8 +263,11 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
       env.workbench.openCommitDiff(model, commit, await model.filesFor(commit.commitId)),
     ),
     'ukemi.commit.squash': withTarget(env, async ({ model, commit }) => {
-      const parent =
-        commit.parents.length === 1 ? model.findCommit(commit.parents[0] ?? '') : undefined
+      const parentId = commit.parents.length === 1 ? commit.parents[0] : undefined
+      // The parent can be elided from the graph, so read it from jj then.
+      const parent = parentId
+        ? (model.findCommit(parentId) ?? (await model.repo.log(parentId, 1))[0])
+        : undefined
       if (!mutable(env, commit) || (parent && !mutable(env, parent))) {
         return
       }
