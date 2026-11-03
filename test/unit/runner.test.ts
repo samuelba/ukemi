@@ -54,6 +54,12 @@ describe('describeArgs', () => {
     ).toBe('log -r @ -T <template> --config=merge-tools.ukemi-split.program=…')
   })
 
+  test('shortens the operation a read is pinned to', () => {
+    expect(describeArgs(['log', '-r', '@', `--at-op=${'ab12'.repeat(32)}`])).toBe(
+      'log -r @ --at-op=ab12ab12ab12…',
+    )
+  })
+
   test('hides the password of a remote url', () => {
     expect(describeArgs(['git', 'clone', 'https://sam:secret@host/x.git', 'dir'])).toBe(
       'git clone https://***@host/x.git dir',

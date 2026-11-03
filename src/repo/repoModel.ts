@@ -24,6 +24,7 @@ import {
   type ChangeRef,
 } from '../jj/revsets'
 import type { Logger } from '../util/logger'
+import { mapLimited } from '../util/mapLimited'
 import { errorMessage } from '../util/logger'
 import { placeBookmark as moveLocalBookmark } from './placeBookmark'
 import { resolveSelectedCommit } from './selection'
@@ -33,6 +34,8 @@ const FILE_CACHE_LIMIT = 200
 const NETWORK_OPERATION = /^(fetch from git remote|push .*to git remote)/
 
 export type ChangeListener = () => void
+
+const ELISION_LOOKUPS_AT_ONCE = 4
 
 export class RepoModel {
   private filter: GraphFilter = 'recent'
@@ -45,6 +48,7 @@ export class RepoModel {
   private isDirty = true
   private mustReload = false
   private lastOperationId: string | null = null
+  private loadedRemotes: Remote[] | null = null
   private tail: Promise<void> | null = null
   private isRefreshQueued = false
   private opEventDuringLoad = false
@@ -163,6 +167,11 @@ export class RepoModel {
       }
       this.emit()
     }
+  }
+
+  // The remotes the last refresh read, so other services need not ask jj again.
+  get remotes(): readonly Remote[] | null {
+    return this.loadedRemotes
   }
 
   findCommit(commitId: string): CommitView | undefined {
@@ -287,10 +296,12 @@ export class RepoModel {
       if (this.snapshotOtherWorkspaces) {
         await this.snapshotOthers()
       }
-      const head = await this.headOperation()
+      // The undo history comes along, so a rebuild reads the operation log only once.
+      const operations = await this.repo.operations(UNDO_HISTORY_LIMIT)
+      const head = operations[0]?.id ?? null
       if (reload || head !== this.lastOperationId) {
         this.lastError = null
-        await this.buildState(generation, head)
+        await this.buildState(generation, head, operations)
       }
     } catch (error: unknown) {
       this.lastError = errorMessage(error)
@@ -306,10 +317,14 @@ export class RepoModel {
 
   // Every read sees the repository as of `head`, so the graph matches lastOperationId. A command
   // that lands meanwhile then shows as a new operation, and the next check loads it.
-  private async buildState(generation: number, head: string | null): Promise<void> {
+  private async buildState(
+    generation: number,
+    head: string | null,
+    operations: readonly Operation[],
+  ): Promise<void> {
     const reader = head === null ? this.repo : this.repo.atOperation(head)
     const revset = graphRevset(this.filter, this.depth)
-    const loaded = await this.loadRevisionData(reader, revset)
+    const loaded = await this.loadRevisionData(reader, revset, operations)
     if (generation !== this.viewGeneration) {
       return
     }
@@ -334,26 +349,27 @@ export class RepoModel {
     this.showGraph(generation, this.assemble(commits, nodes, trunkId, shared), bookmarks)
   }
 
-  private async loadRevisionData(reader: JjRepo, revset: string): Promise<LoadedRepo> {
-    const operationsPromise = reader.operations(UNDO_HISTORY_LIMIT).then((operations) => {
-      this.lastOperationId = operations[0]?.id ?? null
-      return operations
-    })
-    const [logged, trunk, operations, workspaces, remotes, listed, currentBookmarks, tracking] =
+  private async loadRevisionData(
+    reader: JjRepo,
+    revset: string,
+    operations: readonly Operation[],
+  ): Promise<LoadedRepo> {
+    this.lastOperationId = operations[0]?.id ?? null
+    const [logged, trunk, workspaces, remotes, listed, currentBookmarks, tracking] =
       await Promise.all([
         reader.log(revset),
         reader.trunk(),
-        operationsPromise,
         reader.workspaces(),
         reader.remotes(),
         reader.bookmarkList({ withTrunk: false }),
         reader.bookmarkNames(CURRENT_BOOKMARKS_REVSET),
         reader.bookmarkTracking(`@ | ${CURRENT_BOOKMARKS_REVSET}`),
       ])
+    this.loadedRemotes = remotes
     return {
       logged,
       trunk,
-      operations,
+      operations: [...operations],
       workspaces,
       remotes,
       bookmarks: listed,
@@ -377,17 +393,17 @@ export class RepoModel {
     missing: readonly string[],
   ): Promise<GraphNodeInput[]> {
     const found = new Map<string, readonly string[]>()
-    await Promise.all(
-      missing.map(async (parent) => {
-        try {
-          const ancestors = await reader.commitIds(`heads(::${parent} & (${revset}))`)
-          this.elisionCache.remember(revset, parent, ancestors)
-          found.set(parent, ancestors)
-        } catch {
-          found.set(parent, [])
-        }
-      }),
-    )
+    // Each lookup is a jj process that loads the repository, so a cold graph with many elided
+    // parents would otherwise start dozens at once.
+    await mapLimited(missing, ELISION_LOOKUPS_AT_ONCE, async (parent) => {
+      try {
+        const ancestors = await reader.commitIds(`heads(::${parent} & (${revset}))`)
+        this.elisionCache.remember(revset, parent, ancestors)
+        found.set(parent, ancestors)
+      } catch {
+        found.set(parent, [])
+      }
+    })
     return graphFromAncestors(commits, (parent) => {
       return found.get(parent) ?? this.elisionCache.get(revset, parent)
     }).nodes
@@ -433,11 +449,6 @@ export class RepoModel {
     this.current = state
     this.emit()
     return true
-  }
-
-  private async headOperation(): Promise<string | null> {
-    const [head] = await this.repo.operations(1)
-    return head?.id ?? null
   }
 
   private async noteExternalOperation(): Promise<void> {

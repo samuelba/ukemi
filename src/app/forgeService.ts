@@ -153,7 +153,8 @@ export class ForgeService implements Disposable {
   }
 
   async target(model: RepoModel): Promise<ForgeTarget | null> {
-    return detectForge(await model.repo.remotes(), readHostLists(this.host.settings))
+    const remotes = model.remotes ?? (await model.repo.remotes())
+    return detectForge(remotes, readHostLists(this.host.settings))
   }
 
   private isTrusted(announce: boolean): boolean {

@@ -61,11 +61,17 @@ export function summarizeStderr(stderr: string): string {
 
 const MAX_LOGGED_ARG = 120
 
+const AT_OP = '--at-op='
+const LOGGED_OPERATION_LENGTH = 12
+
 export function describeArgs(args: readonly string[]): string {
   return args
     .map((arg, index) => {
       if (args[index - 1] === '-T') {
         return '<template>'
+      }
+      if (arg.startsWith(AT_OP)) {
+        return `${arg.slice(0, AT_OP.length + LOGGED_OPERATION_LENGTH)}…`
       }
       const configValue = arg.startsWith('--config=') ? arg.indexOf('=', '--config='.length) : -1
       if (configValue >= 0) {

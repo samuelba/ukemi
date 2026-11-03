@@ -78,24 +78,14 @@ describe('RepoModel', () => {
 
   test('a command that lands during a refresh shows up on the next one', async () => {
     jj(root, 'describe', '-m', 'before')
-    // The graph is read before the command and the operation log after it, which is the order
-    // the parallel reads of a refresh can take.
+    // The command lands after the refresh read the head operation and before it read the graph.
     let landed = false
-    let land = () => undefined as void
-    const hasLanded = new Promise<void>((resolve) => {
-      land = resolve
-    })
     class RacingRunner extends JjRunner {
       override async run(options: RunOptions): Promise<RunResult> {
-        const isOpLog = options.args[0] === 'op' && !options.args.includes('--limit=1')
-        if (isOpLog && !landed) {
-          await hasLanded
-        }
         const result = await super.run(options)
-        if (options.args[0] === 'log' && options.args.includes('--limit=2000') && !landed) {
+        if (options.args[0] === 'op' && !landed) {
           landed = true
           jj(root, 'describe', '-m', 'during')
-          land()
         }
         return result
       }
@@ -106,11 +96,25 @@ describe('RepoModel', () => {
     )
 
     await racing.refresh()
+    // Every read of that refresh saw the operation it started from.
+    expect(racing.graph?.commits.find((c) => c.isWorkingCopy)?.description).toBe('before\n')
     // The watcher reports the command's operation.
     await racing.refreshIfOperationChanged()
 
     expect(landed).toBe(true)
     expect(racing.graph?.commits.find((c) => c.isWorkingCopy)?.description).toBe('during\n')
+  })
+
+  test('a refresh reads the operation log once and keeps the remotes', async () => {
+    const commands: string[] = []
+    const logger = { ...NULL_LOGGER, info: (line: string) => commands.push(line) }
+    const counted = new RepoModel(new JjRepo(root, new JjRunner(JJ_BINARY, logger)), NULL_LOGGER)
+    jj(root, 'git', 'remote', 'add', 'origin', 'https://example.com/x.git')
+
+    await counted.refresh()
+
+    expect(commands.filter((line) => line.includes(' jj op log '))).toHaveLength(1)
+    expect(counted.remotes?.map((remote) => remote.name)).toEqual(['origin'])
   })
 
   test('picks up file changes only after markDirty', async () => {
