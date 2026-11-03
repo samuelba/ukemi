@@ -3,7 +3,7 @@ import { existsSync, readFileSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { GRAPH_FILTERS } from '../../shared/model'
-import { graphRevset } from '../../src/jj/revsets'
+import { confirmedRevset, graphRevset, requestCleanupRevset } from '../../src/jj/revsets'
 import type { JjRepo } from '../../src/jj/repo'
 import { initRepo, jj, makeRepo, makeTempDir, writeFile, type Fixture } from '../helpers/jjFixture'
 
@@ -639,5 +639,56 @@ describe('bookmark rename and untrack', () => {
     await repo.push('main')
 
     expect(await repo.trunkBookmark()).toBe('main')
+  })
+})
+
+describe('request cleanup', () => {
+  async function stack() {
+    writeFile(root, 'a.txt', 'a\n')
+    jj(root, 'describe', '-m', 'A')
+    const a = await current()
+    await repo.setBookmark('parent-req', a.commitId)
+    jj(root, 'new', '-m', 'B')
+    writeFile(root, 'b.txt', 'b\n')
+    const b = await current()
+    await repo.setBookmark('child-req', b.commitId)
+    return { a, b }
+  }
+
+  test('keeps the changes of the request below', async () => {
+    const { b } = await stack()
+    jj(root, 'new')
+
+    expect(await repo.commitIds(requestCleanupRevset('child-req'))).toEqual([b.commitId])
+  })
+
+  test('takes the changes of a request stacked above along', async () => {
+    const { a } = await stack()
+    jj(root, 'new')
+
+    expect(await repo.commitIds(requestCleanupRevset('parent-req'))).toEqual([a.commitId])
+  })
+
+  test('keeps a working copy with edits', async () => {
+    await stack()
+    writeFile(root, 'more.txt', 'more\n')
+    await repo.snapshot()
+
+    expect(await repo.commitIds(requestCleanupRevset('child-req'))).toEqual([])
+  })
+
+  test('applies only to the confirmed changes', async () => {
+    const { b } = await stack()
+    jj(root, 'new', '-m', 'C')
+    writeFile(root, 'c.txt', 'c\n')
+    const c = await current()
+    jj(root, 'new')
+    const confirmed = await repo.commitIds(requestCleanupRevset('child-req'))
+    expect(confirmed).toEqual([b.commitId])
+
+    await repo.setBookmark('child-req', c.commitId)
+
+    const revset = confirmedRevset(requestCleanupRevset('child-req'), confirmed)
+    expect(await repo.commitIds(revset)).toEqual([b.commitId])
   })
 })

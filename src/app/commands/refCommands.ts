@@ -8,7 +8,13 @@ import {
 } from '../../forge/requestBase'
 import { isAllowedForgeUrl } from '../../forge/hostName'
 import type { MergeMethod } from '../../forge/types'
-import { changeRevision, bookmarkRevision, quoteRevsetString } from '../../jj/revsets'
+import {
+  changeRevision,
+  bookmarkRevision,
+  confirmedRevset,
+  quoteRevsetString,
+  requestCleanupRevset,
+} from '../../jj/revsets'
 import type { RepoModel } from '../../repo/repoModel'
 import { isBookmarkTreeElement } from '../../repo/bookmarkItems'
 import { bodyAfterTitle, bookmarkSlug, firstLine, validateBookmarkName } from '../../util/text'
@@ -385,9 +391,9 @@ async function cleanupRequest(
   model: RepoModel,
   request: RequestBadge,
 ): Promise<void> {
-  const bookmark = `bookmarks(exact:${quoteRevsetString(request.headBranch)})`
-  const revset = `(::${bookmark} ~ ::trunk()) & mutable()`
-  const count = (await model.repo.commitIds(revset)).length
+  const revset = requestCleanupRevset(request.headBranch)
+  const commitIds = await model.repo.commitIds(revset)
+  const count = commitIds.length
   if (
     !(await confirm(
       env.ui,
@@ -400,7 +406,7 @@ async function cleanupRequest(
   }
   await env.operations.run('Clean up', model, async () => {
     if (count > 0) {
-      await model.repo.abandon(revset)
+      await model.repo.abandon(confirmedRevset(revset, commitIds))
     }
     await model.repo.forgetBookmark(request.headBranch)
   })
