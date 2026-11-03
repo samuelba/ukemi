@@ -17,6 +17,8 @@ interface Terminal {
   // The name before numbering, to count terminals of the same folder.
   title: string
   pty: IPty | null
+  // The shell is loading node-pty, so a second start must not spawn another.
+  starting: boolean
   pending: string
   timer: ReturnType<typeof setTimeout> | null
 }
@@ -43,7 +45,14 @@ export class Terminals implements Disposable {
     const id = `terminal-${this.nextId++}`
     const base = name ?? basename(cwd)
     const same = [...this.terminals.values()].filter((t) => t.title === base).length
-    this.terminals.set(id, { cwd, title: base, pty: null, pending: '', timer: null })
+    this.terminals.set(id, {
+      cwd,
+      title: base,
+      pty: null,
+      starting: false,
+      pending: '',
+      timer: null,
+    })
     const title = same > 0 ? `${base} (${same + 1})` : base
     this.post({ type: 'desktop.terminalOpen', id, title, cwd })
   }
@@ -52,11 +61,16 @@ export class Terminals implements Disposable {
     const terminal = this.terminals.get(id)
     const columns = size(cols, MAX_COLUMNS)
     const lines = size(rows, MAX_ROWS)
-    if (!terminal || terminal.pty || !columns || !lines) {
+    if (!terminal || terminal.pty || terminal.starting || !columns || !lines) {
       return
     }
+    terminal.starting = true
     try {
       const pty = await this.loadPty()
+      // The tab may have closed while node-pty loaded. A shell spawned now would have no owner.
+      if (this.terminals.get(id) !== terminal) {
+        return
+      }
       const command = terminalCommand(process.platform, process.env, terminal.cwd)
       const child = pty.spawn(command.file, command.args, {
         name: 'xterm-256color',
@@ -80,6 +94,8 @@ export class Terminals implements Disposable {
         data: `\r\nUkemi could not start a terminal: ${errorMessage(error)}\r\n`,
       })
       this.post({ type: 'desktop.terminalExit', id, code: 1 })
+    } finally {
+      terminal.starting = false
     }
   }
 
