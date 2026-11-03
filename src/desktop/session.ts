@@ -53,6 +53,7 @@ import {
 import { aboutText } from './about'
 import { isValidSettingValue, runsProgram, settingFields } from './settingsSchema'
 import { foldersAfterClosing } from './startup'
+import { watchRenderer } from './rendererRecovery'
 import { Terminals } from './terminals'
 import { zoomPercent } from './zoom'
 import { desktopWorkbench, type PanelEntry } from './workbench'
@@ -109,6 +110,8 @@ export class DesktopSession implements Disposable {
   private readonly tabKeys = new Map<string, string>()
   private readonly disposables: Disposable[] = []
   private isReady = false
+  // The page crashed and loaded again, so its terminals need tabs again once it is ready.
+  private needsReattach = false
   // The repository the settings form last showed.
   private settingsRoot: string | null = null
   private isClosed = false
@@ -235,6 +238,10 @@ export class DesktopSession implements Disposable {
       if (message.type === 'ready') {
         this.isReady = true
         this.sendInitial()
+        if (this.needsReattach) {
+          this.needsReattach = false
+          this.terminals.reattach()
+        }
         return
       }
       await this.handleWebview(message)
@@ -419,8 +426,25 @@ export class DesktopSession implements Disposable {
     window.on('resize', () => this.context.saveWindowBounds(window.getBounds()))
     window.on('closed', () => this.context.closeSession(this))
     this.context.guardNavigation(window)
+    watchRenderer(window, this.context.logger, {
+      beforeReload: () => this.pageReloading(),
+      isClosed: () => this.isClosed,
+    })
     void window.loadURL(this.context.pageUrl('desktop'))
     return window
+  }
+
+  // The crashed page took its prompts and Split or Clean up tabs with it. Their state lived there,
+  // so they close. The graph and the details are sent again when the new page is ready.
+  private pageReloading(): void {
+    this.isReady = false
+    this.needsReattach = true
+    this.ui.cancelAll()
+    for (const tab of this.tabs.values()) {
+      tab.closed()
+    }
+    this.tabs.clear()
+    this.tabKeys.clear()
   }
 
   private title(): string {

@@ -82,3 +82,46 @@ test('prompts in the window and applies the answer', async () => {
     await app.close()
   }
 })
+
+test('reloads a crashed window and keeps its running shell', async () => {
+  const repo = fixtureRepo()
+  const { app, page } = await launch(repo)
+  // Playwright gives up on a page whose renderer crashed, so the reloaded page is read from main.
+  const pageText = () =>
+    app.evaluate(({ BrowserWindow }) => {
+      const contents = BrowserWindow.getAllWindows()[0]?.webContents
+      if (!contents || contents.isCrashed()) {
+        return ''
+      }
+      // A page that is going away never answers, so each read gives up after a second.
+      const text = contents.executeJavaScript('document.body.innerText') as Promise<string>
+      const later = new Promise<string>((resolve) => setTimeout(() => resolve(''), 1000))
+      return Promise.race([text.catch(() => ''), later])
+    })
+  try {
+    await page.locator('.titlebar button[title^="Toggle panel"]').click()
+    await page.locator('.bottom-tabs button[title="New terminal"]').click()
+    const terminal = page.locator('.terminal-view:not([hidden])')
+    await terminal.click()
+    await page.keyboard.type('answer=42')
+    await page.keyboard.press('Enter')
+
+    await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()[0]?.webContents.forcefullyCrashRenderer(),
+    )
+
+    await expect.poll(pageText, { timeout: 15_000 }).toContain('docs: explain the setup')
+    await expect.poll(pageText).toContain('Ukemi reloaded the window')
+    await app.evaluate(({ BrowserWindow }) => {
+      const contents = BrowserWindow.getAllWindows()[0]?.webContents
+      for (const key of 'echo kept=$answer') {
+        contents?.sendInputEvent({ type: 'char', keyCode: key })
+      }
+      contents?.sendInputEvent({ type: 'keyDown', keyCode: 'Return' })
+      contents?.sendInputEvent({ type: 'char', keyCode: '\r' })
+    })
+    await expect.poll(pageText).toContain('kept=42')
+  } finally {
+    await app.close()
+  }
+})

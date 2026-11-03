@@ -16,9 +16,13 @@ interface Terminal {
   cwd: string
   // The name before numbering, to count terminals of the same folder.
   title: string
+  // The name the tab shows, numbered when the folder has several.
+  label: string
   pty: IPty | null
   // The shell is loading node-pty, so a second start must not spawn another.
   starting: boolean
+  // The page lost its tab and shows it again. Its view says so when it starts.
+  isReattached: boolean
   pending: string
   timer: ReturnType<typeof setTimeout> | null
 }
@@ -45,23 +49,33 @@ export class Terminals implements Disposable {
     const id = `terminal-${this.nextId++}`
     const base = name ?? basename(cwd)
     const same = [...this.terminals.values()].filter((t) => t.title === base).length
+    const label = same > 0 ? `${base} (${same + 1})` : base
     this.terminals.set(id, {
       cwd,
       title: base,
+      label,
       pty: null,
       starting: false,
+      isReattached: false,
       pending: '',
       timer: null,
     })
-    const title = same > 0 ? `${base} (${same + 1})` : base
-    this.post({ type: 'desktop.terminalOpen', id, title, cwd })
+    this.post({ type: 'desktop.terminalOpen', id, title: label, cwd })
   }
 
   async start(id: string, cols: unknown, rows: unknown): Promise<void> {
     const terminal = this.terminals.get(id)
     const columns = size(cols, MAX_COLUMNS)
     const lines = size(rows, MAX_ROWS)
-    if (!terminal || terminal.pty || terminal.starting || !columns || !lines) {
+    if (!terminal || !columns || !lines) {
+      return
+    }
+    if (terminal.pty && terminal.isReattached) {
+      terminal.isReattached = false
+      terminal.pty.resize(columns, lines)
+      this.queue(id, '\r\n[Ukemi reloaded the window. Earlier output is gone.]\r\n')
+    }
+    if (terminal.pty || terminal.starting) {
       return
     }
     terminal.starting = true
@@ -123,6 +137,19 @@ export class Terminals implements Disposable {
       clearTimeout(terminal.timer)
     }
     terminal.pty?.kill()
+  }
+
+  // The page reloaded after a crash and lost its tabs. Running shells get a tab again and keep
+  // their output from now on. Exited ones and ones that never started are dropped.
+  reattach(): void {
+    for (const [id, terminal] of [...this.terminals]) {
+      if (!terminal.pty && !terminal.starting) {
+        this.close(id)
+        continue
+      }
+      terminal.isReattached = true
+      this.post({ type: 'desktop.terminalOpen', id, title: terminal.label, cwd: terminal.cwd })
+    }
   }
 
   dispose(): void {
