@@ -1,5 +1,74 @@
 # Changelog
 
+## [0.9.0](https://github.com/samuelba/ukemi/compare/v0.8.0...v0.9.0) (2026-11-03)
+
+
+### Features
+
+* change the keyboard shortcuts of the desktop app ([f51ca0b](https://github.com/samuelba/ukemi/commit/f51ca0b6e097b8dd21e1a0c4b4690ac4fa8c0dd8))
+* change the keyboard shortcuts of the desktop app ([2a2d73c](https://github.com/samuelba/ukemi/commit/2a2d73c2c0e2bdb2eca17adc71957c825b1ce0cb))
+* desktop version ([3a4ccf6](https://github.com/samuelba/ukemi/commit/3a4ccf664f2fca9e10081ea8304ef8ad885b7f23))
+* find the desktop app by jj, jujutsu and git in Linux launchers ([f136e16](https://github.com/samuelba/ukemi/commit/f136e16294485ac1253f5c01047270f0f25b465a))
+* find the desktop app by jj, jujutsu and git in Linux launchers ([74a6ef6](https://github.com/samuelba/ukemi/commit/74a6ef697ca0e27f993c86f70d9a5e384b0391db))
+* list recently used repositories under File &gt; Open Recent ([463a42c](https://github.com/samuelba/ukemi/commit/463a42c5a9af68664877b4a951eed8d9ab57d8d5))
+* list recently used repositories under File &gt; Open Recent ([1d20137](https://github.com/samuelba/ukemi/commit/1d20137ec0332f091904b86440c1fa58630a1267))
+* resolve editor in desktop app ([8f5b644](https://github.com/samuelba/ukemi/commit/8f5b644067f6199be75dbd688cae4c48789f2194))
+* suggest change descriptions with installed AI tools ([dbef4ea](https://github.com/samuelba/ukemi/commit/dbef4eaa2f6a9c409f4a4125460d6ebef081e58e))
+* tell the app's users when a newer release is out ([9e2c6fc](https://github.com/samuelba/ukemi/commit/9e2c6fc64a43fc38e0a8bfd69837ad9fbfbc2c5d))
+* zoom from the View menu, the mouse wheel and the status bar ([318a6f3](https://github.com/samuelba/ukemi/commit/318a6f38853b2ab64b62b9c482bb8a3a77fc052d))
+* zoom from the View menu, the mouse wheel and the status bar ([8ae88f0](https://github.com/samuelba/ukemi/commit/8ae88f0af00067317d47b266d5db363d9edab500))
+
+
+### Bug Fixes
+
+* ask before a new request takes a bookmark from another change ([49df262](https://github.com/samuelba/ukemi/commit/49df2622a11579687d8cd513cce7651ba74c005b))
+* ask before Push All publishes bookmarks that no remote has ([9051bd2](https://github.com/samuelba/ukemi/commit/9051bd27e8bad27f7b5e7f4ffa73f97d691f8b89))
+* ask for ssh key passphrases and new host keys ([2568ab6](https://github.com/samuelba/ukemi/commit/2568ab68d1df7b946d5ed3f0c70f9f8520095bad))
+* check settings the app window sends before saving them ([04f1d75](https://github.com/samuelba/ukemi/commit/04f1d75d0431dbafbe9b51b5b5dabc632d236928))
+* **ci:** build one macOS dmg per architecture with its own node-pty ([3a4ccf6](https://github.com/samuelba/ukemi/commit/3a4ccf664f2fca9e10081ea8304ef8ad885b7f23))
+* **ci:** skip apt packages a release lacks, add a 1024px macOS icon ([3a4ccf6](https://github.com/samuelba/ukemi/commit/3a4ccf664f2fca9e10081ea8304ef8ad885b7f23))
+* clean up only the changes that belong to the merged request ([28fa454](https://github.com/samuelba/ukemi/commit/28fa45412ce97940c9355d93979099f39ab96d0e))
+* copy files into a divergent change, with no command in between ([7739e06](https://github.com/samuelba/ukemi/commit/7739e068023beaa1cecbbcc5235e54eddcc1b96c))
+* do not undo a fetch or push from the undo command ([d7b6fb8](https://github.com/samuelba/ukemi/commit/d7b6fb8613f1aa5eb27b7774ba501c3ab7ad06b5))
+* download the jj build for the platform Ukemi runs on ([ad32953](https://github.com/samuelba/ukemi/commit/ad3295348ac6573c50087d7bcd2108ee2850a02b))
+* drop split choices whose hunks changed when the view reloads ([c4d5c5d](https://github.com/samuelba/ukemi/commit/c4d5c5d0a2f727328387d11bd0514ff62c54a231))
+* end git and ssh too when a jj command times out ([d2618c5](https://github.com/samuelba/ukemi/commit/d2618c5a9dcc39bd82713cc0caa455610f6d337c))
+* improve code quality ([6e61946](https://github.com/samuelba/ukemi/commit/6e61946e34027a4b64d4694034bac98988b9382f))
+* keep each desktop window's active repository and views its own (F35) ([4100b1a](https://github.com/samuelba/ukemi/commit/4100b1ae5edac25a1b7fdd6c20d8ec3c0660a37f))
+* keep jj's hints in error messages ([612f11b](https://github.com/samuelba/ukemi/commit/612f11be7341b10c1c0b3f73e2c9b25095e6e0af))
+* keep settings and state when their JSON file does not parse ([7d2692d](https://github.com/samuelba/ukemi/commit/7d2692d2c547bd11a0f2c658fa625e82ab01a493))
+* keep the Clean up choices when the view reloads after a refresh ([82be29f](https://github.com/samuelba/ukemi/commit/82be29f93b60d4e92db6bc13fc1a7064b6127363))
+* keep the parent's description when squashing into an elided parent ([b1998ce](https://github.com/samuelba/ukemi/commit/b1998ce275fbd635a571751a9c7c5107a2727966))
+* keep what the user typed while a file in the editor tab saves ([64c74d3](https://github.com/samuelba/ukemi/commit/64c74d3f5c66cc5dda0eddba5ccd979ff198d1fd))
+* never delete the folder that holds the repository with a workspace ([f643b0a](https://github.com/samuelba/ukemi/commit/f643b0a9d47a2040277681a3aee213055dd83dfa))
+* quit with an error box when the desktop app fails to start (F33) ([1e428ae](https://github.com/samuelba/ukemi/commit/1e428ae9798ab1f077ad48c11bbf0bc5511e7cc5))
+* quote bookmark names that jj reads as revset expressions ([bfe9fdb](https://github.com/samuelba/ukemi/commit/bfe9fdbd832d366bc6bb73a2578bedde664e809a))
+* read each refresh at one operation so a command in between is not missed ([fbd5984](https://github.com/samuelba/ukemi/commit/fbd5984e44217d1ecc96562ce18e9b3f7467a322))
+* refresh pull and merge requests after a create or merge, even mid-refresh ([25b654f](https://github.com/samuelba/ukemi/commit/25b654f5f704ebfeb133a4ab7fbd1a1a90ebdb89))
+* refresh when .gitignore or files under .github change in the app ([8a4d50d](https://github.com/samuelba/ukemi/commit/8a4d50d375cee0d44fdfc07d226a97a774a3622b))
+* reload a crashed or hung desktop window and reattach its shells (F42) ([5ff6618](https://github.com/samuelba/ukemi/commit/5ff6618aa6d4ac179e4b7ed548fd4d76210a2984))
+* report a failed desktop state write instead of an unhandled rejection (F38) ([33abd18](https://github.com/samuelba/ukemi/commit/33abd18b976ba9c0508a117e27ec7b5e88810315))
+* report a failed fetch after shipping a request as a failed fetch ([ac27190](https://github.com/samuelba/ukemi/commit/ac27190dae906ca8cea018d2ef7cb14684b818f0))
+* restore the old name too when discarding a renamed file ([1460e50](https://github.com/samuelba/ukemi/commit/1460e5022dc797b8ea47813e137c007aa8cae648))
+* run commands on the change, not on a commit id from before a snapshot ([1068cc6](https://github.com/samuelba/ukemi/commit/1068cc6f1d8e40a9c75c42d8ac1084ecc483a147))
+* share one GitLab sign-in redirect server between desktop windows (F36) ([7887251](https://github.com/samuelba/ukemi/commit/78872513af44b10968bd3f67738f27700be0fb69))
+* show GitHub's GraphQL errors instead of a schema error ([c2471ec](https://github.com/samuelba/ukemi/commit/c2471ec592f32bf795cf15391fd068e521f983ed))
+* show the warnings of jj commands that succeed ([38235d8](https://github.com/samuelba/ukemi/commit/38235d8e674ff0be04f23fcb627253e932e08247))
+* skip graph reloads when a refresh records no new operation ([2ef10a2](https://github.com/samuelba/ukemi/commit/2ef10a2513d767f6530de71b75d3aa831f2b149c))
+* spawn no orphan or second shell while a terminal starts (F37) ([f89c711](https://github.com/samuelba/ukemi/commit/f89c711d3111a2d922359cb84f5f99908b836144))
+* split a merge commit against the merge of its parents ([803ad2c](https://github.com/samuelba/ukemi/commit/803ad2cbb7e05e22c02e784cdc103a83c64c17c1))
+* stop the evolution view flickering on refreshes that change nothing ([84e1870](https://github.com/samuelba/ukemi/commit/84e18702b17f8b81a5f98d9c37c84041534e2db7))
+* stop the jj timeout while a git sign-in prompt is open ([5bfbeb0](https://github.com/samuelba/ukemi/commit/5bfbeb01515ef67b4d15f898de0e693403565c01))
+* tag log lines with the repository and copy them as one line ([6418f89](https://github.com/samuelba/ukemi/commit/6418f892244e33944ccc6c4a1faed31b20d27b12))
+* tell a forge rate limit apart from an expired login ([3d09ad8](https://github.com/samuelba/ukemi/commit/3d09ad8b45e0728a766255b8069598223b787a4f))
+
+
+### Performance Improvements
+
+* diff large files in the app only when asked ([1a7f83e](https://github.com/samuelba/ukemi/commit/1a7f83e96736f62189d02d9301e232cd9d2414df))
+* render only the graph rows that changed ([16cb842](https://github.com/samuelba/ukemi/commit/16cb842a8eb7ad35b3162fd44bfc1a77dc3607c8))
+* run fewer jj processes per refresh ([90d379c](https://github.com/samuelba/ukemi/commit/90d379c18d37b4a5f3fef9e1c49770fc1d1c6fdb))
+
 ## [0.8.0](https://github.com/samuelba/ukemi/compare/v0.7.1...v0.8.0) (2026-10-31)
 
 
