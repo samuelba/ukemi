@@ -56,15 +56,25 @@ export class JjError extends Error {
   }
 }
 
+// The error and its hints. jj and its argument parser write `Error:`, older parsers `error:`, and
+// the parser adds a usage block that does not help in a message.
 export function summarizeStderr(stderr: string): string {
   const lines = stderr
     .split('\n')
     .map((line) => line.trimEnd())
     .filter((line) => line.length > 0)
-  const errorIndex = lines.findIndex((line) => line.startsWith('Error:'))
+  const errorIndex = lines.findIndex((line) => ERROR_LINE.test(line))
   const relevant = errorIndex >= 0 ? lines.slice(errorIndex) : lines
-  const withoutHints = relevant.filter((line) => !line.startsWith('Hint:'))
-  return redactUrlCredentials((withoutHints.join('\n') || 'jj failed').replace(/^Error:\s*/, ''))
+  const usageIndex = relevant.findIndex((line) => line.startsWith('Usage:'))
+  const kept = usageIndex >= 0 ? relevant.slice(0, usageIndex) : relevant
+  return redactUrlCredentials((kept.join('\n') || 'jj failed').replace(ERROR_LINE, ''))
+}
+
+const ERROR_LINE = /^error:\s*/i
+
+function timeoutMessage(timeoutMs: number, stderr: string): string {
+  const message = `jj timed out after ${timeoutMs / 1000} s`
+  return stderr.trim() ? `${message}: ${summarizeStderr(stderr)}` : message
 }
 
 // The warnings jj printed, each with the indented lines and hints that follow it.
@@ -273,7 +283,8 @@ export class JjRunner {
       child.on('exit', (code) => {
         if (hasTimedOut) {
           settle()
-          reject(new JjError(`jj timed out after ${timeoutMs / 1000} s`, args, '', code))
+          const err = Buffer.concat(stderr).toString('utf8')
+          reject(new JjError(timeoutMessage(timeoutMs, err), args, err, code))
         }
       })
       child.on('close', (code, signal) => {
@@ -285,7 +296,7 @@ export class JjRunner {
           `${repoTag(options.cwd)} jj ${describeArgs(options.args)} (${elapsed} ms, exit ${code ?? signal})`,
         )
         if (hasTimedOut) {
-          reject(new JjError(`jj timed out after ${timeoutMs / 1000} s`, args, err, code))
+          reject(new JjError(timeoutMessage(timeoutMs, err), args, err, code))
           return
         }
         if (code !== 0) {

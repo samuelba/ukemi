@@ -135,9 +135,18 @@ describe('describeArgs', () => {
 })
 
 describe('summarizeStderr', () => {
-  test('keeps the error and drops hints', () => {
+  test('keeps the error and its hints', () => {
     const stderr = 'Warning: x\nError: Commit abc is immutable\nHint: Pass --ignore-immutable\n'
-    expect(summarizeStderr(stderr)).toBe('Commit abc is immutable')
+    expect(summarizeStderr(stderr)).toBe('Commit abc is immutable\nHint: Pass --ignore-immutable')
+  })
+
+  test('keeps the tip of an argument error and drops the usage', () => {
+    for (const prefix of ['Error:', 'error:']) {
+      const stderr = `${prefix} unexpected argument '-q' found\n\n  tip: to pass '-q' as a value, use '-- -q'\n\nUsage: jj git init [OPTIONS] [DESTINATION]\n\nFor more information, try '--help'.\n`
+      expect(summarizeStderr(stderr)).toBe(
+        "unexpected argument '-q' found\n  tip: to pass '-q' as a value, use '-- -q'",
+      )
+    }
   })
 
   test('hides a url password', () => {
@@ -167,6 +176,22 @@ describe.skipIf(process.platform === 'win32')('JjRunner timeout', () => {
       rmSync(dir, { recursive: true, force: true })
     }
   }
+
+  test('keeps what jj wrote before the timeout', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ukemi-runner-'))
+    const fake = join(dir, 'jj')
+    writeFileSync(fake, '#!/bin/sh\necho "Error: waiting for the lock" >&2\nsleep 30\n', {
+      mode: 0o700,
+    })
+    const runner = new JjRunner(fake, NULL_LOGGER, { killGraceMs: 200 })
+    try {
+      await expect(runner.run({ cwd: dir, args: ['status'], timeoutMs: 200 })).rejects.toThrow(
+        'jj timed out after 0.2 s: waiting for the lock',
+      )
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 
   test('ends a helper that holds the output pipes open', async () => {
     // Like ssh started by git: it inherits jj's pipes and outlives a SIGTERM to jj alone.
