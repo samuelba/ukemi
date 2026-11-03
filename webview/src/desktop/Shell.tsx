@@ -122,6 +122,32 @@ function useShortcuts(openPalette: () => void): void {
   }, [openPalette])
 }
 
+// Ctrl or Cmd with the mouse wheel, or a pinch on a touchpad, zooms the window like View > Zoom.
+// A touchpad sends a burst of small events, so one step waits for the last to settle.
+const WHEEL_STEP_MS = 120
+
+function useWheelZoom(): void {
+  useEffect(() => {
+    let lastStep = 0
+    const onWheel = (event: WheelEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.deltaY === 0) {
+        return
+      }
+      event.preventDefault()
+      if (event.timeStamp - lastStep < WHEEL_STEP_MS) {
+        return
+      }
+      lastStep = event.timeStamp
+      postMessage<DesktopRendererMessage>({
+        type: 'desktop.zoom',
+        step: event.deltaY < 0 ? 'in' : 'out',
+      })
+    }
+    window.addEventListener('wheel', onWheel, { passive: false })
+    return () => window.removeEventListener('wheel', onWheel)
+  }, [])
+}
+
 export function Shell() {
   const fileIcons = useBundledFileIcons()
   const [layout, setLayout] = useState<Layout>(readLayout)
@@ -148,6 +174,7 @@ export function Shell() {
   const [panelTab, setPanelTab] = useState(LOG_TAB)
   const [terminalFont, setTerminalFont] = useState<FontSpec>(DEFAULT_FONT)
   const [about, setAbout] = useState<{ info: AboutInfo; text: string } | null>(null)
+  const [zoomPercent, setZoomPercent] = useState(100)
   const [now, setNow] = useState(() => Date.now())
   const [viewState, setViewState] = useState<ViewState | null>(null)
 
@@ -243,6 +270,9 @@ export function Shell() {
         applyEditorFont(message.fonts.editor)
         setTerminalFont(message.fonts.terminal)
         return
+      case 'desktop.zoom':
+        setZoomPercent(message.percent)
+        return
       case 'desktop.log':
         setLog((all) =>
           (message.replace ? message.lines : [...all, ...message.lines]).slice(-LOG_LIMIT),
@@ -325,6 +355,7 @@ export function Shell() {
   const openPalette = useCallback(() => setIsPaletteOpen(true), [])
   const closeAbout = useCallback(() => setAbout(null), [])
   useShortcuts(openPalette)
+  useWheelZoom()
 
   // The panes keep their dragged widths while the window has room, and give way to their
   // minimums when it does not, so a narrow window never pushes the change pane out of view.
@@ -464,7 +495,7 @@ export function Shell() {
             onHide={() => update({ showPanel: false })}
           />
         </div>
-        <StatusBar state={viewState} onShowLog={showLog} />
+        <StatusBar state={viewState} zoomPercent={zoomPercent} onShowLog={showLog} />
         {isPaletteOpen && <Palette commands={commands} onClose={() => setIsPaletteOpen(false)} />}
         {about && <AboutDialog info={about.info} text={about.text} onClose={closeAbout} />}
         <Dialogs />
