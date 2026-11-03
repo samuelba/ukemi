@@ -88,6 +88,8 @@ The macOS and Windows builds are not signed yet. On macOS, open Ukemi from the c
 
 Start it from the app menu, or with a repository: `ukemi ~/src/repo`. Settings, the window layout and the log are in `~/.config/Ukemi` on Linux.
 
+When a newer release is out, Ukemi says so and offers to open its page, where you download the installer as above. It asks GitHub when it starts and once a day. Turn this off with **Check for Updates** in the settings.
+
 ### AppImage
 
 An AppImage runs without installing. To get it into the app menu with its icon, put it in a fixed place and extract the icon:

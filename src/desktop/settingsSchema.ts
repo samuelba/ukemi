@@ -10,6 +10,7 @@ import {
 } from './fonts'
 import { KEYBINDINGS, SHORTCUT_ACTIONS } from './menus'
 import { RESTORE_REPOSITORIES, THEME } from './startup'
+import { CHECK_FOR_UPDATES } from './updateCheck'
 
 interface PropertySchema {
   type?: string
@@ -55,6 +56,15 @@ const DESKTOP_FIELDS: readonly Omit<
     title: 'Reopen Repositories',
     description:
       'Reopen the repositories of the last session when Ukemi starts. Repositories named on the command line always open.',
+    type: 'boolean',
+    default: true,
+  },
+  {
+    key: CHECK_FOR_UPDATES,
+    group: 'General',
+    title: 'Check for Updates',
+    description:
+      'Ask GitHub for a newer release when Ukemi starts and once a day, and say when there is one. Ukemi sends nothing else.',
     type: 'boolean',
     default: true,
   },

@@ -46,11 +46,19 @@ import {
 } from './startup'
 import { readZoom, stepZoom, zoomPercent } from './zoom'
 
+import {
+  CHECK_FOR_UPDATES,
+  latestRelease,
+  SKIPPED_UPDATE,
+  updateNotice,
+  type Release,
+} from './updateCheck'
 const SCHEME = 'ukemi'
 const PAGE_HOST = 'app'
 const OPEN_FOLDERS_KEY = 'openFolders'
 const BOUNDS_KEY = 'windowBounds'
 const ZOOM_KEY = 'zoomFactor'
+const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
 const DEFAULT_BOUNDS = { width: 1280, height: 860 }
 const isDevelopment = !app.isPackaged
 
@@ -186,6 +194,8 @@ class DesktopApp implements DesktopContext {
       this.openWindow(folders)
     }
     app.on('second-instance', (_event, argv, cwd) => void this.openFromSecondInstance(argv, cwd))
+    void this.checkForUpdates()
+    setInterval(() => void this.checkForUpdates(), UPDATE_CHECK_INTERVAL_MS).unref()
     app.on('activate', () => {
       if (this.sessions.size === 0) {
         this.openWindow([])
@@ -452,6 +462,36 @@ class DesktopApp implements DesktopContext {
     const open = windowsToRemember([...this.sessions].map((session) => session.folders))
     if (open) {
       void this.state.update(OPEN_FOLDERS_KEY, open)
+    }
+  }
+
+  private async checkForUpdates(): Promise<void> {
+    if (!app.isPackaged || this.settings.values()[CHECK_FOR_UPDATES] === false) {
+      return
+    }
+    let notice: Release | null
+    try {
+      const skipped = this.state.get<string>(SKIPPED_UPDATE)
+      notice = updateNotice(app.getVersion(), await latestRelease(), skipped)
+    } catch (error: unknown) {
+      this.logger.info(`checking for updates failed: ${errorMessage(error)}`)
+      return
+    }
+    const session = [...this.sessions][0]
+    if (!notice || !session) {
+      return
+    }
+    const download = 'Download'
+    const skip = 'Skip This Version'
+    const choice = await session.notify(
+      `Ukemi ${notice.version} is available. You have ${app.getVersion()}.`,
+      download,
+      skip,
+    )
+    if (choice === download) {
+      await shell.openExternal(notice.url)
+    } else if (choice === skip) {
+      await this.state.update(SKIPPED_UPDATE, notice.version)
     }
   }
 

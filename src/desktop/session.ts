@@ -902,6 +902,11 @@ export class DesktopSession implements Disposable {
     }
   }
 
+  // A message in this window with buttons, like the editor's notifications.
+  notify(text: string, ...actions: string[]): Promise<string | undefined> {
+    return this.ui.info(text, ...actions)
+  }
+
   // Asked in a native dialog, which the page cannot answer itself.
   private async confirmProgram(key: string, value: unknown): Promise<boolean> {
     if (typeof value !== 'string' || value.trim() === '') {
