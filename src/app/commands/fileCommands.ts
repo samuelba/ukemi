@@ -47,13 +47,18 @@ function withFile(env: CommandEnv, fn: (target: FileTarget) => Promise<unknown>)
   }
 }
 
+// A rename touches two paths, and restoring only the new one would leave the old one deleted.
+function filePaths(file: ChangedFile): string[] {
+  return file.sourcePath === file.path ? [file.path] : [file.sourcePath, file.path]
+}
+
 async function discard(env: CommandEnv, { model, commit, file }: FileTarget): Promise<void> {
   if (commit.isImmutable) {
     return
   }
   if (await confirm(env.ui, `Discard changes to ${file.path} in ${shortId(commit)}?`, 'Discard')) {
     await env.operations.run('Discard', model, () =>
-      model.repo.restoreFiles(changeRevision(commit), [file.path]),
+      model.repo.restoreFiles(changeRevision(commit), filePaths(file)),
     )
   }
 }
