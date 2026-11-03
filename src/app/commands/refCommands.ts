@@ -326,11 +326,14 @@ async function mergeRequest(
   if (!method) {
     return
   }
-  const outcome = await env.operations.run('Ship request', model, async () => {
-    const result = await client.mergeRequest(request.number, method as MergeMethod)
-    await model.repo.fetch()
-    return result
-  })
+  const outcome = await env.operations.run('Ship request', model, () =>
+    client.mergeRequest(request.number, method as MergeMethod),
+  )
+  if (outcome === undefined) {
+    return
+  }
+  // The forge merged it, so a fetch that fails reports itself, not a failed ship.
+  await env.operations.run('Fetch', model, () => model.repo.fetch())
   await env.forge.refreshRequests(model, { force: true })
   if (outcome === 'enqueued') {
     void env.ui.info(`Ukemi: #${request.number} was added to the merge queue.`)
