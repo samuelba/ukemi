@@ -8,6 +8,7 @@ import { RendererUi } from '../../src/desktop/adapters/rendererUi'
 import { SecretsFile, type Encryptor } from '../../src/desktop/adapters/secretsFile'
 import type { SettingsChange } from '../../src/app/settings'
 import { SettingsFile } from '../../src/desktop/adapters/settingsFile'
+import { windowStore } from '../../src/desktop/adapters/windowStore'
 
 const dirs: string[] = []
 function tempDir(): string {
@@ -159,6 +160,23 @@ describe('KeyValueFile', () => {
     expect(problems).toEqual([expect.stringContaining('state.json')])
     expect(readFileSync(`${path}.invalid`, 'utf8')).toBe('{ "repoTabs": ')
     expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({ active: 'x' })
+  })
+})
+
+describe('windowStore', () => {
+  test('keeps what one window sets apart from another window', async () => {
+    const shared = new KeyValueFile(join(tempDir(), 'state.json')).scoped('window')
+    await shared.update('active', '/repo/start')
+    const first = windowStore(shared)
+    const second = windowStore(shared)
+    expect(first.get('active')).toBe('/repo/start')
+
+    await first.update('active', '/repo/a')
+    await second.update('active', '/repo/b')
+
+    expect(first.get('active')).toBe('/repo/a')
+    expect(second.get('active')).toBe('/repo/b')
+    expect(windowStore(shared).get('active')).toBe('/repo/b')
   })
 })
 

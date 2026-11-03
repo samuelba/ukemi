@@ -40,6 +40,7 @@ import { errorMessage, type Logger } from '../util/logger'
 import { LoopbackRedirect } from './adapters/loopbackRedirect'
 import { RendererUi, type NativeUi } from './adapters/rendererUi'
 import { fsWatchRepo } from './adapters/watchRepo'
+import { windowStore } from './adapters/windowStore'
 import { arrangeTabs, move, pin, rename, unpin } from './repoTabs'
 import { TO_RENDERER, type DesktopContext } from './context'
 import {
@@ -455,7 +456,7 @@ export class DesktopSession implements Disposable {
       window: windowState,
       folders,
       watchRepo: fsWatchRepo(context.logger),
-      store: context.state.scoped('window'),
+      store: windowStore(context.state.scoped('window')),
       secrets: context.secrets,
     }
   }
