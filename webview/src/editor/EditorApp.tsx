@@ -1,4 +1,4 @@
-import type { Text } from '@codemirror/state'
+import { Text } from '@codemirror/state'
 import { EditorView, type ViewUpdate } from '@codemirror/view'
 import { useEffect, useRef, useState } from 'react'
 import { fileSideLabel, fileSideTitle, sharedSideCount } from '../../../shared/conflictMarkers'
@@ -11,6 +11,7 @@ import { useHostMessages } from '../shared/hooks'
 import { useSend } from '../shared/hostChannel'
 import { LoadingScreen } from '../shared/LoadingMark'
 import { createState } from './codemirror'
+import { loadAction } from './loadAction'
 import {
   acceptSideEverywhere,
   conflictBlocks,
@@ -79,6 +80,10 @@ export function EditorApp({ tabId }: { tabId: string }) {
   const loadedRef = useRef<Text | null>(null)
   const fileRef = useRef<FileState | null>(null)
   const dirtyRef = useRef(false)
+  // What the next load answers, see loadAction.
+  const savingRef = useRef<string | null>(null)
+  const revertingRef = useRef(false)
+  const rebaseRef = useRef(false)
 
   const markDirty = (dirty: boolean) => {
     dirtyRef.current = dirty
@@ -95,7 +100,9 @@ export function EditorApp({ tabId }: { tabId: string }) {
     const current = fileRef.current
     if (view && current && !current.readOnly) {
       setError(null)
-      send({ type: 'save', text: view.state.sliceDoc(), baseHash: current.baseHash })
+      const text = view.state.sliceDoc()
+      savingRef.current = text
+      send({ type: 'save', text, baseHash: current.baseHash })
     }
   }
 
@@ -113,18 +120,34 @@ export function EditorApp({ tabId }: { tabId: string }) {
   useHostMessages<EditorHostMessage>(
     (message) => {
       switch (message.type) {
-        case 'load':
-          setError(null)
-          setFile(message.state)
+        case 'load': {
+          const action = loadAction({
+            shown: fileRef.current,
+            next: message.state,
+            saving: savingRef.current,
+            reverting: revertingRef.current,
+            isDirty: dirtyRef.current,
+          })
+          savingRef.current = null
+          revertingRef.current = false
           setSeenConflicts((seen) => [
             ...seen,
             ...message.state.conflictedPaths.filter((path) => !seen.includes(path)),
           ])
+          if (action === 'keep') {
+            return
+          }
+          setError(null)
+          rebaseRef.current = action === 'rebase'
+          setFile(message.state)
           return
+        }
         case 'busy':
           setBusy(message.label)
           return
         case 'error':
+          savingRef.current = null
+          revertingRef.current = false
           setError(message.text)
           return
         case 'show':
@@ -135,13 +158,22 @@ export function EditorApp({ tabId }: { tabId: string }) {
     { type: 'ready' } satisfies EditorWebviewMessage,
   )
 
-  // A new load replaces the document, its undo history and the read-only state.
+  // A new load replaces the document, its undo history and the read-only state. After a save it
+  // only moves the baseline that tells whether there are edits.
   useEffect(() => {
     const host = hostRef.current
     if (!file || !host) {
       return
     }
     fileRef.current = file
+    const view = viewRef.current
+    if (rebaseRef.current && view) {
+      rebaseRef.current = false
+      loadedRef.current = Text.of(file.text.split('\n'))
+      markDirty(!view.state.doc.eq(loadedRef.current))
+      setSummary(summarize(view))
+      return
+    }
     const state = createState(file.text, {
       path: file.path,
       readOnly: file.readOnly !== null,
@@ -244,7 +276,10 @@ export function EditorApp({ tabId }: { tabId: string }) {
               className="button secondary"
               disabled={busy !== null}
               title="Load the file again and drop your edits"
-              onClick={() => send({ type: 'reload' })}
+              onClick={() => {
+                revertingRef.current = true
+                send({ type: 'reload' })
+              }}
             >
               Revert
             </button>
