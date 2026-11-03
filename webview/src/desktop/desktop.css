@@ -2159,6 +2159,22 @@ button.status-item:focus-visible {
   flex: none;
 }
 
+/* The zoom buttons sit together. The percentage keeps its width as it changes. */
+.status-zoom {
+  display: inline-flex;
+  flex: none;
+  margin-right: 4px;
+  border-right: 1px solid var(--vscode-statusBar-border);
+}
+
+.status-zoom .status-item {
+  padding: 0 5px;
+}
+
+.status-zoom .status-text {
+  font-variant-numeric: tabular-nums;
+}
+
 .status-announce {
   position: absolute;
   width: 1px;

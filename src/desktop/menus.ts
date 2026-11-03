@@ -1,5 +1,5 @@
 import type { MenuItemConstructorOptions } from 'electron'
-import type { ShellAction } from '../../shared/desktopProtocol'
+import type { ShellAction, ZoomStep } from '../../shared/desktopProtocol'
 import {
   inlineActions,
   resolveMenu,
@@ -130,6 +130,8 @@ export interface AppMenuActions {
   recent: { roots: readonly string[]; home: string }
   openRecent: (root: string) => void
   clearRecent: () => void
+  // The zoom of the windows, as a percentage.
+  zoom: { percent: number; step: (step: ZoomStep) => void }
   newWindow: () => void
   openSettings: () => void
   openLog: () => void
@@ -155,6 +157,22 @@ function recentMenu(actions: AppMenuActions): MenuItemConstructorOptions[] {
     })),
     { type: 'separator' },
     { label: 'Clear Recently Opened', click: actions.clearRecent },
+  ]
+}
+
+// Ctrl+= zooms in as in VS Code and browsers. Electron's own role wants Ctrl+Shift+= on most
+// keyboards. Ctrl with the mouse wheel zooms too, in the window.
+function zoomMenu(zoom: AppMenuActions['zoom']): MenuItemConstructorOptions[] {
+  const isZoomed = zoom.percent !== 100
+  return [
+    { label: 'Zoom In', accelerator: 'CmdOrCtrl+=', click: () => zoom.step('in') },
+    { label: 'Zoom Out', accelerator: 'CmdOrCtrl+-', click: () => zoom.step('out') },
+    {
+      label: isZoomed ? `Reset Zoom (${zoom.percent}%)` : 'Reset Zoom',
+      accelerator: 'CmdOrCtrl+0',
+      enabled: isZoomed,
+      click: () => zoom.step('reset'),
+    },
   ]
 }
 
@@ -244,9 +262,8 @@ export function appMenuTemplate(actions: AppMenuActions): MenuItemConstructorOpt
         command('ukemi.view.asList', run),
         command('ukemi.view.asTree', run),
         { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
+        ...zoomMenu(actions.zoom),
+        { type: 'separator' },
         { role: 'togglefullscreen' },
         ...(actions.isDevelopment
           ? [

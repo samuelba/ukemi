@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type MouseEvent } from 'react'
-import type { DesktopRendererMessage } from '../../../shared/desktopProtocol'
+import type { DesktopRendererMessage, ZoomStep } from '../../../shared/desktopProtocol'
 import type { HostMessage, ViewState } from '../../../shared/protocol'
 import { summarizeStatus, type StatusAction, type StatusItem } from '../../../shared/statusSummary'
 import { postMessage } from '../shared/hostApi'
@@ -9,6 +9,7 @@ const TICK_MS = 30_000
 
 interface StatusBarProps {
   state: ViewState | null
+  zoomPercent: number
   onShowLog: () => void
 }
 
@@ -97,7 +98,40 @@ function Item({ item, state, onShowLog }: ItemProps) {
   )
 }
 
-export function StatusBar({ state, onShowLog }: StatusBarProps) {
+// Shown while the window is zoomed, as in VS Code, so the way back is one click away.
+function ZoomItem({ percent }: { percent: number }) {
+  const step = (step: ZoomStep) =>
+    postMessage<DesktopRendererMessage>({ type: 'desktop.zoom', step })
+  return (
+    <span className="status-zoom">
+      <button
+        className="status-item"
+        title="Zoom Out"
+        aria-label="Zoom out"
+        onClick={() => step('out')}
+      >
+        <span className="codicon codicon-zoom-out" aria-hidden />
+      </button>
+      <button
+        className="status-item"
+        title={`Zoom ${percent}%. Click to reset to 100%.`}
+        onClick={() => step('reset')}
+      >
+        <span className="status-text">{percent}%</span>
+      </button>
+      <button
+        className="status-item"
+        title="Zoom In"
+        aria-label="Zoom in"
+        onClick={() => step('in')}
+      >
+        <span className="codicon codicon-zoom-in" aria-hidden />
+      </button>
+    </span>
+  )
+}
+
+export function StatusBar({ state, zoomPercent, onShowLog }: StatusBarProps) {
   const [tick, setTick] = useState(0)
   useEffect(() => {
     const timer = setInterval(() => setTick((t) => t + 1), TICK_MS)
@@ -114,7 +148,10 @@ export function StatusBar({ state, onShowLog }: StatusBarProps) {
   return (
     <footer className="status-bar" aria-label="Repository status">
       <div className="status-group status-left">{group('left')}</div>
-      <div className="status-group status-right">{group('right')}</div>
+      <div className="status-group status-right">
+        {zoomPercent !== 100 && <ZoomItem percent={zoomPercent} />}
+        {group('right')}
+      </div>
       {/* Only errors are announced. The rest changes too often to read out. */}
       <span className="status-announce" role="alert">
         {error?.text}

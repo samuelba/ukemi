@@ -53,6 +53,7 @@ import { aboutText } from './about'
 import { settingFields } from './settingsSchema'
 import { foldersAfterClosing } from './startup'
 import { Terminals } from './terminals'
+import { zoomPercent } from './zoom'
 import { desktopWorkbench, type PanelEntry } from './workbench'
 import { cliSuggesters, DescriptionSuggestions } from '../app/describeSuggest/service'
 
@@ -288,6 +289,11 @@ export class DesktopSession implements Disposable {
     this.post({ type: 'desktop.about', info, text: aboutText(info) })
   }
 
+  setZoom(factor: number): void {
+    this.window.webContents.setZoomFactor(factor)
+    this.post({ type: 'desktop.zoom', percent: zoomPercent(factor) })
+  }
+
   postLog(lines: LogLine[], replace: boolean): void {
     this.post({ type: 'desktop.log', lines, replace })
   }
@@ -402,6 +408,9 @@ export class DesktopSession implements Disposable {
       window.once('closed', () => resolve())
     })
     window.once('ready-to-show', () => window.show())
+    window.webContents.on('did-finish-load', () =>
+      window.webContents.setZoomFactor(this.context.zoomFactor()),
+    )
     window.on('focus', () => this.focusEmitter.fire())
     window.on('resize', () => this.context.saveWindowBounds(window.getBounds()))
     window.on('closed', () => this.context.closeSession(this))
@@ -600,6 +609,11 @@ export class DesktopSession implements Disposable {
         this.context.logger.clear()
         this.context.broadcastLog()
         return
+      case 'desktop.zoom':
+        if (message.step === 'in' || message.step === 'out' || message.step === 'reset') {
+          this.context.zoom(message.step)
+        }
+        return
       case 'desktop.openRepo': {
         const folder = await this.ui.pickFolder('Open Repository')
         if (folder) {
@@ -684,6 +698,7 @@ export class DesktopSession implements Disposable {
     this.post({ type: 'fileIcons', theme: null })
     this.post({ type: 'desktop.window', title: this.title(), platform: process.platform })
     this.post({ type: 'desktop.fonts', fonts: this.context.fonts() })
+    this.post({ type: 'desktop.zoom', percent: zoomPercent(this.context.zoomFactor()) })
     this.postLog(this.context.logger.recent(), true)
     this.post({
       type: 'desktop.commands',
