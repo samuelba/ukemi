@@ -4,6 +4,7 @@ import type {
   BookmarkTracking,
   ChangedFile,
   Commit,
+  EvolutionEntry,
   GraphFilter,
   HistoryDepth,
   Operation,
@@ -45,6 +46,8 @@ export class RepoModel {
   private snapshotOtherWorkspaces = false
   private showLineStats = false
   private readonly fileCache = new Map<string, ChangedFile[]>()
+  private readonly evolutionCache = new Map<string, Promise<EvolutionEntry[]>>()
+  private evolutionOperation: string | null = null
   private readonly listeners = new Set<ChangeListener>()
   private listedBookmarks: ParsedBookmark[] = []
 
@@ -423,6 +426,29 @@ export class RepoModel {
     }
     this.fileCache.set(key, files)
     return files
+  }
+
+  // Nothing in an evolution changes without a new operation, so refreshes and overlapping callers share one load.
+  evolutionFor(commitId: string): Promise<EvolutionEntry[]> {
+    if (
+      this.evolutionOperation !== this.lastOperationId ||
+      this.evolutionCache.size >= FILE_CACHE_LIMIT
+    ) {
+      this.evolutionCache.clear()
+      this.evolutionOperation = this.lastOperationId
+    }
+    const cached = this.evolutionCache.get(commitId)
+    if (cached) {
+      return cached
+    }
+    const loading = this.repo.evolution(commitId)
+    this.evolutionCache.set(commitId, loading)
+    loading.catch(() => {
+      if (this.evolutionCache.get(commitId) === loading) {
+        this.evolutionCache.delete(commitId)
+      }
+    })
+    return loading
   }
 }
 

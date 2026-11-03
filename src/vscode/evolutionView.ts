@@ -90,6 +90,32 @@ export class EvolutionView
     if (!this.stale) {
       return this.nodes
     }
+    return this.load()
+  }
+
+  dispose(): void {
+    this.disposables.forEach((item) => item.dispose())
+  }
+
+  // Reloads behind the shown rows and redraws only when they differ, so a refresh that changes nothing does not flicker.
+  private invalidate(): void {
+    this.generation += 1
+    this.stale = true
+    this.pending = null
+    this.updateDescription()
+    if (!this.tree.visible) {
+      return
+    }
+    const generation = this.generation
+    const shown = JSON.stringify(this.nodes)
+    void this.load().then((nodes) => {
+      if (generation === this.generation && JSON.stringify(nodes) !== shown) {
+        this.change.fire(undefined)
+      }
+    })
+  }
+
+  private load(): Promise<EvolutionVersionNode[]> {
     if (this.pending) {
       return this.pending
     }
@@ -100,20 +126,6 @@ export class EvolutionView
     })
     this.pending = run
     return run
-  }
-
-  dispose(): void {
-    this.disposables.forEach((item) => item.dispose())
-  }
-
-  private invalidate(): void {
-    this.generation += 1
-    this.stale = true
-    this.pending = null
-    this.updateDescription()
-    if (this.tree.visible) {
-      this.change.fire(undefined)
-    }
   }
 
   private async reload(): Promise<EvolutionVersionNode[]> {
@@ -156,7 +168,7 @@ export class EvolutionView
       return []
     }
     try {
-      return await model.repo.evolution(target.commit.commitId)
+      return await model.evolutionFor(target.commit.commitId)
     } catch (error: unknown) {
       this.logger.warn(`Evolution of ${target.commit.changeId} failed: ${errorMessage(error)}`)
       return null

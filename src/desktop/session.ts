@@ -114,6 +114,10 @@ export class DesktopSession implements Disposable {
   private shown!: Promise<void>
   private stateTimer: ReturnType<typeof setTimeout> | null = null
   private detail: { repoId: string; commitId: string; changeId: string } | null = null
+  private detailGeneration = 0
+  // What the renderer shows, so a refresh that changes nothing does not redraw the panel.
+  private postedDetail: string | null = null
+  private postedChangeId: string | null = null
 
   constructor(
     private readonly context: DesktopContext,
@@ -670,6 +674,8 @@ export class DesktopSession implements Disposable {
   }
 
   private sendInitial(): void {
+    this.postedDetail = null
+    this.postedChangeId = null
     const offers = (command: string) => this.offers(command)
     this.post({ type: 'fileIcons', theme: null })
     this.post({ type: 'desktop.window', title: this.title(), platform: process.platform })
@@ -732,6 +738,7 @@ export class DesktopSession implements Disposable {
 
   // Follows the selected change through rewrites, by its change id.
   private async refreshDetail(): Promise<void> {
+    const generation = ++this.detailGeneration
     const model = this.registry.activeModel
     const selected = this.detail
     const commit =
@@ -739,7 +746,7 @@ export class DesktopSession implements Disposable {
         ? model.commitFor(selected.commitId, selected.changeId)
         : null
     if (!model || !selected || !commit) {
-      this.post({ type: 'desktop.detail', detail: null })
+      this.postDetail(null)
       return
     }
     this.detail = { ...selected, commitId: commit.commitId }
@@ -748,14 +755,27 @@ export class DesktopSession implements Disposable {
         ? (model.graph?.workingCopyFiles ?? [])
         : await model.filesFor(commit.commitId)
       const detail: ChangeDetail = { repoId: model.root, commit, files, evolution: null }
-      this.post({ type: 'desktop.detail', detail })
-      this.post({
-        type: 'desktop.detail',
-        detail: { ...detail, evolution: await this.evolution(commit) },
-      })
+      // Another change shows "Loading…" at once; the same one is posted once, with its evolution, so the rows never blank out.
+      if (generation === this.detailGeneration && this.postedChangeId !== commit.changeId) {
+        this.postDetail(detail)
+      }
+      const evolution = await this.evolution(commit)
+      if (generation === this.detailGeneration) {
+        this.postDetail({ ...detail, evolution })
+      }
     } catch (error: unknown) {
       this.context.logger.warn(`loading the change details failed: ${errorMessage(error)}`)
     }
+  }
+
+  private postDetail(detail: ChangeDetail | null): void {
+    const serialized = JSON.stringify(detail)
+    if (serialized === this.postedDetail) {
+      return
+    }
+    this.postedDetail = serialized
+    this.postedChangeId = detail?.commit.changeId ?? null
+    this.post({ type: 'desktop.detail', detail })
   }
 
   private async askTrust(): Promise<void> {
@@ -879,7 +899,7 @@ export class DesktopSession implements Disposable {
       return []
     }
     try {
-      const entries = await model.repo.evolution(commit.commitId)
+      const entries = await model.evolutionFor(commit.commitId)
       const config = this.context.settings.read()
       return evolutionVersionNodes(
         entries,

@@ -294,4 +294,17 @@ describe('RepoModel', () => {
 
     expect(second).toBe(first)
   })
+
+  test('shares an evolution until the operation log moves', async () => {
+    await model.refresh()
+    const id = model.graph?.commits.find((commit) => commit.isWorkingCopy)?.commitId ?? ''
+
+    const first = model.evolutionFor(id)
+    expect(model.evolutionFor(id)).toBe(first)
+
+    writeFile(root, 'a.txt', 'a\n')
+    model.markDirty()
+    await model.refresh()
+    expect(model.evolutionFor(id)).not.toBe(first)
+  })
 })
