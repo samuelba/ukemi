@@ -275,3 +275,8 @@ Then run **Developer: Restart Extension Host** or **Developer: Reload Window**. 
 A push to `main` does not publish. [release-please](https://github.com/googleapis/release-please) opens a release pull request from conventional commits (`feat` bumps minor before 1.0, `fix` bumps patch, `feat!` bumps major after 1.0). Merging that pull request creates the `vX.Y.Z` tag, the GitHub Release, and attaches `ukemi-jj-X.Y.Z.vsix`. Merge commits are removed from those notes afterward.
 
 Set the repository secret `RELEASE_PLEASE_TOKEN` to a fine-grained personal access token if CI should run on that pull request. Without it, the release still works.
+
+The release publishes to the Visual Studio Marketplace and to Open VSX, which Cursor, VSCodium and Windsurf use. Both use trusted publishing, so no token is stored: the workflow proves to the store that it runs in this repository. Each store is skipped until it is set up:
+
+- **Visual Studio Marketplace.** On the publisher management page, open **Trusted Publishing > Create** and enter the owner `samuelba`, the repository `ukemi` and the workflow `release.yml`. Then set the repository variable `MARKETPLACE_TRUSTED_PUBLISHING` to `true`. See [Publishing extensions](https://code.visualstudio.com/api/working-with-extensions/publishing-extension).
+- **Open VSX.** As the owner of the `samuelba` namespace, open **Settings > Trusted Publishers** on open-vsx.org, pick GitHub Actions and enter the same owner, repository and workflow. Then set the repository variable `OPEN_VSX_TRUSTED_PUBLISHING` to `true`. See [Trusted Publishing](https://github.com/eclipse/openvsx/wiki/Trusted-Publishing).
