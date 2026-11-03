@@ -113,8 +113,12 @@ async function foldersFromArgs(argv: readonly string[], cwd: string): Promise<st
 class DesktopApp implements DesktopContext {
   readonly paths = desktopPaths()
   readonly logger = new LogBuffer(fileLogger(this.paths.log, isDevelopment))
-  readonly settings = new SettingsFile(join(this.paths.userData, 'settings.json'))
-  readonly state = new KeyValueFile(join(this.paths.userData, 'state.json'))
+  readonly settings = new SettingsFile(join(this.paths.userData, 'settings.json'), (problem) =>
+    this.logger.warn(problem),
+  )
+  readonly state = new KeyValueFile(join(this.paths.userData, 'state.json'), (problem) =>
+    this.logger.warn(problem),
+  )
   readonly trust = new TrustStore(this.state)
   readonly repoTabs = new RepoTabStore(this.state)
   readonly recentRepos = new RecentRepoStore(this.state)

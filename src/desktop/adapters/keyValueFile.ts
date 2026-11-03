@@ -1,12 +1,25 @@
 import type { KeyValueStore } from '../../app/host'
-import { readJsonObject, withoutKey, writeJsonObject } from './jsonFile'
+import {
+  invalidCopyPath,
+  readJson,
+  withoutKey,
+  writeJsonObject,
+  type ProblemListener,
+} from './jsonFile'
 
 // The app's memento: small values kept between runs, like the active repository.
 export class KeyValueFile implements KeyValueStore {
   private values: Record<string, unknown>
 
-  constructor(private readonly path: string) {
-    this.values = readJsonObject(path)
+  constructor(
+    private readonly path: string,
+    onProblem: ProblemListener = () => undefined,
+  ) {
+    const read = readJson(path)
+    this.values = read.values
+    if (read.problem !== null) {
+      onProblem(`${read.problem}. Saving state keeps it as ${invalidCopyPath(path)}.`)
+    }
   }
 
   get<T>(key: string): T | undefined {

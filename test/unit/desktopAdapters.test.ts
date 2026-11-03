@@ -148,6 +148,18 @@ describe('KeyValueFile', () => {
     await reopened.update('/repo/a\nactive', undefined)
     expect(new KeyValueFile(path).scoped('/repo/a').get('active')).toBeUndefined()
   })
+  test('keeps a copy of a file it cannot read before writing over it', async () => {
+    const path = join(tempDir(), 'state.json')
+    writeFileSync(path, '{ "repoTabs": ')
+    const problems: string[] = []
+
+    const store = new KeyValueFile(path, (problem) => problems.push(problem))
+    await store.update('active', 'x')
+
+    expect(problems).toEqual([expect.stringContaining('state.json')])
+    expect(readFileSync(`${path}.invalid`, 'utf8')).toBe('{ "repoTabs": ')
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({ active: 'x' })
+  })
 })
 
 describe('SecretsFile', () => {
@@ -195,6 +207,36 @@ describe('SecretsFile', () => {
 })
 
 describe('SettingsFile', () => {
+  test('keeps the current values while the file does not parse', async () => {
+    const path = join(tempDir(), 'settings.json')
+    writeFileSync(path, JSON.stringify({ showGitTags: false }))
+    const problems: string[] = []
+    const settings = new SettingsFile(path, (problem) => problems.push(problem))
+
+    writeFileSync(path, '{ "showGitTags": false,')
+    await vi.waitFor(() => expect(problems).toHaveLength(1))
+    expect(settings.read().showGitTags).toBe(false)
+
+    writeFileSync(path, JSON.stringify({ showGitTags: true }))
+    await vi.waitFor(() => expect(settings.read().showGitTags).toBe(true))
+    settings.dispose()
+  })
+
+  test('starts with defaults from a file that does not parse and keeps a copy of it', async () => {
+    const path = join(tempDir(), 'settings.json')
+    writeFileSync(path, '{ "showGitTags": false,')
+    const problems: string[] = []
+    const settings = new SettingsFile(path, (problem) => problems.push(problem))
+
+    expect(problems).toEqual([expect.stringContaining('settings.json')])
+    expect(settings.read().showGitTags).toBe(true)
+    settings.ensureFile()
+    expect(readFileSync(path, 'utf8')).toBe('{ "showGitTags": false,')
+    await settings.update('historyDepth', '30d')
+    expect(readFileSync(`${path}.invalid`, 'utf8')).toBe('{ "showGitTags": false,')
+    settings.dispose()
+  })
+
   test('reads defaults for missing keys and stored values for the rest', () => {
     const path = join(tempDir(), 'settings.json')
     writeFileSync(path, JSON.stringify({ 'autoFetch.enabled': true, historyDepth: '30d' }))
