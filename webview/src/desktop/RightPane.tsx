@@ -4,6 +4,7 @@ import { CleanupApp } from '../cleanup/CleanupApp'
 import { dirtyTabs } from '../editor/dirtyTabs'
 import { EditorApp } from '../editor/EditorApp'
 import { postMessage } from '../shared/hostApi'
+import { HistoryApp } from '../history/HistoryApp'
 import { HostChannelContext, windowChannel, type HostChannel } from '../shared/hostChannel'
 import { SplitApp } from '../split/SplitApp'
 
@@ -37,6 +38,8 @@ function PanelView({ tab }: { tab: PanelTab }) {
         <SplitApp />
       ) : tab.kind === 'editor' ? (
         <EditorApp tabId={tab.id} />
+      ) : tab.kind === 'history' ? (
+        <HistoryApp />
       ) : (
         <CleanupApp />
       )}
@@ -48,6 +51,7 @@ const ICONS: Record<PanelTab['kind'], string> = {
   split: 'split-horizontal',
   cleanup: 'sparkle',
   editor: 'edit',
+  history: 'history',
 }
 
 // An editor tab decides itself, so it can ask before dropping unsaved edits.

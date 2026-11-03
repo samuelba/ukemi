@@ -372,6 +372,66 @@ test('search dims the changes that do not match and steps through matches', asyn
   }
 })
 
+test('opens the history of a file, with the diff of the selected change and a blame', async () => {
+  const { app, page } = await launch(fixtureRepo())
+  try {
+    await expect(page.locator('.commit.is-wc')).toBeVisible()
+    await page.evaluate(() =>
+      window.ukemiHost?.postMessage({
+        type: 'desktop.run',
+        command: 'ukemi.file.history',
+        arg: { path: 'src/cart.js' },
+      }),
+    )
+    await expect(page.locator('.pane-tab', { hasText: 'History of cart.js' })).toBeVisible()
+    const rows = page.locator('.history-row')
+    await expect(rows).toHaveCount(2)
+    // The newest change opens selected, with its diff of the file under the list.
+    await expect(rows.nth(0)).toHaveAttribute('aria-selected', 'true')
+    const detail = page.locator('.history-detail')
+    await expect(detail.locator('.diff-file')).toContainText('src/cart.js')
+    await expect(detail).toContainText('let sum = 0')
+
+    // The arrow keys step to the older change, and the detail follows it.
+    await page.getByRole('listbox', { name: 'Changes to this file' }).press('ArrowDown')
+    await expect(rows.nth(1)).toHaveAttribute('aria-selected', 'true')
+    await expect(detail.locator('.history-detail-title')).toContainText('feat: add the cart total')
+    await expect(detail).toContainText('let total = 0')
+    await expect(page.locator('.right-pane .pane-tab.is-active')).toContainText(
+      'History of cart.js',
+    )
+
+    // The handle between the list and the detail moves the split.
+    // The window can still settle after launch, which moves the 1px handle and rescales the list,
+    // so this compares the list's share of the split and drags again if the press missed.
+    const list = page.locator('.history-list')
+    const share = () =>
+      list.evaluate((el) => el.clientHeight / (el.parentElement?.clientHeight ?? 1))
+    const before = await share()
+    await expect(async () => {
+      const handle = await page
+        .getByRole('separator', { name: 'Resize the history list' })
+        .boundingBox()
+      const x = (handle?.x ?? 0) + (handle?.width ?? 0) / 2
+      const y = (handle?.y ?? 0) + (handle?.height ?? 0) / 2
+      await page.mouse.move(x, y)
+      await page.mouse.down()
+      await page.mouse.move(x, y + 80, { steps: 4 })
+      await page.mouse.up()
+      expect(await share()).toBeGreaterThan(before + 0.05)
+    }).toPass()
+
+    await page.getByRole('tab', { name: 'Blame' }).click()
+    await expect(page.locator('.blame-row')).toHaveCount(2)
+    await expect(page.locator('.blame-text').first()).toHaveText('let sum = 0')
+    // A change in the gutter goes back to the list with that change selected.
+    await page.locator('.blame-change').first().click()
+    await expect(rows.nth(0)).toHaveAttribute('aria-selected', 'true')
+  } finally {
+    await app.close()
+  }
+})
+
 test('shows line stats as soon as they are switched on', async () => {
   const { app, page } = await launch(fixtureRepo())
   try {

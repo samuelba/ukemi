@@ -6,6 +6,7 @@ import { commitCommands } from './app/commands/commitCommands'
 import type { CommandEnv } from './app/commands/context'
 import { evolutionCommands } from './app/commands/evolutionCommands'
 import { operationCommands } from './app/commands/operationCommands'
+import { fileHistoryCommands } from './app/commands/fileHistoryCommands'
 import { fileCommands } from './app/commands/fileCommands'
 import { globalCommands } from './app/commands/globalCommands'
 import { refCommands } from './app/commands/refCommands'
@@ -45,6 +46,8 @@ import { LanguageModelSuggester } from './vscode/languageModelSuggester'
 import { cliSuggesters, DescriptionSuggestions } from './app/describeSuggest/service'
 import { WorkspacesView } from './vscode/workspacesView'
 import { OperationsView } from './vscode/operationsView'
+import { FileHistoryView } from './vscode/fileHistoryView'
+import { InlineBlame } from './vscode/blameDecorations'
 
 export interface UkemiApi {
   readonly registry: RepoRegistry
@@ -81,6 +84,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
   const evolutionView = new EvolutionView(registry, selection, logger)
   const workspacesView = new WorkspacesView(registry)
   const operationsView = new OperationsView(registry)
+  const fileHistoryView = new FileHistoryView(registry, logger)
   const bookmarksView = new BookmarksView(registry)
   const forge = new ForgeService(registry, host, logger, vscodeForgeAccounts(context.extension.id))
   const askpass = new AskpassServer(
@@ -133,6 +137,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
       },
       () => env,
       install,
+      () => fileHistoryView,
     ),
     suggestions: new DescriptionSuggestions(
       [...cliSuggesters(settings), new LanguageModelSuggester(settings)],
@@ -145,6 +150,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
     }),
   )
   const conflictDecorator = new ConflictDecorator(registry)
+  const inlineBlame = new InlineBlame(registry, logger)
 
   context.subscriptions.push(
     channel,
@@ -164,6 +170,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
     conflictDecorator,
     workspacesView,
     operationsView,
+    fileHistoryView,
+    inlineBlame,
     bookmarksView,
     vscode.window.registerTreeDataProvider('ukemi.workspaces', workspacesView),
     vscode.window.registerTreeDataProvider('ukemi.operations', operationsView),
@@ -199,6 +207,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
     ...workspaceCommands(env),
     ...evolutionCommands(env),
     ...operationCommands(env),
+    ...fileHistoryCommands(env),
+    ...inlineBlame.commands(),
     'ukemi.evolution.follow': () => {
       selection.toggleFollow(evolutionView.currentSelection())
     },

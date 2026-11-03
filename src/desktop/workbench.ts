@@ -2,6 +2,7 @@ import { open } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import type { CleanupHostMessage, CleanupWebviewMessage } from '../../shared/cleanup'
 import type { EditorHostMessage, EditorWebviewMessage } from '../../shared/editor'
+import type { FileHistoryHostMessage, FileHistoryWebviewMessage } from '../../shared/fileHistory'
 import type {
   DesktopHostMessage,
   DiffDocument,
@@ -14,6 +15,7 @@ import type { SplitHostMessage, SplitWebviewMessage } from '../../shared/split'
 import { cleanupController } from '../app/cleanupController'
 import { shortId, type CommandEnv, type Workbench } from '../app/commands/context'
 import { editorController } from '../app/editorController'
+import { fileHistoryController } from '../app/fileHistoryController'
 import type { PanelChannel, PanelHandler } from '../app/panel'
 import {
   BINARY_PLACEHOLDER,
@@ -37,7 +39,7 @@ export const MAX_DIFF_BYTES = 2_000_000
 const TOO_LARGE = '(file too large to show)'
 const LOAD_CONCURRENCY = 8
 
-export type PanelEntry = 'split' | 'cleanup' | 'editor'
+export type PanelEntry = 'split' | 'cleanup' | 'editor' | 'history'
 
 export type OpenPanelWindow = <H, W>(
   entry: PanelEntry,
@@ -152,19 +154,25 @@ export function desktopWorkbench(deps: DesktopWorkbenchDeps, env: () => CommandE
     )
   }
 
+  const commitDocument = async (
+    model: RepoModel,
+    commit: CommitView,
+    files: ChangedFile[],
+    focus?: string,
+  ): Promise<DiffDocument> => ({
+    kind: 'files',
+    title: commitDiffTitle(commit),
+    files: await diffFiles(model, commitDiffEntries(commit, files), statusMap(files)),
+    ...(focus ? { focus } : {}),
+  })
+
   const showCommit = async (
     model: RepoModel,
     commit: CommitView,
     files: ChangedFile[],
     focus?: string,
   ) => {
-    const loaded = await diffFiles(model, commitDiffEntries(commit, files), statusMap(files))
-    show({
-      kind: 'files',
-      title: commitDiffTitle(commit),
-      files: loaded,
-      ...(focus ? { focus } : {}),
-    })
+    show(await commitDocument(model, commit, files, focus))
   }
 
   return {
@@ -197,6 +205,17 @@ export function desktopWorkbench(deps: DesktopWorkbenchDeps, env: () => CommandE
         'split',
         `Split ${shortId(target.commit)}`,
         (channel) => splitController(env(), target, channel, deps.splitPaths),
+      )
+    },
+    showFileHistory: async (model, path) => {
+      deps.openPanelWindow<FileHistoryHostMessage, FileHistoryWebviewMessage>(
+        'history',
+        `History of ${basename(path)}`,
+        (channel) =>
+          fileHistoryController(env(), model, path, channel, (model, commit, file) =>
+            commitDocument(model, commit, [file], file.path),
+          ),
+        `history:${model.root}:${path}`,
       )
     },
     openCleanup: (model) => {

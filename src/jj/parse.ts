@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type {
+  AnnotatedLine,
   BookmarkTracking,
   ChangedFile,
   Commit,
@@ -76,6 +77,12 @@ const evolutionSchema = z.object({
   timestamp: z.string(),
   is_empty: z.boolean(),
   operation: z.string(),
+})
+
+const annotationSchema = z.object({
+  commit_id: z.string(),
+  change_id: z.string(),
+  line: z.number(),
 })
 
 const operationSchema = z.object({
@@ -213,6 +220,14 @@ export function parseDiffFiles(output: string): ChangedFile[] {
     sourcePath: file.source,
     status: file.status,
     isConflicted: false,
+  }))
+}
+
+export function parseAnnotation(output: string): AnnotatedLine[] {
+  return parseLines(output, annotationSchema, 'annotation').map((entry) => ({
+    commitId: entry.commit_id,
+    changeId: entry.change_id,
+    line: entry.line,
   }))
 }
 

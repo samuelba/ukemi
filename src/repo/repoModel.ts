@@ -210,6 +210,16 @@ export class RepoModel {
     return known ? changeRevision(known) : commitId
   }
 
+  // A change by its commit id, also when the graph does not show it, as for a file's history.
+  async loadCommit(commitId: string): Promise<CommitView | null> {
+    const shown = this.findCommit(commitId)
+    if (shown) {
+      return shown
+    }
+    const [commit] = await this.repo.log(commitId, 1)
+    return commit ? toCommitView(commit, undefined, undefined) : null
+  }
+
   commitFor(commitId: string, changeId: string): CommitView | null {
     return resolveSelectedCommit(
       this.current?.commits ?? [],

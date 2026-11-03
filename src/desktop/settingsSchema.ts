@@ -34,6 +34,7 @@ const EDITOR_ONLY = new Set([
   'showInPanel',
   'showEditorTitleDiff',
   'followActiveEditor',
+  'inlineBlame',
 ])
 
 const GROUPS: ReadonlyArray<readonly [string, (key: string) => boolean]> = [

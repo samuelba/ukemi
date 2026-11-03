@@ -167,10 +167,21 @@
           "icon": "$(history)",
           "initialSize": 15,
           "visibility": "collapsed"
+        },
+        {
+          "id": "ukemi.fileHistory",
+          "name": "File History",
+          "icon": "$(git-commit)",
+          "initialSize": 15,
+          "visibility": "collapsed"
         }
       ]
     },
     "viewsWelcome": [
+      {
+        "view": "ukemi.fileHistory",
+        "contents": "Right-click a file and pick Show File History to list the changes that touched it.\n[Show History of the Active File](command:ukemi.showFileHistory)"
+      },
       {
         "view": "ukemi.bookmarks",
         "contents": "No bookmarks. Right-click a change in the graph → Set Bookmark…"
@@ -832,6 +843,46 @@
         "category": "Ukemi"
       },
       {
+        "command": "ukemi.file.history",
+        "title": "Show File History",
+        "category": "Ukemi",
+        "icon": "$(history)"
+      },
+      {
+        "command": "ukemi.showFileHistory",
+        "title": "Show File History (jj)",
+        "category": "Ukemi",
+        "icon": "$(history)"
+      },
+      {
+        "command": "ukemi.fileHistory.openDiff",
+        "title": "Show Changes to This File",
+        "category": "Ukemi",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "ukemi.fileHistory.openFile",
+        "title": "Open the File as of This Change",
+        "category": "Ukemi",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "ukemi.fileHistory.reveal",
+        "title": "Show in Graph",
+        "category": "Ukemi",
+        "icon": "$(target)"
+      },
+      {
+        "command": "ukemi.fileHistory.copyChangeId",
+        "title": "Copy Change ID",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.toggleInlineBlame",
+        "title": "Toggle Inline Blame",
+        "category": "Ukemi"
+      },
+      {
         "command": "ukemi.bookmarks.filter",
         "title": "Filter Bookmarks",
         "category": "Ukemi",
@@ -1120,9 +1171,28 @@
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.directory' && !isImmutable"
         },
         {
+          "command": "ukemi.file.history",
+          "group": "1_open@4",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.file'"
+        },
+        {
           "command": "ukemi.file.copyPath",
           "group": "9_copy@1",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.file'"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "ukemi.showFileHistory",
+          "group": "7_ukemi@1",
+          "when": "resourceScheme == file && !explorerResourceIsFolder"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "ukemi.showFileHistory",
+          "group": "7_ukemi@1",
+          "when": "resourceScheme == file"
         }
       ],
       "view/title": [
@@ -1283,6 +1353,36 @@
           "command": "ukemi.operation.copyId",
           "group": "2_copy@1",
           "when": "view == ukemi.operations && viewItem =~ /^operation/"
+        },
+        {
+          "command": "ukemi.fileHistory.openFile",
+          "group": "inline@1",
+          "when": "view == ukemi.fileHistory && viewItem =~ /^fileHistory/"
+        },
+        {
+          "command": "ukemi.fileHistory.reveal",
+          "group": "inline@2",
+          "when": "view == ukemi.fileHistory && viewItem =~ /^fileHistory/"
+        },
+        {
+          "command": "ukemi.fileHistory.openDiff",
+          "group": "1_open@1",
+          "when": "view == ukemi.fileHistory && viewItem =~ /^fileHistory/"
+        },
+        {
+          "command": "ukemi.fileHistory.openFile",
+          "group": "1_open@2",
+          "when": "view == ukemi.fileHistory && viewItem =~ /^fileHistory/"
+        },
+        {
+          "command": "ukemi.fileHistory.reveal",
+          "group": "1_open@3",
+          "when": "view == ukemi.fileHistory && viewItem =~ /^fileHistory/"
+        },
+        {
+          "command": "ukemi.fileHistory.copyChangeId",
+          "group": "9_copy@1",
+          "when": "view == ukemi.fileHistory && viewItem =~ /^fileHistory/"
         },
         {
           "command": "ukemi.bookmark.newChange",
@@ -1804,6 +1904,30 @@
           "when": "false"
         },
         {
+          "command": "ukemi.file.history",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.showFileHistory",
+          "when": "resourceScheme == file"
+        },
+        {
+          "command": "ukemi.fileHistory.openDiff",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.fileHistory.openFile",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.fileHistory.reveal",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.fileHistory.copyChangeId",
+          "when": "false"
+        },
+        {
           "command": "ukemi.bookmarks.clearFilter",
           "when": "ukemi.bookmarks.filtering"
         }
@@ -1957,6 +2081,11 @@
           "type": "boolean",
           "default": false,
           "description": "Show an \"Open Changes (jj)\" button in the editor title."
+        },
+        "ukemi.inlineBlame": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show who last changed the line under the cursor, after the line's end. Only for saved files of a jj repository."
         },
         "ukemi.followActiveEditor": {
           "type": "boolean",
