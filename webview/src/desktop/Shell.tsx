@@ -26,7 +26,7 @@ import { BottomPanel, LOG_TAB, type TerminalTab } from './BottomPanel'
 import { Palette } from './Palette'
 import { RepoTabs } from './RepoTabs'
 import { CHANGE_TAB, RightPane, SETTINGS_TAB } from './RightPane'
-import { SettingsView, type SettingsScope } from './SettingsView'
+import { KEYBINDINGS_KEY, SettingsView, type SettingsScope } from './SettingsView'
 import { Sidebar } from './Sidebar'
 import { Splitter } from './Splitter'
 import { StatusBar } from './StatusBar'
@@ -169,6 +169,8 @@ export function Shell() {
     repository: SettingsRepository | null
   }>({ fields: [], path: '', repository: null })
   const [settingsScope, setSettingsScope] = useState<SettingsScope>('global')
+  // The setting to scroll to, as File > Keyboard Shortcuts asks. A new object asks again.
+  const [settingsFocus, setSettingsFocus] = useState<{ key: string } | null>(null)
   const [log, setLog] = useState<readonly LogLine[]>([])
   const [terminals, setTerminals] = useState<readonly TerminalTab[]>([])
   const [panelTab, setPanelTab] = useState(LOG_TAB)
@@ -309,6 +311,12 @@ export function Shell() {
           case 'settings':
           case 'repositorySettings':
             setSettingsScope(message.action === 'settings' ? 'global' : 'repository')
+            setIsSettingsOpen(true)
+            showTab(SETTINGS_TAB)
+            return
+          case 'keyboardShortcuts':
+            setSettingsScope('global')
+            setSettingsFocus({ key: KEYBINDINGS_KEY })
             setIsSettingsOpen(true)
             showTab(SETTINGS_TAB)
             return
@@ -469,6 +477,7 @@ export function Shell() {
                   <SettingsView
                     {...settingFields}
                     scope={settingsScope}
+                    focus={settingsFocus}
                     onScope={setSettingsScope}
                   />
                 }

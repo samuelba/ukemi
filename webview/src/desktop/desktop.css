@@ -1697,6 +1697,114 @@ textarea.setting-input {
   color: var(--vscode-errorForeground);
 }
 
+/* Keyboard shortcuts: one table per menu, the keys in a column that lines up. */
+.shortcuts {
+  display: grid;
+  gap: 14px;
+  max-width: 560px;
+}
+
+.shortcut-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.shortcut-table caption {
+  padding-bottom: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+  color: var(--vscode-descriptionForeground);
+}
+
+.shortcut th,
+.shortcut td {
+  padding: 3px 0;
+  vertical-align: middle;
+  border-top: 1px solid color-mix(in srgb, var(--vscode-widget-border) 45%, transparent);
+}
+
+.shortcut-title {
+  font-weight: normal;
+  text-align: left;
+}
+
+.shortcut-keys {
+  width: 180px;
+}
+
+.shortcut-tools {
+  width: 56px;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.shortcut-tools .icon-button {
+  width: 24px;
+  height: 24px;
+  opacity: 0;
+  transition: opacity var(--shell-fast);
+}
+
+.shortcut:hover .shortcut-tools .icon-button,
+.shortcut-tools .icon-button:focus-visible {
+  opacity: 1;
+}
+
+.shortcut-key {
+  min-width: 112px;
+  padding: 2px 8px;
+  border: 1px dashed transparent;
+  border-radius: var(--shell-radius);
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--shell-fast),
+    border-color var(--shell-fast);
+}
+
+.shortcut-key kbd {
+  font-size: 11.5px;
+  color: var(--vscode-foreground);
+}
+
+.shortcut-key.is-empty {
+  font-style: italic;
+}
+
+.shortcut-key:hover {
+  border-color: var(--vscode-widget-border);
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.shortcut-key:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+/* Recording takes the keyboard, so it looks like a field waiting for input. */
+.shortcut-key.is-recording {
+  border-style: solid;
+  border-color: var(--vscode-focusBorder);
+  background: var(--vscode-input-background);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--vscode-focusBorder) 18%, transparent);
+  color: var(--vscode-foreground);
+  outline: none;
+}
+
+.shortcut.has-clash .shortcut-key kbd {
+  border-color: var(--vscode-inputValidation-errorBorder);
+}
+
+.shortcut-clash {
+  margin-top: 2px;
+}
+
 .switch {
   display: inline-flex;
   align-items: center;
