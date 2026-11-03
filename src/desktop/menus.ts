@@ -9,6 +9,7 @@ import {
   type MenuManifest,
 } from '../../shared/menus'
 import packageJson from '../../package.json'
+import { recentLabel } from './recentRepos'
 
 // Commands of the standalone app alone. The extension never registers them, so they are not in
 // package.json.
@@ -125,12 +126,36 @@ export interface AppMenuActions {
   run: RunCommand
   shell: (action: ShellAction) => void
   openRepository: () => void
+  // The repositories used last, newest first, and the home folder their labels shorten.
+  recent: { roots: readonly string[]; home: string }
+  openRecent: (root: string) => void
+  clearRecent: () => void
   newWindow: () => void
   openSettings: () => void
   openLog: () => void
   about: () => void
   openExternal: (url: string) => void
   isDevelopment: boolean
+}
+
+// A label shows `&` as is. Otherwise it marks the access key on Windows and Linux.
+function literal(label: string): string {
+  return label.replace(/&/g, '&&')
+}
+
+function recentMenu(actions: AppMenuActions): MenuItemConstructorOptions[] {
+  const { roots, home } = actions.recent
+  if (roots.length === 0) {
+    return [{ label: 'No Recent Repositories', enabled: false }]
+  }
+  return [
+    ...roots.map((root): MenuItemConstructorOptions => ({
+      label: literal(recentLabel(root, home)),
+      click: () => actions.openRecent(root),
+    })),
+    { type: 'separator' },
+    { label: 'Clear Recently Opened', click: actions.clearRecent },
+  ]
 }
 
 function command(id: string, run: RunCommand, accelerator?: string): MenuItemConstructorOptions {
@@ -146,6 +171,7 @@ export function appMenuTemplate(actions: AppMenuActions): MenuItemConstructorOpt
       label: '&File',
       submenu: [
         { label: 'Open Repository…', accelerator: 'CmdOrCtrl+O', click: actions.openRepository },
+        { label: 'Open &Recent', submenu: recentMenu(actions) },
         { label: 'New Window', accelerator: 'CmdOrCtrl+Shift+N', click: actions.newWindow },
         { type: 'separator' },
         command('ukemi.initRepo', run),

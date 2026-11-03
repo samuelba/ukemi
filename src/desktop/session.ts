@@ -156,6 +156,10 @@ export class DesktopSession implements Disposable {
       this.askpass,
       this.registry.onDidChange(() => {
         this.scheduleState()
+        const root = this.registry.activeModel?.root
+        if (root) {
+          void context.recentRepos.remember(root)
+        }
         // The form's "This repository" mode follows the active repository.
         if (this.settingsRoot !== (this.registry.activeModel?.root ?? null)) {
           this.postSettings()
