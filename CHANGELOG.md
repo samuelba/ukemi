@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.10.0](https://github.com/samuelba/ukemi/compare/v0.9.0...v0.10.0) (2026-11-03)
+
+
+### Features
+
+* operation log view with restore and revert (M1) ([f75496e](https://github.com/samuelba/ukemi/commit/f75496ebbd16fe36404d4696e7205c9bb1e74538))
+* operation log view with restore and revert (M1) ([f647b25](https://github.com/samuelba/ukemi/commit/f647b25768579a369399e269f2f8cbe064dc760c))
+
+
+### Bug Fixes
+
+* drop rebased copies of commits from the release notes ([53506d5](https://github.com/samuelba/ukemi/commit/53506d5a8eabfa484d703fd47b75d84be6e8b9e3))
+* drop rebased copies of commits from the release notes ([5c978e5](https://github.com/samuelba/ukemi/commit/5c978e5ffb365992b2e10b88bf060f511730c405))
+
 ## [0.9.0](https://github.com/samuelba/ukemi/compare/v0.8.0...v0.9.0) (2026-11-03)
 
 
