@@ -89,6 +89,24 @@ test('keeps a narrow change pane as wide as its column, whatever the diff holds'
   }
 })
 
+test('shows a large file only when asked', async () => {
+  const repo = fixtureRepo()
+  writeFileSync(join(repo, 'big.lock'), 'line\n'.repeat(6_000))
+  const { app, page } = await launch(repo)
+  try {
+    await page.locator('.commit.is-wc').click({ position: { x: 60, y: 8 } })
+    await page.locator('.detail-file-list .file', { hasText: 'big.lock' }).click()
+    const diff = page.locator('.detail-diff')
+    await expect(diff.getByText('This file is too large to show at once.')).toBeVisible()
+    await expect(diff.locator('.diff-row')).toHaveCount(0)
+
+    await diff.getByRole('button', { name: 'Show the diff' }).click()
+    await expect(diff.locator('.diff-row').first()).toBeVisible()
+  } finally {
+    await app.close()
+  }
+})
+
 test('fits the title bar and every pane into a narrow window', async () => {
   const { app, page } = await launch(fixtureRepo())
   try {

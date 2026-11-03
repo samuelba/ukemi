@@ -97,6 +97,26 @@ function hunkRows(lines: readonly string[], oldStart: number, newStart: number):
 }
 
 // The hunks between two versions of a file. A missing side is an added or removed file.
+// Above these, diffing and rendering every line freezes the window for seconds, as with a lock
+// file or a minified bundle, so the view waits until it is asked.
+export const LARGE_DIFF_LINES = 5_000
+const LARGE_DIFF_CHARACTERS = 1_000_000
+
+export function isLargeDiff(left: string | null, right: string | null): boolean {
+  return [left, right].some(
+    (text) =>
+      text !== null && (text.length > LARGE_DIFF_CHARACTERS || lineCount(text) > LARGE_DIFF_LINES),
+  )
+}
+
+function lineCount(text: string): number {
+  let count = 0
+  for (let index = text.indexOf('\n'); index !== -1; index = text.indexOf('\n', index + 1)) {
+    count += 1
+  }
+  return count
+}
+
 export function diffHunks(left: string | null, right: string | null): DiffHunk[] {
   const patch = structuredPatch('a', 'b', left ?? '', right ?? '', '', '', {
     context: CONTEXT_LINES,

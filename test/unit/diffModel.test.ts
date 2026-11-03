@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'vitest'
-import { diffHunks, patchHunks, segments } from '../../webview/src/desktop/diffModel'
+import {
+  diffHunks,
+  isLargeDiff,
+  LARGE_DIFF_LINES,
+  patchHunks,
+  segments,
+} from '../../webview/src/desktop/diffModel'
 
 const lines = (...items: string[]) => `${items.join('\n')}\n`
 
@@ -96,5 +102,19 @@ describe('segments', () => {
       { text: '"a', cls: 'tok-string', changed: false },
       { text: 'bc"', cls: 'tok-string', changed: true },
     ])
+  })
+})
+
+describe('isLargeDiff', () => {
+  const many = (count: number) => 'x\n'.repeat(count)
+
+  test('lets ordinary files through', () => {
+    expect(isLargeDiff(many(100), many(120))).toBe(false)
+    expect(isLargeDiff(null, many(LARGE_DIFF_LINES))).toBe(false)
+  })
+
+  test('flags a side with too many lines or too many characters', () => {
+    expect(isLargeDiff(many(LARGE_DIFF_LINES + 1), null)).toBe(true)
+    expect(isLargeDiff(null, 'x'.repeat(1_000_001))).toBe(true)
   })
 })
