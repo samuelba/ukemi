@@ -13,6 +13,7 @@ import { isDesktopMessage } from '../../shared/desktopProtocol'
 import type { MenuEntry } from '../../shared/menus'
 import type { CommitView, WebviewMessage } from '../../shared/protocol'
 import { isRepositoryKey } from '../../shared/settingsScope'
+import { answerPrompt } from '../app/askpassPrompts'
 import { AutoFetcher } from '../app/autoFetch'
 import { ChangeSelection } from '../app/changeSelection'
 import { commitCommands } from '../app/commands/commitCommands'
@@ -36,9 +37,9 @@ import { buildViewState } from '../app/viewState'
 import { AskpassServer } from '../askpass/server'
 import { JjRunner } from '../jj/runner'
 import { errorMessage, type Logger } from '../util/logger'
-import { LoopbackRedirect } from './adapters/loopbackRedirect'
 import { RendererUi, type NativeUi } from './adapters/rendererUi'
 import { fsWatchRepo } from './adapters/watchRepo'
+import { windowStore } from './adapters/windowStore'
 import { arrangeTabs, move, pin, rename, unpin } from './repoTabs'
 import { TO_RENDERER, type DesktopContext } from './context'
 import {
@@ -52,6 +53,7 @@ import {
 import { aboutText } from './about'
 import { isValidSettingValue, runsProgram, settingFields } from './settingsSchema'
 import { foldersAfterClosing } from './startup'
+import { watchRenderer } from './rendererRecovery'
 import { Terminals } from './terminals'
 import { zoomPercent } from './zoom'
 import { desktopWorkbench, type PanelEntry } from './workbench'
@@ -108,6 +110,8 @@ export class DesktopSession implements Disposable {
   private readonly tabKeys = new Map<string, string>()
   private readonly disposables: Disposable[] = []
   private isReady = false
+  // The page crashed and loaded again, so its terminals need tabs again once it is ready.
+  private needsReattach = false
   // The repository the settings form last showed.
   private settingsRoot: string | null = null
   private isClosed = false
@@ -129,10 +133,12 @@ export class DesktopSession implements Disposable {
     this.ui = new RendererUi((message) => this.post(message), this.nativeUi())
     this.terminals = new Terminals((message) => this.post(message), logger)
     this.runner = new JjRunner(context.jj.path ?? 'jj', logger)
+    this.runner.onWarning((warning) => void this.ui.warn(`jj: ${warning.text}`))
     this.askpass = new AskpassServer(
       process.execPath,
       [context.paths.helper('askpass.js')],
-      (request) => this.forge.gitCredential(request),
+      (request) => this.runner.whilePrompting(() => this.forge.gitCredential(request)),
+      (request) => this.runner.whilePrompting(() => answerPrompt(this.ui, request)),
     )
 
     const host = this.host()
@@ -140,7 +146,7 @@ export class DesktopSession implements Disposable {
     this.operations = new Operations(logger)
     this.forge = new ForgeService(this.registry, host, logger, {
       githubSession: null,
-      gitlabRedirect: new LoopbackRedirect(),
+      gitlabRedirect: context.loopback.redirect(),
       untrustedMessage: UNTRUSTED_MESSAGE,
     })
     this.autoFetch = new AutoFetcher(this.registry, this.forge, this.operations, logger, host)
@@ -232,6 +238,10 @@ export class DesktopSession implements Disposable {
       if (message.type === 'ready') {
         this.isReady = true
         this.sendInitial()
+        if (this.needsReattach) {
+          this.needsReattach = false
+          this.terminals.reattach()
+        }
         return
       }
       await this.handleWebview(message)
@@ -416,8 +426,25 @@ export class DesktopSession implements Disposable {
     window.on('resize', () => this.context.saveWindowBounds(window.getBounds()))
     window.on('closed', () => this.context.closeSession(this))
     this.context.guardNavigation(window)
+    watchRenderer(window, this.context.logger, {
+      beforeReload: () => this.pageReloading(),
+      isClosed: () => this.isClosed,
+    })
     void window.loadURL(this.context.pageUrl('desktop'))
     return window
+  }
+
+  // The crashed page took its prompts and Split or Clean up tabs with it. Their state lived there,
+  // so they close. The graph and the details are sent again when the new page is ready.
+  private pageReloading(): void {
+    this.isReady = false
+    this.needsReattach = true
+    this.ui.cancelAll()
+    for (const tab of this.tabs.values()) {
+      tab.closed()
+    }
+    this.tabs.clear()
+    this.tabKeys.clear()
   }
 
   private title(): string {
@@ -452,7 +479,7 @@ export class DesktopSession implements Disposable {
       window: windowState,
       folders,
       watchRepo: fsWatchRepo(context.logger),
-      store: context.state.scoped('window'),
+      store: windowStore(context.state.scoped('window')),
       secrets: context.secrets,
     }
   }

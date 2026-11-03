@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from 'react'
+import { useMemo, useRef, useState, type CSSProperties } from 'react'
 import type {
   Segment,
   SplitFile,
@@ -10,11 +10,10 @@ import type {
 import { changeIds } from '../../../shared/split'
 import { useElementHeight, useHostMessages } from '../shared/hooks'
 import { LoadingScreen } from '../shared/LoadingMark'
+import { keptChoices, type FileChoice } from './keptChoices'
 import { useSend } from '../shared/hostChannel'
 
 const CONTEXT_LINES = 3
-
-type FileChoice = ReadonlySet<number> | 'whole'
 
 function lines(text: string): string[] {
   const parts = text.split('\n')
@@ -195,6 +194,7 @@ function FileSection({
 export function SplitApp() {
   const send = useSend<SplitWebviewMessage>()
   const [request, setRequest] = useState<SplitRequest | null>(null)
+  const requestRef = useRef<SplitRequest | null>(null)
   const [choices, setChoices] = useState<ReadonlyMap<string, FileChoice>>(new Map())
   const [message, setMessage] = useState('')
   const [headerRef, headerHeight] = useElementHeight()
@@ -202,6 +202,9 @@ export function SplitApp() {
   useHostMessages<SplitHostMessage>(
     (incoming) => {
       if (incoming.type === 'load') {
+        const previous = requestRef.current
+        requestRef.current = incoming.request
+        setChoices((prev) => keptChoices(prev, previous, incoming.request))
         setRequest(incoming.request)
       }
     },

@@ -1,4 +1,5 @@
 import * as vscode from 'vscode'
+import { answerPrompt } from './app/askpassPrompts'
 import { AutoFetcher } from './app/autoFetch'
 import { ChangeSelection } from './app/changeSelection'
 import { commitCommands } from './app/commands/commitCommands'
@@ -63,6 +64,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
 
   const located = await locateJj(storageDir, logger)
   const runner = new JjRunner(located?.path ?? 'jj', logger)
+  runner.onWarning((warning) => void host.ui.warn(`jj: ${warning.text}`))
   const availability = { isAvailable: located !== null }
   updateTerminalPath(context, located)
 
@@ -81,7 +83,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
   const askpass = new AskpassServer(
     process.execPath,
     [vscode.Uri.joinPath(context.extensionUri, 'dist', 'askpass.js').fsPath],
-    (request) => forge.gitCredential(request),
+    (request) => runner.whilePrompting(() => forge.gitCredential(request)),
+    (request) => runner.whilePrompting(() => answerPrompt(host.ui, request)),
   )
   try {
     await askpass.start()

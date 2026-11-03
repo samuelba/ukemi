@@ -81,3 +81,18 @@ function graphBase(filter: Exclude<GraphFilter, 'working'>, depth: HistoryDepth)
       return 'reachable(@, mutable())'
   }
 }
+
+// The changes that only a request's bookmark holds, which Clean up abandons after the request
+// merged. Changes another bookmark builds on stay, such as those of the request it is stacked
+// on, and so does a working copy that holds edits.
+export function requestCleanupRevset(headBranch: string): string {
+  const head = `bookmarks(${exactBookmark(headBranch)})`
+  const others = `bookmarks() ~ ${head}::`
+  return `(::${head} ~ ::trunk() ~ ::(${others}) ~ (working_copies() ~ empty())) & mutable()`
+}
+
+// Commits that are still in a revset and were among the ids the user agreed to, so a command
+// that ran in between cannot widen what a confirmed command rewrites.
+export function confirmedRevset(revset: string, commitIds: readonly string[]): string {
+  return `(${revset}) & (${commitIds.join(' | ')})`
+}

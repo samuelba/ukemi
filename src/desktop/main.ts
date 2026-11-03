@@ -24,6 +24,7 @@ import { downloadJj, MIN_JJ_VERSION, PINNED_RELEASE } from '../jj/binary'
 import { findRepoRootUpwards } from '../repo/discovery'
 import { errorMessage } from '../util/logger'
 import { KeyValueFile } from './adapters/keyValueFile'
+import { LoopbackServer } from './adapters/loopbackRedirect'
 import { adoptLoginShellPath } from './adapters/loginShellPath'
 import { SecretsFile } from './adapters/secretsFile'
 import { SettingsFile } from './adapters/settingsFile'
@@ -130,6 +131,7 @@ class DesktopApp implements DesktopContext {
   readonly trust = new TrustStore(this.state)
   readonly repoTabs = new RepoTabStore(this.state)
   readonly recentRepos = new RecentRepoStore(this.state)
+  readonly loopback = new LoopbackServer()
   readonly jj: { path: string | null; version: string | null } = { path: null, version: null }
   private systemFont: SystemFont | null = null
   readonly secrets: SecretsFile
@@ -204,6 +206,7 @@ class DesktopApp implements DesktopContext {
     app.on('before-quit', () => {
       this.isQuitting = true
       this.rememberOpenFolders()
+      this.loopback.dispose()
     })
   }
 
@@ -504,16 +507,25 @@ class DesktopApp implements DesktopContext {
   }
 }
 
+// A process that stays up without a window would keep the single-instance lock, and every later
+// launch would hand its arguments to it and exit silently. So a failed start says why and quits.
+function failStartup(error: unknown, desktop: DesktopApp | null): void {
+  const message = errorMessage(error)
+  desktop?.logger.error(`startup failed: ${message}`)
+  dialog.showErrorBox('Ukemi could not start', message)
+  app.exit(1)
+}
+
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   void app.whenReady().then(async () => {
-    const desktop = new DesktopApp()
+    let desktop: DesktopApp | null = null
     try {
+      desktop = new DesktopApp()
       await desktop.start()
     } catch (error: unknown) {
-      desktop.logger.error(`startup failed: ${errorMessage(error)}`)
-      throw error
+      failStartup(error, desktop)
     }
   })
   app.on('window-all-closed', () => {

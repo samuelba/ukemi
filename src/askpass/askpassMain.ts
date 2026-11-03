@@ -26,7 +26,10 @@ function main(prompt: string): void {
   const timer = setTimeout(() => socket.destroy(), TIMEOUT_MS)
   socket.setEncoding('utf8')
   const interactive = process.env.UKEMI_ASKPASS_INTERACTIVE !== '0'
-  socket.on('connect', () => socket.write(`${JSON.stringify({ nonce, prompt, interactive })}\n`))
+  const sshMode = process.env.SSH_ASKPASS_PROMPT ?? ''
+  socket.on('connect', () =>
+    socket.write(`${JSON.stringify({ nonce, prompt, interactive, sshMode })}\n`),
+  )
   socket.on('data', (chunk: string) => {
     data += chunk
   })

@@ -30,14 +30,44 @@ export class ForgeError extends Error {
     message: string,
     readonly status: number,
     readonly body?: unknown,
+    // How long the forge asks to wait, when it sent a rate limit header.
+    readonly retryAfterMs: number | null = null,
   ) {
     super(message)
     this.name = 'ForgeError'
   }
 
-  get isAuthError(): boolean {
-    return this.status === 401 || this.status === 403
+  // GitHub answers 403 for a used-up or secondary rate limit, GitLab 429.
+  get isRateLimited(): boolean {
+    return (
+      this.status === 429 ||
+      (this.status === 403 && (this.retryAfterMs !== null || /rate limit/i.test(this.message)))
+    )
   }
+
+  get isAuthError(): boolean {
+    return (this.status === 401 || this.status === 403) && !this.isRateLimited
+  }
+}
+
+// Reads `Retry-After`, or the reset time of a used-up limit: GitHub's `x-ratelimit-*` and GitLab's
+// `ratelimit-*` headers.
+export function retryAfterMs(headers: Headers, now = Date.now()): number | null {
+  const retryAfter = headers.get('retry-after')
+  if (retryAfter !== null) {
+    const seconds = Number(retryAfter)
+    if (Number.isFinite(seconds)) {
+      return Math.max(0, seconds * 1000)
+    }
+    const date = Date.parse(retryAfter)
+    return Number.isNaN(date) ? null : Math.max(0, date - now)
+  }
+  const remaining = headers.get('x-ratelimit-remaining') ?? headers.get('ratelimit-remaining')
+  const reset = Number(headers.get('x-ratelimit-reset') ?? headers.get('ratelimit-reset'))
+  if (remaining === '0' && reset > 0) {
+    return Math.max(0, reset * 1000 - now)
+  }
+  return null
 }
 
 const REQUEST_TIMEOUT_MS = 30_000
@@ -95,7 +125,12 @@ export async function requestJson(
   const text = await response.text()
   const body: unknown = text ? safeJson(text) : null
   if (!response.ok) {
-    throw new ForgeError(apiErrorMessage(body, response.status), response.status, body)
+    throw new ForgeError(
+      apiErrorMessage(body, response.status),
+      response.status,
+      body,
+      retryAfterMs(response.headers),
+    )
   }
   return body
 }

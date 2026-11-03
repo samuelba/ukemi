@@ -6,15 +6,34 @@ import { flatpakAppId, sharedTempDir } from '../util/hostProcess'
 import { nodeWrapperScript } from '../util/nodeWrapper'
 
 // What askpassMain reads. From a Flatpak, git runs on the host and the script hands these over.
-const ASKPASS_ENV = ['UKEMI_ASKPASS_SOCKET', 'UKEMI_ASKPASS_NONCE', 'UKEMI_ASKPASS_INTERACTIVE']
-import { parsePrompt, type CredentialRequest } from './prompt'
+const ASKPASS_ENV = [
+  'UKEMI_ASKPASS_SOCKET',
+  'UKEMI_ASKPASS_NONCE',
+  'UKEMI_ASKPASS_INTERACTIVE',
+  'SSH_ASKPASS_PROMPT',
+]
+import {
+  parseOtherPrompt,
+  parsePrompt,
+  type CredentialRequest,
+  type OtherPromptRequest,
+} from './prompt'
 
-export type { CredentialRequest } from './prompt'
+export type { CredentialRequest, OtherPromptRequest } from './prompt'
 export type CredentialResolver = (request: CredentialRequest) => Promise<string | null>
+// Asks the user. Resolves to the answer, or null when the user cancels.
+export type PromptResolver = (request: OtherPromptRequest) => Promise<string | null>
+
+interface HelperRequest {
+  nonce: string
+  prompt: string
+  interactive: boolean
+  sshMode: string
+}
 
 const MAX_REQUEST_BYTES = 4096
 
-function readRequest(line: string): { nonce: string; prompt: string; interactive: boolean } | null {
+function readRequest(line: string): HelperRequest | null {
   try {
     const value: unknown = JSON.parse(line)
     if (typeof value !== 'object' || value === null) {
@@ -25,7 +44,8 @@ function readRequest(line: string): { nonce: string; prompt: string; interactive
     if (typeof nonce !== 'string' || typeof prompt !== 'string') {
       return null
     }
-    return { nonce, prompt, interactive: record.interactive !== false }
+    const sshMode = typeof record.sshMode === 'string' ? record.sshMode : ''
+    return { nonce, prompt, interactive: record.interactive !== false, sshMode }
   } catch {
     return null
   }
@@ -41,6 +61,7 @@ export class AskpassServer {
     private readonly nodePath: string,
     private readonly helperArgs: readonly string[],
     private readonly resolve: CredentialResolver,
+    private readonly ask: PromptResolver,
   ) {}
 
   async start(): Promise<void> {
@@ -66,8 +87,12 @@ export class AskpassServer {
     })
     this.server = server
     this.dir = dir
+    // `force` makes ssh use the helper although it has no display, for key passphrases and new
+    // host keys.
     this.env = {
       GIT_ASKPASS: scriptPath,
+      SSH_ASKPASS: scriptPath,
+      SSH_ASKPASS_REQUIRE: 'force',
       UKEMI_ASKPASS_SOCKET: socketPath,
       UKEMI_ASKPASS_NONCE: this.nonce.toString(),
     }
@@ -100,8 +125,13 @@ export class AskpassServer {
     if (!request || !this.isValidNonce(request.nonce)) {
       return null
     }
+    const { interactive } = request
     const credential = parsePrompt(request.prompt)
-    return credential ? this.resolve({ ...credential, interactive: request.interactive }) : null
+    if (credential) {
+      return this.resolve({ ...credential, interactive })
+    }
+    const other = parseOtherPrompt(request.prompt, request.sshMode)
+    return other ? this.ask({ ...other, interactive }) : null
   }
 
   private isValidNonce(nonce: string): boolean {

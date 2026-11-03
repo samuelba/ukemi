@@ -28,7 +28,7 @@ import {
   parseWorkspaces,
 } from './parse'
 import { bookmarkRevision, exactBookmark, rootFileset } from './revsets'
-import { JjError, JjRunner, NETWORK_TIMEOUT_MS, type RunResult } from './runner'
+import { JjError, JjRunner, NETWORK_TIMEOUT_MS, type RunOptions, type RunResult } from './runner'
 import { jjString } from './templates'
 import {
   BOOKMARK_LIST_GRAPH_TEMPLATE,
@@ -102,7 +102,7 @@ export class JjRepo {
 
   private mutate(
     args: readonly string[],
-    options: { stdin?: string; timeoutMs?: number; env?: Readonly<Record<string, string>> } = {},
+    options: Pick<RunOptions, 'stdin' | 'timeoutMs' | 'env' | 'background'> = {},
   ) {
     if (this.operationId !== null) {
       throw new Error('jj commands cannot run at an old operation')
@@ -111,7 +111,7 @@ export class JjRepo {
   }
 
   snapshot(): Promise<RunResult> {
-    return this.mutate(['util', 'snapshot'])
+    return this.mutate(['util', 'snapshot'], { background: true })
   }
 
   async log(revset: string, limit = MAX_LOG_ENTRIES): Promise<Commit[]> {
@@ -265,6 +265,16 @@ export class JjRepo {
     return new Set(stdout.split('\n').filter((line) => line.length > 0))
   }
 
+  // The local bookmarks, split by whether a remote has a branch of that name yet.
+  async localBookmarks(): Promise<{ published: string[]; unpublished: string[] }> {
+    const [rows, pushed] = await Promise.all([this.bookmarkList(), this.pushedBookmarkNames()])
+    const local = rows.filter((row) => row.remote === null && row.present).map((row) => row.name)
+    return {
+      published: local.filter((name) => pushed.has(name)),
+      unpublished: local.filter((name) => !pushed.has(name)),
+    }
+  }
+
   async operations(limit: number): Promise<Operation[]> {
     const { stdout } = await this.read([
       'op',
@@ -335,35 +345,66 @@ export class JjRepo {
     ])
   }
 
-  async copyFiles(fromCommitId: string, intoCommitId: string, paths: readonly string[]) {
-    const [target] = await this.log(intoCommitId)
-    if (!target) {
-      throw new Error(`Target change ${intoCommitId} not found`)
-    }
-    await this.restoreInto(fromCommitId, target.commitId, paths)
-    const [after] = await this.log(target.changeId)
-    if (!after) {
-      throw new Error(`Target change ${target.changeId} not found`)
-    }
-    if (await this.diffHasAnyPath(after.commitId, paths)) {
-      return
-    }
-    // An empty descendant already has the source content, so restore is a no-op.
-    // Move it beside the source, then the same restore becomes a real change.
-    if (after.isEmpty && (await this.isProperDescendant(after.commitId, fromCommitId))) {
-      await this.rebase(after.commitId, `parents(${fromCommitId})`, 'revision')
-      const [moved] = await this.log(target.changeId)
-      if (!moved) {
-        throw new Error(`Target change ${target.changeId} not found after rebase`)
+  // One queue entry, so no other command runs between the steps. The target is followed by its
+  // commit id, since its change id can name several commits when the change is divergent.
+  copyFiles(fromCommitId: string, intoCommitId: string, paths: readonly string[]) {
+    return this.mutations.run(async () => {
+      const [target] = await this.log(intoCommitId, 1)
+      if (!target) {
+        throw new Error(`Target change ${intoCommitId} not found`)
       }
-      await this.restoreInto(fromCommitId, moved.commitId, paths)
-      return
-    }
-    throw new Error('Target already contains this file content')
+      const restored = await this.rewriting(target, () =>
+        this.restoreNow(fromCommitId, target.commitId, paths),
+      )
+      if (await this.diffHasAnyPath(restored, paths)) {
+        return
+      }
+      const [after] = await this.log(restored, 1)
+      // An empty descendant already has the source content, so restore is a no-op.
+      // Move it beside the source, then the same restore becomes a real change.
+      if (after?.isEmpty && (await this.isProperDescendant(restored, fromCommitId))) {
+        const moved = await this.rewriting(after, () =>
+          this.runNow([
+            'rebase',
+            REBASE_MODE_FLAGS.revision,
+            restored,
+            PLACEMENT_FLAGS.onto,
+            `parents(${fromCommitId})`,
+          ]),
+        )
+        await this.restoreNow(fromCommitId, moved, paths)
+        return
+      }
+      throw new Error('Target already contains this file content')
+    })
   }
 
-  private restoreInto(fromCommitId: string, intoCommitId: string, paths: readonly string[]) {
-    return this.mutate([
+  // Runs a command that rewrites `commit` and returns the commit id the change has afterwards.
+  private async rewriting(
+    commit: { commitId: string; changeId: string },
+    run: () => Promise<unknown>,
+  ): Promise<string> {
+    const revset = `change_id(${commit.changeId})`
+    const before = new Set(await this.commitIds(revset))
+    await run()
+    const after = await this.commitIds(revset)
+    const rewritten = after.find((id) => !before.has(id))
+    if (rewritten) {
+      return rewritten
+    }
+    if (after.includes(commit.commitId)) {
+      return commit.commitId
+    }
+    throw new Error(`Change ${commit.changeId} not found after the command`)
+  }
+
+  // Runs a mutation inside a queue entry that is already running.
+  private runNow(args: readonly string[]) {
+    return this.runner.run({ cwd: this.root, args })
+  }
+
+  private restoreNow(fromCommitId: string, intoCommitId: string, paths: readonly string[]) {
+    return this.runNow([
       'restore',
       '--from',
       fromCommitId,
@@ -404,6 +445,19 @@ export class JjRepo {
       commitId,
       '--tool=ukemi-split',
       `--message=${message}`,
+    ])
+  }
+
+  // Runs the configured diff tool on the commit's diff. For a merge, jj diffs against the merge
+  // of the parents.
+  async diffWithTool(commitId: string, paths: readonly string[], toolConfig: readonly string[]) {
+    await this.read([
+      ...toolConfig,
+      'diff',
+      '-r',
+      commitId,
+      '--tool=ukemi-split',
+      ...paths.map(rootFileset),
     ])
   }
 
@@ -509,7 +563,11 @@ export class JjRepo {
       branches.length > 0
         ? ['git', 'fetch', ...branches.flatMap((name) => ['--branch', exactBookmark(name)])]
         : ['git', 'fetch', '--all-remotes']
-    return this.mutate(args, { timeoutMs: NETWORK_TIMEOUT_MS, env })
+    return this.mutate(args, {
+      timeoutMs: NETWORK_TIMEOUT_MS,
+      env,
+      background: options.interactive === false,
+    })
   }
 
   push(bookmarks?: string | readonly string[]) {
@@ -551,8 +609,9 @@ export class JjRepo {
 
   snapshotWorkspace(workspaceRoot: string): Promise<void> {
     return this.mutations.run(async () => {
-      await this.runner.run({ cwd: workspaceRoot, args: ['workspace', 'update-stale'] })
-      await this.runner.run({ cwd: workspaceRoot, args: ['status'] })
+      const background = { cwd: workspaceRoot, background: true }
+      await this.runner.run({ ...background, args: ['workspace', 'update-stale'] })
+      await this.runner.run({ ...background, args: ['status'] })
     })
   }
 

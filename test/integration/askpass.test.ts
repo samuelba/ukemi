@@ -2,23 +2,37 @@ import { spawn } from 'node:child_process'
 import { statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { AskpassServer, type CredentialRequest } from '../../src/askpass/server'
+import {
+  AskpassServer,
+  type CredentialRequest,
+  type OtherPromptRequest,
+} from '../../src/askpass/server'
 
 const HELPER = join(__dirname, '../../src/askpass/askpassMain.ts')
 const NODE_ARGS = ['--experimental-strip-types', '--no-warnings', HELPER]
 
 let server: AskpassServer
 const requests: CredentialRequest[] = []
+const prompts: OtherPromptRequest[] = []
 
 beforeEach(async () => {
   requests.length = 0
-  server = new AskpassServer(process.execPath, NODE_ARGS, async (request) => {
-    requests.push(request)
-    if (request.host !== 'github.com') {
-      return null
-    }
-    return request.field === 'username' ? 'x-access-token' : 'secret-token'
-  })
+  prompts.length = 0
+  server = new AskpassServer(
+    process.execPath,
+    NODE_ARGS,
+    async (request) => {
+      requests.push(request)
+      if (request.host !== 'github.com') {
+        return null
+      }
+      return request.field === 'username' ? 'x-access-token' : 'secret-token'
+    },
+    async (request) => {
+      prompts.push(request)
+      return request.answer === 'confirm' ? 'yes' : 'key-passphrase'
+    },
+  )
   await server.start()
 })
 
@@ -70,9 +84,27 @@ describe('AskpassServer', () => {
     expect(requests.at(-1)?.interactive).toBe(true)
   })
 
-  test('fails for prompts it cannot read, without asking for credentials', async () => {
-    expect(await ask('Enter passphrase: ')).toEqual({ status: 1, stdout: '' })
+  test('asks the user for an ssh key passphrase, without asking for credentials', async () => {
+    const prompt = "Enter passphrase for key '/home/sam/.ssh/id_ed25519': "
+
+    expect(await ask(prompt)).toEqual({ status: 0, stdout: 'key-passphrase\n' })
     expect(requests).toEqual([])
+    expect(prompts).toEqual([{ text: prompt.trim(), answer: 'secret', interactive: true }])
+  })
+
+  test('passes the kind of prompt that ssh sets', async () => {
+    const env = { ...server.env, SSH_ASKPASS_PROMPT: 'confirm' }
+
+    expect(await ask('Allow use of key /home/sam/.ssh/id_ed25519_sk?', env)).toEqual({
+      status: 0,
+      stdout: 'yes\n',
+    })
+    expect(prompts.at(-1)?.answer).toBe('confirm')
+  })
+
+  test('lets ssh use the helper without a display', () => {
+    expect(server.env.SSH_ASKPASS).toBe(server.env.GIT_ASKPASS)
+    expect(server.env.SSH_ASKPASS_REQUIRE).toBe('force')
   })
 
   test('refuses a helper with the wrong key', async () => {

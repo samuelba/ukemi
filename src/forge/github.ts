@@ -79,6 +79,27 @@ const listSchema = z.object({
   }),
 })
 
+// GraphQL answers HTTP 200 and lists its errors next to the data it could still read.
+const graphqlErrorsSchema = z.object({
+  errors: z.array(z.object({ message: z.string(), type: z.string().optional() })),
+})
+
+const GRAPHQL_ERROR_STATUS: Readonly<Record<string, number>> = {
+  RATE_LIMITED: 429,
+  NOT_FOUND: 404,
+}
+
+function graphqlError(body: unknown): ForgeError | null {
+  const parsed = graphqlErrorsSchema.safeParse(body)
+  const errors = parsed.success ? parsed.data.errors : []
+  if (errors.length === 0) {
+    return null
+  }
+  const status = GRAPHQL_ERROR_STATUS[errors[0]?.type ?? ''] ?? 422
+  const message = [...new Set(errors.map((error) => error.message))].join('; ')
+  return new ForgeError(`GitHub: ${message}`, status, body)
+}
+
 const restPullSchema = z.object({
   number: z.number(),
   title: z.string(),
@@ -268,7 +289,19 @@ export class GithubClient implements ForgeClient {
         variables: { owner: this.owner, name: this.name, limit, after },
       }),
     })
-    const data = listSchema.parse(body).data
+    const parsed = listSchema.safeParse(body)
+    if (!parsed.success || !parsed.data.data.repository) {
+      throw (
+        graphqlError(body) ??
+        (parsed.success
+          ? new ForgeError(
+              `GitHub has no repository ${this.owner}/${this.name} for this login`,
+              404,
+            )
+          : parsed.error)
+      )
+    }
+    const data = parsed.data.data
     const connection = data.repository?.pullRequests
     const pageInfo = connection?.pageInfo
     return {

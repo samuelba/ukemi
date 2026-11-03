@@ -13,7 +13,11 @@ import {
 import { glabFetch } from '../forge/glabApi'
 import { glabKnowsHost } from '../forge/glabConfig'
 import { GitlabClient, type GitlabTokenKind } from '../forge/gitlab'
-import { FORGE_REFRESH_IDLE_MS, forgeRefreshInterval } from '../forge/refreshInterval'
+import {
+  FORGE_REFRESH_IDLE_MS,
+  forgeRefreshInterval,
+  rateLimitPause,
+} from '../forge/refreshInterval'
 import { ForgeError, type ForgeClient } from '../forge/types'
 import type { RepoModel } from '../repo/repoModel'
 import { durationSetting } from '../util/duration'
@@ -91,7 +95,11 @@ function requestsOf(model: RepoModel): RequestBadge[] {
 
 export class ForgeService implements Disposable {
   private readonly lastRefresh = new Map<string, number>()
+  // Per repository: until when background refreshes wait for the rate limit, and how many
+  // refreshes in a row it refused.
+  private readonly rateLimit = new Map<string, { until: number; refusals: number }>()
   private readonly reportedMissing = new Set<string>()
+  private readonly reportedErrors = new Set<string>()
   private readonly disposables: Disposable[] = []
   private readonly github: GithubCredentials
   private readonly gitlabAuth: GitlabAuth
@@ -358,7 +366,8 @@ export class ForgeService implements Disposable {
     }
     const interval = this.refreshInterval(model)
     const last = this.lastRefresh.get(model.root) ?? 0
-    if (!options.force && Date.now() - last < interval) {
+    const limitedUntil = this.rateLimit.get(model.root)?.until ?? 0
+    if (!options.force && (Date.now() - last < interval || Date.now() < limitedUntil)) {
       this.schedule(model)
       return
     }
@@ -373,12 +382,36 @@ export class ForgeService implements Disposable {
   private async loadReportingErrors(model: RepoModel): Promise<void> {
     try {
       await this.loadRequests(model)
+      this.rateLimit.delete(model.root)
     } catch (error: unknown) {
-      const isAuth = error instanceof ForgeError && error.isAuthError
       this.logger.warn(`loading requests failed: ${errorMessage(error)}`)
-      if (isAuth) {
+      if (error instanceof ForgeError && error.isRateLimited) {
+        this.pauseForRateLimit(model, error)
+      } else if (error instanceof ForgeError && error.isAuthError) {
         void this.host.ui.warn('Ukemi: the forge login has expired. Sign in again.')
+      } else if (error instanceof ForgeError) {
+        this.reportOnce(`Ukemi could not load the requests. ${error.message}`)
       }
+    }
+  }
+
+  // The forge's answer does not change until the user does something, so it is shown once.
+  private reportOnce(message: string): void {
+    if (!this.reportedErrors.has(message)) {
+      this.reportedErrors.add(message)
+      void this.host.ui.warn(message)
+    }
+  }
+
+  private pauseForRateLimit(model: RepoModel, error: ForgeError): void {
+    const refusals = (this.rateLimit.get(model.root)?.refusals ?? 0) + 1
+    const pause = rateLimitPause(error.retryAfterMs, refusals)
+    this.rateLimit.set(model.root, { until: Date.now() + pause, refusals })
+    if (refusals === 1) {
+      const minutes = Math.ceil(pause / 60_000)
+      void this.host.ui.warn(
+        `Ukemi: the forge's rate limit is used up. Request status refreshes again in ${minutes} min.`,
+      )
     }
   }
 
@@ -401,7 +434,8 @@ export class ForgeService implements Disposable {
     }
     const interval = this.refreshInterval(model)
     const last = this.lastRefresh.get(model.root) ?? 0
-    const delay = Math.max(0, interval - (Date.now() - last))
+    const limitedUntil = this.rateLimit.get(model.root)?.until ?? 0
+    const delay = Math.max(0, interval - (Date.now() - last), limitedUntil - Date.now())
     this.timer = setTimeout(() => {
       this.timer = null
       const active = this.registry.activeModel

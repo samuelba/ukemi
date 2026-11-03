@@ -21,6 +21,14 @@ export interface RunOptions {
   timeoutMs?: number
   ignoreWorkingCopy?: boolean
   env?: Readonly<Record<string, string>>
+  // Nobody waits for the result, like a snapshot or an auto-fetch: warnings are only logged.
+  background?: boolean
+}
+
+export interface JjWarning {
+  cwd: string
+  args: readonly string[]
+  text: string
 }
 
 export interface RunResult {
@@ -48,15 +56,42 @@ export class JjError extends Error {
   }
 }
 
+// The error and its hints. jj and its argument parser write `Error:`, older parsers `error:`, and
+// the parser adds a usage block that does not help in a message.
 export function summarizeStderr(stderr: string): string {
   const lines = stderr
     .split('\n')
     .map((line) => line.trimEnd())
     .filter((line) => line.length > 0)
-  const errorIndex = lines.findIndex((line) => line.startsWith('Error:'))
+  const errorIndex = lines.findIndex((line) => ERROR_LINE.test(line))
   const relevant = errorIndex >= 0 ? lines.slice(errorIndex) : lines
-  const withoutHints = relevant.filter((line) => !line.startsWith('Hint:'))
-  return redactUrlCredentials((withoutHints.join('\n') || 'jj failed').replace(/^Error:\s*/, ''))
+  const usageIndex = relevant.findIndex((line) => line.startsWith('Usage:'))
+  const kept = usageIndex >= 0 ? relevant.slice(0, usageIndex) : relevant
+  return redactUrlCredentials((kept.join('\n') || 'jj failed').replace(ERROR_LINE, ''))
+}
+
+const ERROR_LINE = /^error:\s*/i
+
+function timeoutMessage(timeoutMs: number, stderr: string): string {
+  const message = `jj timed out after ${timeoutMs / 1000} s`
+  return stderr.trim() ? `${message}: ${summarizeStderr(stderr)}` : message
+}
+
+// The warnings jj printed, each with the indented lines and hints that follow it.
+export function stderrWarnings(stderr: string): string[] {
+  const warnings: string[][] = []
+  let current: string[] | null = null
+  for (const line of stderr.split('\n').map((text) => text.trimEnd())) {
+    if (line.startsWith('Warning:')) {
+      current = [line.replace(/^Warning:\s*/, '')]
+      warnings.push(current)
+    } else if (current && line.length > 0 && (/^\s/.test(line) || line.startsWith('Hint:'))) {
+      current.push(line)
+    } else {
+      current = null
+    }
+  }
+  return warnings.map((lines) => redactUrlCredentials(lines.join('\n')))
 }
 
 const MAX_LOGGED_ARG = 120
@@ -90,8 +125,42 @@ function repoTag(cwd: string): string {
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
+// A timeout that can stop while the user answers a git or ssh prompt, and go on afterwards.
+class Countdown {
+  private timer: ReturnType<typeof setTimeout> | null = null
+  private startedAt = 0
+
+  constructor(
+    private remainingMs: number,
+    private readonly onEnd: () => void,
+  ) {}
+
+  resume(): void {
+    if (this.timer) {
+      return
+    }
+    this.startedAt = Date.now()
+    this.timer = setTimeout(() => {
+      this.timer = null
+      this.onEnd()
+    }, this.remainingMs)
+  }
+
+  pause(): void {
+    if (!this.timer) {
+      return
+    }
+    clearTimeout(this.timer)
+    this.timer = null
+    this.remainingMs = Math.max(0, this.remainingMs - (Date.now() - this.startedAt))
+  }
+}
+
 export class JjRunner {
   private extraEnv: Readonly<Record<string, string>> = {}
+  private readonly countdowns = new Set<Countdown>()
+  private openPrompts = 0
+  private warningHandler: ((warning: JjWarning) => void) | null = null
 
   constructor(
     private binaryPath: string,
@@ -114,6 +183,26 @@ export class JjRunner {
   // The variables Ukemi adds for jj and git: askpass, and no terminal prompts.
   hostEnv(overrides: Readonly<Record<string, string>> = {}): Record<string, string> {
     return { ...this.extraEnv, ...overrides, GIT_TERMINAL_PROMPT: '0' }
+  }
+
+  // Receives the warnings of commands that succeed while someone waits for them.
+  onWarning(handler: (warning: JjWarning) => void): void {
+    this.warningHandler = handler
+  }
+
+  // Stops every timeout while the task runs, so the time the user takes to answer a prompt from
+  // git or ssh does not count against the command that asked.
+  async whilePrompting<T>(task: () => Promise<T>): Promise<T> {
+    if (this.openPrompts++ === 0) {
+      this.countdowns.forEach((countdown) => countdown.pause())
+    }
+    try {
+      return await task()
+    } finally {
+      if (--this.openPrompts === 0) {
+        this.countdowns.forEach((countdown) => countdown.resume())
+      }
+    }
   }
 
   async run(options: RunOptions): Promise<RunResult> {
@@ -162,16 +251,22 @@ export class JjRunner {
       const stderr: Buffer[] = []
       let hasTimedOut = false
       let killTimer: ReturnType<typeof setTimeout> | null = null
-      const timer = setTimeout(() => {
+      const countdown = new Countdown(timeoutMs, () => {
+        this.countdowns.delete(countdown)
         hasTimedOut = true
         killTree(child, 'SIGTERM')
         killTimer = setTimeout(
           () => killTree(child, 'SIGKILL'),
           this.options.killGraceMs ?? KILL_GRACE_MS,
         )
-      }, timeoutMs)
+      })
+      this.countdowns.add(countdown)
+      if (this.openPrompts === 0) {
+        countdown.resume()
+      }
       const settle = () => {
-        clearTimeout(timer)
+        countdown.pause()
+        this.countdowns.delete(countdown)
         if (killTimer) {
           clearTimeout(killTimer)
         }
@@ -188,7 +283,8 @@ export class JjRunner {
       child.on('exit', (code) => {
         if (hasTimedOut) {
           settle()
-          reject(new JjError(`jj timed out after ${timeoutMs / 1000} s`, args, '', code))
+          const err = Buffer.concat(stderr).toString('utf8')
+          reject(new JjError(timeoutMessage(timeoutMs, err), args, err, code))
         }
       })
       child.on('close', (code, signal) => {
@@ -200,7 +296,7 @@ export class JjRunner {
           `${repoTag(options.cwd)} jj ${describeArgs(options.args)} (${elapsed} ms, exit ${code ?? signal})`,
         )
         if (hasTimedOut) {
-          reject(new JjError(`jj timed out after ${timeoutMs / 1000} s`, args, err, code))
+          reject(new JjError(timeoutMessage(timeoutMs, err), args, err, code))
           return
         }
         if (code !== 0) {
@@ -210,6 +306,7 @@ export class JjRunner {
           reject(new JjError(summarizeStderr(err), args, err, code))
           return
         }
+        this.reportWarnings(options, err)
         resolve({ stdout: out, stderr: err })
       })
 
@@ -220,6 +317,16 @@ export class JjRunner {
       })
       child.stdin.end(options.stdin ?? '')
     })
+  }
+
+  private reportWarnings(options: RunOptions, stderr: string): void {
+    const quiet = options.background || options.ignoreWorkingCopy
+    for (const text of stderrWarnings(stderr)) {
+      this.logger.warn(`${repoTag(options.cwd)} ${text}`)
+      if (!quiet) {
+        this.warningHandler?.({ cwd: options.cwd, args: options.args, text })
+      }
+    }
   }
 
   async runBytes(options: RunOptions): Promise<Buffer> {

@@ -2,7 +2,13 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { describe, expect, test } from 'vitest'
-import { describeArgs, JjRunner, summarizeStderr } from '../../src/jj/runner'
+import {
+  describeArgs,
+  JjRunner,
+  stderrWarnings,
+  summarizeStderr,
+  type JjWarning,
+} from '../../src/jj/runner'
 import { NULL_LOGGER } from '../../src/util/logger'
 
 describe('JjRunner environment', () => {
@@ -40,6 +46,62 @@ describe('JjRunner environment', () => {
   })
 })
 
+describe('JjRunner warnings', () => {
+  async function warningsOf(options: { background?: boolean; ignoreWorkingCopy?: boolean }) {
+    const dir = mkdtempSync(join(tmpdir(), 'ukemi-runner-'))
+    const fake = join(dir, 'jj')
+    writeFileSync(
+      fake,
+      '#!/bin/sh\necho "Warning: No matching bookmarks for names: nope" >&2\necho "No bookmarks to delete." >&2\n',
+      { mode: 0o700 },
+    )
+    const logged: string[] = []
+    const shown: JjWarning[] = []
+    const runner = new JjRunner(fake, { ...NULL_LOGGER, warn: (message) => logged.push(message) })
+    runner.onWarning((warning) => shown.push(warning))
+    try {
+      await runner.run({ cwd: dir, args: ['bookmark', 'delete'], ...options })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+    return { logged, shown: shown.map((warning) => warning.text) }
+  }
+
+  test('logs and reports the warnings of a command that succeeds', async () => {
+    const { logged, shown } = await warningsOf({})
+    expect(shown).toEqual(['No matching bookmarks for names: nope'])
+    expect(logged).toHaveLength(1)
+    expect(logged[0]).toMatch(/\] No matching bookmarks for names: nope$/)
+  })
+
+  test('only logs the warnings of reads and background commands', async () => {
+    expect((await warningsOf({ background: true })).shown).toEqual([])
+    expect((await warningsOf({ ignoreWorkingCopy: true })).shown).toEqual([])
+    expect((await warningsOf({ background: true })).logged).toHaveLength(1)
+  })
+})
+
+describe('stderrWarnings', () => {
+  test('keeps the lines and hints that belong to each warning', () => {
+    const stderr = [
+      'Warning: Refused to snapshot some files:',
+      '  big.bin: 2.0MiB (2097152 bytes); the maximum size allowed is 1.0MiB',
+      'Hint: Run `jj file track` to track them.',
+      'Working copy  (@) now at: abc',
+      'Warning: No matching remotes for names: origin',
+      '',
+    ].join('\n')
+    expect(stderrWarnings(stderr)).toEqual([
+      'Refused to snapshot some files:\n  big.bin: 2.0MiB (2097152 bytes); the maximum size allowed is 1.0MiB\nHint: Run `jj file track` to track them.',
+      'No matching remotes for names: origin',
+    ])
+  })
+
+  test('ignores output that is not a warning', () => {
+    expect(stderrWarnings('Nothing changed.\n')).toEqual([])
+  })
+})
+
 describe('describeArgs', () => {
   test('hides templates and config values', () => {
     expect(
@@ -73,9 +135,18 @@ describe('describeArgs', () => {
 })
 
 describe('summarizeStderr', () => {
-  test('keeps the error and drops hints', () => {
+  test('keeps the error and its hints', () => {
     const stderr = 'Warning: x\nError: Commit abc is immutable\nHint: Pass --ignore-immutable\n'
-    expect(summarizeStderr(stderr)).toBe('Commit abc is immutable')
+    expect(summarizeStderr(stderr)).toBe('Commit abc is immutable\nHint: Pass --ignore-immutable')
+  })
+
+  test('keeps the tip of an argument error and drops the usage', () => {
+    for (const prefix of ['Error:', 'error:']) {
+      const stderr = `${prefix} unexpected argument '-q' found\n\n  tip: to pass '-q' as a value, use '-- -q'\n\nUsage: jj git init [OPTIONS] [DESTINATION]\n\nFor more information, try '--help'.\n`
+      expect(summarizeStderr(stderr)).toBe(
+        "unexpected argument '-q' found\n  tip: to pass '-q' as a value, use '-- -q'",
+      )
+    }
   })
 
   test('hides a url password', () => {
@@ -106,6 +177,22 @@ describe.skipIf(process.platform === 'win32')('JjRunner timeout', () => {
     }
   }
 
+  test('keeps what jj wrote before the timeout', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ukemi-runner-'))
+    const fake = join(dir, 'jj')
+    writeFileSync(fake, '#!/bin/sh\necho "Error: waiting for the lock" >&2\nsleep 30\n', {
+      mode: 0o700,
+    })
+    const runner = new JjRunner(fake, NULL_LOGGER, { killGraceMs: 200 })
+    try {
+      await expect(runner.run({ cwd: dir, args: ['status'], timeoutMs: 200 })).rejects.toThrow(
+        'jj timed out after 0.2 s: waiting for the lock',
+      )
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   test('ends a helper that holds the output pipes open', async () => {
     // Like ssh started by git: it inherits jj's pipes and outlives a SIGTERM to jj alone.
     expect(await timesOut('sleep 30 &\nwait')).toBeLessThan(5000)
@@ -113,5 +200,35 @@ describe.skipIf(process.platform === 'win32')('JjRunner timeout', () => {
 
   test('kills a process that ignores SIGTERM', async () => {
     expect(await timesOut("trap '' TERM\nwhile :; do sleep 0.1; done")).toBeLessThan(5000)
+  })
+})
+
+describe.skipIf(process.platform === 'win32')('JjRunner prompts', () => {
+  test('does not count the time a prompt is open against the timeout', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ukemi-runner-'))
+    const fake = join(dir, 'jj')
+    writeFileSync(fake, '#!/bin/sh\nsleep 0.6\necho done\n', { mode: 0o700 })
+    const runner = new JjRunner(fake, NULL_LOGGER, { killGraceMs: 200 })
+    try {
+      const result = runner.run({ cwd: dir, args: ['git', 'push'], timeoutMs: 300 })
+      await runner.whilePrompting(() => new Promise((resolve) => setTimeout(resolve, 500)))
+      expect((await result).stdout).toBe('done\n')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('times out again once the prompt is answered', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ukemi-runner-'))
+    const fake = join(dir, 'jj')
+    writeFileSync(fake, '#!/bin/sh\nsleep 30\n', { mode: 0o700 })
+    const runner = new JjRunner(fake, NULL_LOGGER, { killGraceMs: 200 })
+    try {
+      const result = runner.run({ cwd: dir, args: ['git', 'push'], timeoutMs: 300 })
+      await runner.whilePrompting(() => new Promise((resolve) => setTimeout(resolve, 100)))
+      await expect(result).rejects.toThrow('timed out')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
