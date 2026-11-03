@@ -5,19 +5,83 @@ import { pathToFileURL } from 'node:url'
 
 const BULLET = /^[*-] /
 const HEADING = /^#{1,6} /
+const RELEASE_HEADING = /^#{1,2} /
 const SECTION_HEADING = /^### /
 const THEMATIC_BREAK = /^---\s*$/
 const COMMIT_URL = /\/commit\/([0-9a-f]{7,40})\b/i
+const COMMIT_LINK = /\s*\(\[[0-9a-f]{7,40}\]\([^)]*\/commit\/[0-9a-f]{7,40}\)\)/gi
 const REPO_NAME = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
+const DIFF_BUFFER_BYTES = 64 * 1024 * 1024
 
 export function omitMergeCommitEntries(markdown: string, mergeShas: ReadonlySet<string>): string {
   const merges = new Set([...mergeShas].map((sha) => sha.toLowerCase()))
+  return mapLines(markdown, (lines) => dropEmptySections(withoutMergeBullets(lines, merges)))
+}
+
+// A branch built on commits that were rebased and merged elsewhere brings the old copies to main
+// as well. Those copies repeat both the subject and the diff of a commit listed before them.
+export function omitCopiedCommitEntries(
+  markdown: string,
+  patchIds: ReadonlyMap<string, string>,
+): string {
+  return mapLines(markdown, (lines) => dropEmptySections(withoutCopiedBullets(lines, patchIds)))
+}
+
+export function shasWithRepeatedSubjects(markdown: string): string[] {
+  const bySubject = new Map<string, string[]>()
+  for (const { key, sha } of commitBullets(markdown.split('\n'))) {
+    bySubject.set(key, [...(bySubject.get(key) ?? []), sha])
+  }
+  return [...bySubject.values()].filter((shas) => shas.length > 1).flat()
+}
+
+function mapLines(markdown: string, transform: (lines: readonly string[]) => string[]): string {
   const endsWithNewline = markdown.endsWith('\n')
   const lines = markdown.split('\n')
   if (endsWithNewline) lines.pop()
-  return `${dropEmptySections(withoutMergeBullets(lines, merges)).join('\n')}${
-    endsWithNewline ? '\n' : ''
-  }`
+  return `${transform(lines).join('\n')}${endsWithNewline ? '\n' : ''}`
+}
+
+interface CommitBullet {
+  index: number
+  key: string
+  sha: string
+}
+
+// The key holds the release and section headings so equal subjects elsewhere stay apart.
+function commitBullets(lines: readonly string[]): CommitBullet[] {
+  const bullets: CommitBullet[] = []
+  let release = ''
+  let section = ''
+  lines.forEach((line, index) => {
+    if (RELEASE_HEADING.test(line)) {
+      release = line
+      section = ''
+    } else if (SECTION_HEADING.test(line)) {
+      section = line
+    } else if (BULLET.test(line)) {
+      const sha = COMMIT_URL.exec(line)?.[1]?.toLowerCase()
+      const subject = line.replace(COMMIT_LINK, '').trim()
+      if (sha) bullets.push({ index, key: `${release}\n${section}\n${subject}`, sha })
+    }
+  })
+  return bullets
+}
+
+function withoutCopiedBullets(
+  lines: readonly string[],
+  patchIds: ReadonlyMap<string, string>,
+): string[] {
+  const seen = new Set<string>()
+  const copies = new Set<number>()
+  for (const { index, key, sha } of commitBullets(lines)) {
+    const patchId = patchIds.get(sha)
+    if (patchId === undefined) continue
+    const change = `${key}\n${patchId}`
+    if (seen.has(change)) copies.add(index)
+    seen.add(change)
+  }
+  return lines.filter((_, index) => !copies.has(index))
 }
 
 function withoutMergeBullets(lines: readonly string[], mergeShas: ReadonlySet<string>): string[] {
@@ -64,13 +128,46 @@ function main(): void {
     ? readFileSync(args.pullRequestBodyPath, 'utf8')
     : undefined
   const mergeShas = mergeCommits(args.repo, [changelog, pullRequestBody ?? ''])
-  replaceIfChanged(args.changelogPath, changelog, omitMergeCommitEntries(changelog, mergeShas))
+  const withoutMerges = [changelog, pullRequestBody ?? ''].map((text) =>
+    omitMergeCommitEntries(text, mergeShas),
+  )
+  const patchIds = commitPatchIds(args.repo, withoutMerges.flatMap(shasWithRepeatedSubjects))
+  const [nextChangelog, nextBody] = withoutMerges.map((text) =>
+    omitCopiedCommitEntries(text, patchIds),
+  )
+  replaceIfChanged(args.changelogPath, changelog, nextChangelog ?? changelog)
   if (args.pullRequestBodyPath && pullRequestBody !== undefined) {
-    replaceIfChanged(
-      args.pullRequestBodyPath,
-      pullRequestBody,
-      omitMergeCommitEntries(pullRequestBody, mergeShas),
+    replaceIfChanged(args.pullRequestBodyPath, pullRequestBody, nextBody ?? pullRequestBody)
+  }
+}
+
+function commitPatchIds(repo: string, shas: readonly string[]): Map<string, string> {
+  const patchIds = new Map<string, string>()
+  for (const sha of new Set(shas)) {
+    const patchId = commitPatchId(repo, sha)
+    if (patchId) patchIds.set(sha, patchId)
+  }
+  return patchIds
+}
+
+// GitHub refuses the diff of a very large commit. Such a commit stays in the notes.
+function commitPatchId(repo: string, sha: string): string | undefined {
+  try {
+    const diff = execFileSync(
+      'gh',
+      ['api', `repos/${repo}/commits/${sha}`, '-H', 'Accept: application/vnd.github.diff'],
+      { encoding: 'utf8', maxBuffer: DIFF_BUFFER_BYTES },
     )
+    const output = execFileSync('git', ['patch-id', '--stable'], {
+      encoding: 'utf8',
+      input: diff,
+      maxBuffer: DIFF_BUFFER_BYTES,
+    })
+    return /^[0-9a-f]{40}\b/.exec(output)?.[0]
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'unknown error'
+    process.stderr.write(`keeping ${sha}: could not read its diff (${message})\n`)
+    return undefined
   }
 }
 

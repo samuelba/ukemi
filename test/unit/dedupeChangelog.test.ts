@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'vitest'
-import { omitMergeCommitEntries } from '../../scripts/dedupeChangelog'
+import {
+  omitCopiedCommitEntries,
+  omitMergeCommitEntries,
+  shasWithRepeatedSubjects,
+} from '../../scripts/dedupeChangelog'
 
 const notes = `## [0.3.0](https://github.com/samuelba/ukemi/compare/v0.2.0...v0.3.0) (2026-10-27)
 
@@ -82,5 +86,81 @@ footer
 ---
 footer
 `)
+  })
+})
+
+const sha = (char: string) => char.repeat(40)
+const bullet = (subject: string, char: string) =>
+  `* ${subject} ([${char.repeat(7)}](https://github.com/samuelba/ukemi/commit/${sha(char)}))`
+
+const copied = `## [0.9.0](https://github.com/samuelba/ukemi/compare/v0.8.0...v0.9.0) (2026-11-03)
+
+### Features
+
+${bullet('change the keyboard shortcuts', 'a')}
+${bullet('change the keyboard shortcuts', 'b')}
+${bullet('zoom from the View menu', 'c')}
+${bullet('zoom from the View menu', 'd')}
+${bullet('desktop version', 'e')}
+
+### Bug Fixes
+
+${bullet('zoom from the View menu', 'f')}
+
+## [0.8.0](https://github.com/samuelba/ukemi/compare/v0.7.0...v0.8.0) (2026-10-30)
+
+### Features
+
+${bullet('change the keyboard shortcuts', '1')}
+`
+
+describe('shasWithRepeatedSubjects', () => {
+  test('lists the commits whose subject repeats within one section of one release', () => {
+    expect(shasWithRepeatedSubjects(copied)).toEqual([sha('a'), sha('b'), sha('c'), sha('d')])
+  })
+})
+
+describe('omitCopiedCommitEntries', () => {
+  test('drops a later commit that repeats the subject and the diff of an earlier one', () => {
+    const patchIds = new Map([
+      [sha('a'), 'p1'],
+      [sha('b'), 'p1'],
+      [sha('c'), 'p2'],
+      [sha('d'), 'p2'],
+      [sha('f'), 'p2'],
+      [sha('1'), 'p1'],
+    ])
+
+    const filtered = omitCopiedCommitEntries(copied, patchIds)
+
+    expect(filtered)
+      .toBe(`## [0.9.0](https://github.com/samuelba/ukemi/compare/v0.8.0...v0.9.0) (2026-11-03)
+
+### Features
+
+${bullet('change the keyboard shortcuts', 'a')}
+${bullet('zoom from the View menu', 'c')}
+${bullet('desktop version', 'e')}
+
+### Bug Fixes
+
+${bullet('zoom from the View menu', 'f')}
+
+## [0.8.0](https://github.com/samuelba/ukemi/compare/v0.7.0...v0.8.0) (2026-10-30)
+
+### Features
+
+${bullet('change the keyboard shortcuts', '1')}
+`)
+    expect(omitCopiedCommitEntries(filtered, patchIds)).toBe(filtered)
+  })
+
+  test('keeps commits that share a subject but change different things', () => {
+    const patchIds = new Map([
+      [sha('a'), 'p1'],
+      [sha('b'), 'p2'],
+    ])
+
+    expect(omitCopiedCommitEntries(copied, patchIds)).toBe(copied)
   })
 })
