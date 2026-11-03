@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { basename } from 'node:path'
 import { hostSpawn } from '../util/hostProcess'
+import { killTree, OWN_GROUP } from '../util/processTree'
 import type { Logger } from '../util/logger'
 import { redactUrlCredentials } from '../util/text'
 
@@ -8,6 +9,8 @@ export const DEFAULT_TIMEOUT_MS = 60_000
 export const NETWORK_TIMEOUT_MS = 120_000
 const INDEX_LOCK_RETRIES = 3
 const INDEX_LOCK_DELAY_MS = 500
+// How long jj and its helpers get to end after SIGTERM before they are killed.
+const KILL_GRACE_MS = 3_000
 
 const GLOBAL_ARGS = ['--color=never', '--no-pager']
 
@@ -87,6 +90,7 @@ export class JjRunner {
   constructor(
     private binaryPath: string,
     private readonly logger: Logger,
+    private readonly options: { killGraceMs?: number } = {},
   ) {}
 
   get binary(): string {
@@ -140,27 +144,49 @@ export class JjRunner {
         cwd: options.cwd,
         env: this.hostEnv({ ...options.env, JJ_EDITOR: 'false' }),
       })
+      // In its own process group, so a timeout also ends git and ssh, which hold jj's pipes. See
+      // killTree.
       const child = spawn(host.command, host.args, {
         cwd: options.cwd,
         env: host.env,
         stdio: ['pipe', 'pipe', 'pipe'],
+        detached: OWN_GROUP,
       })
       const stdout: Buffer[] = []
       const stderr: Buffer[] = []
       let hasTimedOut = false
+      let killTimer: ReturnType<typeof setTimeout> | null = null
       const timer = setTimeout(() => {
         hasTimedOut = true
-        child.kill('SIGTERM')
+        killTree(child, 'SIGTERM')
+        killTimer = setTimeout(
+          () => killTree(child, 'SIGKILL'),
+          this.options.killGraceMs ?? KILL_GRACE_MS,
+        )
       }, timeoutMs)
+      const settle = () => {
+        clearTimeout(timer)
+        if (killTimer) {
+          clearTimeout(killTimer)
+        }
+      }
 
       child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk))
       child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk))
       child.on('error', (error) => {
-        clearTimeout(timer)
+        settle()
         reject(new JjError(`Failed to start jj: ${error.message}`, args, '', null))
       })
+      // After a timeout, a helper that ignores the signals can still hold the pipes, and then
+      // 'close' never comes. jj itself has ended once 'exit' comes.
+      child.on('exit', (code) => {
+        if (hasTimedOut) {
+          settle()
+          reject(new JjError(`jj timed out after ${timeoutMs / 1000} s`, args, '', code))
+        }
+      })
       child.on('close', (code, signal) => {
-        clearTimeout(timer)
+        settle()
         const out = Buffer.concat(stdout).toString('utf8')
         const err = Buffer.concat(stderr).toString('utf8')
         const elapsed = Date.now() - started
