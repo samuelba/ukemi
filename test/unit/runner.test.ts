@@ -1,6 +1,6 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { describeArgs, JjRunner, summarizeStderr } from '../../src/jj/runner'
 import { NULL_LOGGER } from '../../src/util/logger'
@@ -17,6 +17,26 @@ describe('JjRunner environment', () => {
     rmSync(dir, { recursive: true, force: true })
 
     expect(stdout).toBe('/x/askpass.sh 0\n')
+  })
+
+  test('names the repository in the log', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ukemi-runner-'))
+    const fake = join(dir, 'jj')
+    writeFileSync(fake, '#!/bin/sh\necho "Error: boom" >&2\nexit 1\n', { mode: 0o700 })
+    const lines: string[] = []
+    const logger = {
+      info: (message: string) => lines.push(message),
+      warn: (message: string) => lines.push(message),
+      error: (message: string) => lines.push(message),
+    }
+    const runner = new JjRunner(fake, logger)
+
+    await expect(runner.run({ cwd: dir, args: ['status'] })).rejects.toThrow('boom')
+    rmSync(dir, { recursive: true, force: true })
+
+    const name = basename(dir)
+    expect(lines[0]).toMatch(new RegExp(`^\\[${name}\\] jj status \\(\\d+ ms, exit 1\\)$`))
+    expect(lines[1]).toBe(`[${name}] Error: boom`)
   })
 })
 

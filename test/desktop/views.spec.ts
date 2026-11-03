@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { expect, test } from '@playwright/test'
 import { fixtureRepo, launch } from './launch'
 
@@ -138,7 +138,25 @@ test('runs a shell in the bottom panel, in the repository, next to the log', asy
     await expect(terminal.locator('.xterm-rows')).toContainText(repo)
 
     await page.locator('.bottom-tab', { hasText: 'Log' }).click()
-    await expect(page.locator('.log-line', { hasText: 'jj log' }).first()).toBeVisible()
+    await expect(
+      page.locator('.log-line', { hasText: `[${basename(repo)}] jj log` }).first(),
+    ).toBeVisible()
+    // Copied lines keep time, level and message on one line.
+    await page.evaluate(() => {
+      const lines = document.querySelectorAll('.log-line')
+      const range = document.createRange()
+      range.setStartBefore(lines[0]!)
+      range.setEndAfter(lines[1]!)
+      document.getSelection()?.removeAllRanges()
+      document.getSelection()?.addRange(range)
+      document.execCommand('copy')
+    })
+    const copied = await app.evaluate(({ clipboard }) => clipboard.readText())
+    const copiedLines = copied.split('\n')
+    expect(copiedLines).toHaveLength(2)
+    for (const line of copiedLines) {
+      expect(line).toMatch(/^\d\d:\d\d:\d\d (info|warn|error) \S/)
+    }
     await page
       .locator('.bottom-tab', { hasText: 'ukemi-desktop-repo' })
       .locator('.repo-tab-close')

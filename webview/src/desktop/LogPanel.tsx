@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent } from 'react'
 import type { DesktopRendererMessage, LogLine } from '../../../shared/desktopProtocol'
 import { postMessage } from '../shared/hostApi'
 
@@ -8,6 +8,38 @@ function send(message: DesktopRendererMessage): void {
 
 function clock(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour12: false })
+}
+
+// Copies the selected lines as "time level message", one per line. The browser would put each
+// grid column on its own line. A selection inside one column copies as the browser does it.
+function copyLines(event: ClipboardEvent<HTMLDivElement>): void {
+  const selection = window.getSelection()
+  if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+    return
+  }
+  const range = selection.getRangeAt(0)
+  const common = range.commonAncestorContainer
+  const within = common instanceof Element ? common : common.parentElement
+  if (within?.closest('.log-line > span')) {
+    return
+  }
+  // A selection that ends where the next line starts does not take that line.
+  const picked = [...event.currentTarget.querySelectorAll('.log-line')].filter((line) => {
+    const contents = document.createRange()
+    contents.selectNodeContents(line)
+    return (
+      range.compareBoundaryPoints(Range.START_TO_END, contents) > 0 &&
+      range.compareBoundaryPoints(Range.END_TO_START, contents) < 0
+    )
+  })
+  if (picked.length === 0) {
+    return
+  }
+  const text = picked
+    .map((line) => [...line.children].map((cell) => cell.textContent ?? '').join(' '))
+    .join('\n')
+  event.clipboardData.setData('text/plain', text)
+  event.preventDefault()
 }
 
 // The app's log, like the Output panel of VS Code: every jj call and what went wrong.
@@ -75,6 +107,7 @@ export function LogPanel({ lines }: { lines: readonly LogLine[] }) {
       <div
         className="log-body"
         ref={body}
+        onCopy={copyLines}
         onScroll={(e) => {
           const el = e.currentTarget
           stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
