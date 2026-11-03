@@ -37,7 +37,6 @@ import { buildViewState } from '../app/viewState'
 import { AskpassServer } from '../askpass/server'
 import { JjRunner } from '../jj/runner'
 import { errorMessage, type Logger } from '../util/logger'
-import { LoopbackRedirect } from './adapters/loopbackRedirect'
 import { RendererUi, type NativeUi } from './adapters/rendererUi'
 import { fsWatchRepo } from './adapters/watchRepo'
 import { windowStore } from './adapters/windowStore'
@@ -144,7 +143,7 @@ export class DesktopSession implements Disposable {
     this.operations = new Operations(logger)
     this.forge = new ForgeService(this.registry, host, logger, {
       githubSession: null,
-      gitlabRedirect: new LoopbackRedirect(),
+      gitlabRedirect: context.loopback.redirect(),
       untrustedMessage: UNTRUSTED_MESSAGE,
     })
     this.autoFetch = new AutoFetcher(this.registry, this.forge, this.operations, logger, host)

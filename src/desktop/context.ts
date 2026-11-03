@@ -2,6 +2,7 @@ import type { BrowserWindow, Rectangle } from 'electron'
 import type { AboutInfo, Fonts, ZoomStep } from '../../shared/desktopProtocol'
 import type { Ui } from '../app/ui'
 import type { KeyValueFile } from './adapters/keyValueFile'
+import type { LoopbackServer } from './adapters/loopbackRedirect'
 import type { SecretsFile } from './adapters/secretsFile'
 import type { SettingsFile } from './adapters/settingsFile'
 import type { TrustStore } from './adapters/trustStore'
@@ -38,6 +39,8 @@ export interface DesktopContext {
   readonly trust: TrustStore
   readonly repoTabs: RepoTabStore
   readonly recentRepos: RecentRepoStore
+  // The one local server that receives GitLab sign-in redirects for every window.
+  readonly loopback: LoopbackServer
   readonly jj: { path: string | null; version: string | null }
   about(): AboutInfo
   // The fonts of diffs and terminals, from the settings and the system.

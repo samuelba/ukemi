@@ -1,9 +1,11 @@
+import { createServer } from 'node:net'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import type { DesktopHostMessage } from '../../shared/desktopProtocol'
 import { KeyValueFile } from '../../src/desktop/adapters/keyValueFile'
+import { LoopbackServer } from '../../src/desktop/adapters/loopbackRedirect'
 import { RendererUi } from '../../src/desktop/adapters/rendererUi'
 import { SecretsFile, type Encryptor } from '../../src/desktop/adapters/secretsFile'
 import type { SettingsChange } from '../../src/app/settings'
@@ -177,6 +179,40 @@ describe('windowStore', () => {
     expect(first.get('active')).toBe('/repo/a')
     expect(second.get('active')).toBe('/repo/b')
     expect(windowStore(shared).get('active')).toBe('/repo/b')
+  })
+})
+
+function freePort(): Promise<number> {
+  return new Promise((resolve) => {
+    const server = createServer()
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address()
+      server.close(() => resolve(typeof address === 'object' && address ? address.port : 0))
+    })
+  })
+}
+
+describe('LoopbackServer', () => {
+  test('serves every window from one port and stops telling a closed window', async () => {
+    const server = new LoopbackServer(await freePort())
+    const first = server.redirect()
+    const second = server.redirect()
+    const seen: string[] = []
+    first.onDidRedirect((params) => seen.push(`first ${params.get('state')}`))
+    second.onDidRedirect((params) => seen.push(`second ${params.get('state')}`))
+    try {
+      const [uri, again] = await Promise.all([first.prepare(), second.prepare()])
+      expect(again).toBe(uri)
+
+      await fetch(`${uri}?state=a`)
+      second.dispose()
+      await fetch(`${uri}?state=b`)
+
+      expect(seen).toEqual(['first a', 'second a', 'first b'])
+    } finally {
+      first.dispose()
+      server.dispose()
+    }
   })
 })
 

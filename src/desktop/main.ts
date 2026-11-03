@@ -24,6 +24,7 @@ import { downloadJj, MIN_JJ_VERSION, PINNED_RELEASE } from '../jj/binary'
 import { findRepoRootUpwards } from '../repo/discovery'
 import { errorMessage } from '../util/logger'
 import { KeyValueFile } from './adapters/keyValueFile'
+import { LoopbackServer } from './adapters/loopbackRedirect'
 import { adoptLoginShellPath } from './adapters/loginShellPath'
 import { SecretsFile } from './adapters/secretsFile'
 import { SettingsFile } from './adapters/settingsFile'
@@ -130,6 +131,7 @@ class DesktopApp implements DesktopContext {
   readonly trust = new TrustStore(this.state)
   readonly repoTabs = new RepoTabStore(this.state)
   readonly recentRepos = new RecentRepoStore(this.state)
+  readonly loopback = new LoopbackServer()
   readonly jj: { path: string | null; version: string | null } = { path: null, version: null }
   private systemFont: SystemFont | null = null
   readonly secrets: SecretsFile
@@ -204,6 +206,7 @@ class DesktopApp implements DesktopContext {
     app.on('before-quit', () => {
       this.isQuitting = true
       this.rememberOpenFolders()
+      this.loopback.dispose()
     })
   }
 
