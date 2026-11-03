@@ -305,6 +305,24 @@ test('starts with the working copy selected, and keeps it selected after edits',
   }
 })
 
+test('lists the operation log in the sidebar, with restore on earlier operations', async () => {
+  const { app, page } = await launch(fixtureRepo())
+  try {
+    const section = page.locator('.side-section[aria-label="Operation Log"]')
+    await section.locator('.side-section-toggle').click()
+    const rows = section.locator('.side-row')
+    await expect(rows.first()).toBeVisible()
+    await expect(rows.first().locator('.side-row-description')).toContainText('current')
+    expect(await rows.count()).toBeGreaterThan(1)
+    await rows.nth(1).hover()
+    await expect(
+      rows.nth(1).getByRole('button', { name: /^Restore the Repository to This Operation: / }),
+    ).toBeVisible()
+  } finally {
+    await app.close()
+  }
+})
+
 test('shows line stats as soon as they are switched on', async () => {
   const { app, page } = await launch(fixtureRepo())
   try {

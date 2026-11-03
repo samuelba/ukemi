@@ -19,6 +19,7 @@ import { ChangeSelection } from '../app/changeSelection'
 import { commitCommands } from '../app/commands/commitCommands'
 import type { CommandEnv, Handler } from '../app/commands/context'
 import { evolutionCommands } from '../app/commands/evolutionCommands'
+import { operationCommands } from '../app/commands/operationCommands'
 import { fileCommands } from '../app/commands/fileCommands'
 import { globalCommands } from '../app/commands/globalCommands'
 import { refCommands } from '../app/commands/refCommands'
@@ -531,6 +532,7 @@ export class DesktopSession implements Disposable {
       ...refCommands(env),
       ...workspaceCommands(env),
       ...evolutionCommands(env),
+      ...operationCommands(env),
       'ukemi.showLog': () => this.shell('showLog'),
       'ukemi.repoTab.rename': (arg) =>
         this.withTab(arg, (repoId) => {
@@ -773,6 +775,7 @@ export class DesktopSession implements Disposable {
           rows: group.rows.map((row) => this.withActions(row)),
         })),
         workspaces: panels.workspaces.map((row) => this.withActions(row)),
+        operations: panels.operations.map((row) => this.withActions(row)),
       },
     })
     void this.refreshDetail()

@@ -5,6 +5,7 @@ import { ChangeSelection } from './app/changeSelection'
 import { commitCommands } from './app/commands/commitCommands'
 import type { CommandEnv } from './app/commands/context'
 import { evolutionCommands } from './app/commands/evolutionCommands'
+import { operationCommands } from './app/commands/operationCommands'
 import { fileCommands } from './app/commands/fileCommands'
 import { globalCommands } from './app/commands/globalCommands'
 import { refCommands } from './app/commands/refCommands'
@@ -43,6 +44,7 @@ import { vscodeWorkbench } from './vscode/workbench'
 import { LanguageModelSuggester } from './vscode/languageModelSuggester'
 import { cliSuggesters, DescriptionSuggestions } from './app/describeSuggest/service'
 import { WorkspacesView } from './vscode/workspacesView'
+import { OperationsView } from './vscode/operationsView'
 
 export interface UkemiApi {
   readonly registry: RepoRegistry
@@ -78,6 +80,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
   })
   const evolutionView = new EvolutionView(registry, selection, logger)
   const workspacesView = new WorkspacesView(registry)
+  const operationsView = new OperationsView(registry)
   const bookmarksView = new BookmarksView(registry)
   const forge = new ForgeService(registry, host, logger, vscodeForgeAccounts(context.extension.id))
   const askpass = new AskpassServer(
@@ -160,8 +163,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
     registerConflictLenses(registry),
     conflictDecorator,
     workspacesView,
+    operationsView,
     bookmarksView,
     vscode.window.registerTreeDataProvider('ukemi.workspaces', workspacesView),
+    vscode.window.registerTreeDataProvider('ukemi.operations', operationsView),
     vscode.window.registerWebviewViewProvider(GRAPH_VIEW_ID, graphView, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
@@ -193,6 +198,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
     ...refCommands(env),
     ...workspaceCommands(env),
     ...evolutionCommands(env),
+    ...operationCommands(env),
     'ukemi.evolution.follow': () => {
       selection.toggleFollow(evolutionView.currentSelection())
     },

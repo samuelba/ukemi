@@ -1,5 +1,6 @@
 import type { SidePanelGroup, SidePanelRow, SidePanels } from '../../shared/desktopProtocol'
 import { bookmarkGroups, bookmarkRows, type BookmarkRowElement } from '../repo/bookmarkItems'
+import { operationNodes } from '../repo/operationItems'
 import type { RepoModel } from '../repo/repoModel'
 import {
   compareWorkspaces,
@@ -68,17 +69,31 @@ function workspacePanel(model: RepoModel, openFolders: readonly string[]): SideP
   }))
 }
 
-// The bookmarks and workspaces of the active repository, as the VS Code tree views list them.
+function operationPanel(model: RepoModel): SidePanelRow[] {
+  return operationNodes(model.root, model.operations, Date.now()).map((node) => ({
+    id: node.id,
+    label: node.label,
+    description: node.description,
+    tooltip: node.tooltip,
+    icon: node.contextValue.includes('+current') ? 'circle-filled' : 'history',
+    contextValue: node.contextValue,
+    view: 'ukemi.operations',
+    arg: node,
+  }))
+}
+
+// The bookmarks, workspaces and operation log of the active repository, as the VS Code tree views list them.
 export function sidePanels(
   model: RepoModel | null,
   openFolders: readonly string[],
   bookmarkQuery = '',
 ): SidePanels {
   if (!model) {
-    return { bookmarks: [], workspaces: [] }
+    return { bookmarks: [], workspaces: [], operations: [] }
   }
   return {
     bookmarks: bookmarkPanel(model, bookmarkQuery),
     workspaces: workspacePanel(model, openFolders),
+    operations: operationPanel(model),
   }
 }

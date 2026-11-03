@@ -97,7 +97,7 @@ function Section({
   )
 }
 
-// Bookmarks and workspaces of the active repository, as the VS Code sidebar views list them.
+// Bookmarks, workspaces and operations of the active repository, as the VS Code sidebar views list them.
 export function Sidebar({ panels }: { panels: SidePanels }) {
   const [filter, setFilter] = useState('')
   const groups = useMemo(() => {
@@ -114,6 +114,7 @@ export function Sidebar({ panels }: { panels: SidePanels }) {
   const bookmarkCount = panels.bookmarks.reduce((sum, group) => sum + group.rows.length, 0)
   const [showBookmarks, setShowBookmarks] = useState(true)
   const [showWorkspaces, setShowWorkspaces] = useState(true)
+  const [showOperations, setShowOperations] = useState(false)
   const [share, setShare] = useState(readShare)
   const aside = useRef<HTMLElement>(null)
 
@@ -128,15 +129,16 @@ export function Sidebar({ panels }: { panels: SidePanels }) {
 
   // A closed section shrinks to its header, and the open one takes the rest.
   const isSplit = showBookmarks && showWorkspaces
-  const rows = isSplit
+  const pair = isSplit
     ? `minmax(0, ${1 - share}fr) 1px minmax(0, ${share}fr)`
     : `${showBookmarks ? 'minmax(0, 1fr)' : 'auto'} ${showWorkspaces ? 'minmax(0, 1fr)' : 'auto'}`
+  const rows = `${pair} ${showOperations ? 'minmax(0, 1fr)' : 'auto'}`
 
   return (
     <aside
       ref={aside}
       className="sidebar"
-      aria-label="Bookmarks and workspaces"
+      aria-label="Bookmarks, workspaces and operations"
       data-split={isSplit || undefined}
       style={{ gridTemplateRows: rows }}
     >
@@ -210,6 +212,18 @@ export function Sidebar({ panels }: { panels: SidePanels }) {
       >
         <ul className="side-rows">
           {panels.workspaces.map((row) => (
+            <Row key={row.id} row={row} />
+          ))}
+        </ul>
+      </Section>
+      <Section
+        title="Operation Log"
+        count={panels.operations.length}
+        isOpen={showOperations}
+        onToggle={() => setShowOperations((v) => !v)}
+      >
+        <ul className="side-rows">
+          {panels.operations.map((row) => (
             <Row key={row.id} row={row} />
           ))}
         </ul>

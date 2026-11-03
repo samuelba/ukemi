@@ -81,6 +81,7 @@ const evolutionSchema = z.object({
 const operationSchema = z.object({
   id: z.string(),
   description: z.string(),
+  user: z.string(),
   time: z.string(),
 })
 
