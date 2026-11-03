@@ -35,10 +35,13 @@ export class RepoModel {
   private current: GraphState | null = null
   private lastError: string | null = null
   private isDirty = true
+  private mustReload = false
   private lastOperationId: string | null = null
   private tail: Promise<void> | null = null
   private isRefreshQueued = false
   private opEventDuringLoad = false
+  private operationCheck: Promise<void> | null = null
+  private opEventDuringCheck = false
   private viewGeneration = 0
   private readonly elisionCache = new ElisionCache()
   private requests: RequestBadge[] = []
@@ -166,16 +169,36 @@ export class RepoModel {
     )
   }
 
-  async refreshIfOperationChanged(): Promise<void> {
+  // One operation touches several files under op_heads, so the events of a burst share one check.
+  refreshIfOperationChanged(): Promise<void> {
     if (this.tail) {
       this.opEventDuringLoad = true
-      return
+      return Promise.resolve()
     }
-    try {
-      const [head] = await this.repo.operations(1)
-      if (head && head.id !== this.lastOperationId) {
-        await this.refresh()
+    if (this.operationCheck) {
+      this.opEventDuringCheck = true
+      return this.operationCheck
+    }
+    const check = this.checkOperation().finally(() => {
+      if (this.operationCheck === check) {
+        this.operationCheck = null
       }
+    })
+    this.operationCheck = check
+    return check
+  }
+
+  // An event that lands while the head is read may be newer than it, so that read is repeated.
+  private async checkOperation(): Promise<void> {
+    try {
+      do {
+        this.opEventDuringCheck = false
+        const [head] = await this.repo.operations(1)
+        if (head && head.id !== this.lastOperationId) {
+          await this.refresh()
+          return
+        }
+      } while (this.opEventDuringCheck)
     } catch (error: unknown) {
       this.logger.warn(`operation check failed: ${errorMessage(error)}`)
     }
@@ -189,6 +212,18 @@ export class RepoModel {
   }
 
   refresh(): Promise<void> {
+    this.mustReload = true
+    return this.request()
+  }
+
+  // Snapshots the working copy and reloads only when that recorded an operation, so a write that
+  // changes nothing jj tracks (an ignored build output, a save without edits) costs no graph load.
+  refreshWorkingCopy(): Promise<void> {
+    this.isDirty = true
+    return this.request()
+  }
+
+  private request(): Promise<void> {
     if (this.tail) {
       this.isRefreshQueued = true
       return this.tail
@@ -213,6 +248,8 @@ export class RepoModel {
   private async load(): Promise<void> {
     const generation = this.viewGeneration
     this.opEventDuringLoad = false
+    const reload = this.mustReload || !this.current || this.lastError !== null
+    this.mustReload = false
     try {
       if (this.isDirty) {
         this.isDirty = false
@@ -221,8 +258,10 @@ export class RepoModel {
       if (this.snapshotOtherWorkspaces) {
         await this.snapshotOthers()
       }
-      this.lastError = null
-      await this.buildState(generation)
+      if (reload || (await this.operationMoved())) {
+        this.lastError = null
+        await this.buildState(generation)
+      }
     } catch (error: unknown) {
       this.lastError = errorMessage(error)
       this.logger.error(`refresh failed: ${this.lastError}`)
@@ -361,6 +400,11 @@ export class RepoModel {
     return true
   }
 
+  private async operationMoved(): Promise<boolean> {
+    const [head] = await this.repo.operations(1)
+    return head?.id !== this.lastOperationId
+  }
+
   private async noteExternalOperation(): Promise<void> {
     if (!this.opEventDuringLoad) {
       return
@@ -370,6 +414,7 @@ export class RepoModel {
       const [head] = await this.repo.operations(1)
       if (head && head.id !== this.lastOperationId) {
         this.isRefreshQueued = true
+        this.mustReload = true
       }
     } catch (error: unknown) {
       this.logger.warn(`operation check failed: ${errorMessage(error)}`)
