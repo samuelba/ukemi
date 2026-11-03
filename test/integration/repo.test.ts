@@ -200,6 +200,30 @@ describe('mutations', () => {
     expect(await repo.fileContent(sourceAfter?.commitId ?? '', 'a.txt')).toEqual(Buffer.from('a\n'))
   })
 
+  test('copyFiles writes into the chosen commit of a divergent change', async () => {
+    writeFile(root, 'a.txt', 'a\n')
+    jj(root, 'describe', '-m', 'base')
+    const base = await current()
+    jj(root, 'new', '-m', 'target')
+    const first = await current()
+    jj(root, 'describe', '-m', 'target one')
+    jj(root, 'describe', '-r', first.commitId, '-m', 'target two')
+    const [two] = await repo.log('description(exact:"target two\n")')
+    jj(root, 'new', base.commitId, '-m', 'source')
+    writeFile(root, 'b.txt', 'b\n')
+    const source = await current()
+    expect(two?.isDivergent).toBe(true)
+
+    await repo.copyFiles(source.commitId, two?.commitId ?? '', ['b.txt'])
+
+    const filesOf = async (description: string) => {
+      const [commit] = await repo.log(`description(exact:"${description}\n")`)
+      return (await repo.files(commit?.commitId ?? '')).map((file) => file.path)
+    }
+    expect(await filesOf('target two')).toEqual(['b.txt'])
+    expect(await filesOf('target one')).toEqual([])
+  })
+
   test('copyFiles restores both names of a rename', async () => {
     writeFile(root, 'a.txt', 'old\n')
     jj(root, 'describe', '-m', 'base')
