@@ -265,6 +265,16 @@ export class JjRepo {
     return new Set(stdout.split('\n').filter((line) => line.length > 0))
   }
 
+  // The local bookmarks, split by whether a remote has a branch of that name yet.
+  async localBookmarks(): Promise<{ published: string[]; unpublished: string[] }> {
+    const [rows, pushed] = await Promise.all([this.bookmarkList(), this.pushedBookmarkNames()])
+    const local = rows.filter((row) => row.remote === null && row.present).map((row) => row.name)
+    return {
+      published: local.filter((name) => pushed.has(name)),
+      unpublished: local.filter((name) => !pushed.has(name)),
+    }
+  }
+
   async operations(limit: number): Promise<Operation[]> {
     const { stdout } = await this.read([
       'op',

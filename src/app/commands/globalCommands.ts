@@ -285,6 +285,35 @@ function setChangedFilesView(env: CommandEnv, view: ChangedFilesView): Promise<v
   return env.settings.update('changedFilesView', view)
 }
 
+const PUSH_NEW = 'Push All'
+const PUSH_PUBLISHED = 'Only Published Ones'
+
+// Pushes the bookmarks a remote already has. A bookmark that was never pushed can be work in
+// progress or private, so it goes along only when the user says so.
+async function pushAll(env: CommandEnv, model: RepoModel): Promise<void> {
+  const { published, unpublished } = await model.repo.localBookmarks()
+  let names = published
+  if (unpublished.length > 0) {
+    const count = unpublished.length
+    const choice = await env.ui.ask(
+      'warning',
+      `Also push ${count} ${count === 1 ? 'bookmark' : 'bookmarks'} that no remote has yet?`,
+      { detail: unpublished.join(', ') },
+      PUSH_NEW,
+      ...(published.length > 0 ? [PUSH_PUBLISHED] : []),
+    )
+    if (choice === undefined) {
+      return
+    }
+    names = choice === PUSH_NEW ? [...published, ...unpublished] : published
+  }
+  if (names.length === 0) {
+    void env.ui.info('Ukemi: there are no bookmarks to push.')
+    return
+  }
+  await env.operations.run('Push', model, () => model.repo.push(names))
+}
+
 export function globalCommands(env: CommandEnv): Record<string, Handler> {
   return {
     'ukemi.refresh': withModel(env, (model) =>
@@ -305,9 +334,7 @@ export function globalCommands(env: CommandEnv): Record<string, Handler> {
     }),
     'ukemi.toggleAutoFetch': () => toggleSetting(env, 'autoFetch.enabled', 'autoFetchEnabled'),
     'ukemi.toggleGitTags': () => toggleSetting(env, 'showGitTags', 'showGitTags'),
-    'ukemi.push': withModel(env, (model) =>
-      env.operations.run('Push', model, () => model.repo.push()),
-    ),
+    'ukemi.push': withModel(env, (model) => pushAll(env, model)),
     'ukemi.pushCurrent': withModel(env, async (model) => {
       const names = model.graph?.currentBookmarks ?? []
       if (names.length === 0) {
