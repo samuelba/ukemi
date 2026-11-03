@@ -165,6 +165,22 @@ describe('KeyValueFile', () => {
   })
 })
 
+describe('KeyValueFile writes', () => {
+  test('reports a failed write once and keeps the value in memory', async () => {
+    // A path below a regular file cannot be created, like a read-only or full disk.
+    const blocker = join(tempDir(), 'blocker')
+    writeFileSync(blocker, '')
+    const problems: string[] = []
+    const store = new KeyValueFile(join(blocker, 'state.json'), (problem) => problems.push(problem))
+
+    await expect(store.update('active', 'x')).resolves.toBeUndefined()
+    await store.update('active', 'y')
+
+    expect(store.get('active')).toBe('y')
+    expect(problems).toEqual([expect.stringContaining('saving')])
+  })
+})
+
 describe('windowStore', () => {
   test('keeps what one window sets apart from another window', async () => {
     const shared = new KeyValueFile(join(tempDir(), 'state.json')).scoped('window')
