@@ -132,7 +132,7 @@ export class DesktopSession implements Disposable {
     this.askpass = new AskpassServer(
       process.execPath,
       [context.paths.helper('askpass.js')],
-      (request) => this.forge.gitCredential(request),
+      (request) => this.runner.whilePrompting(() => this.forge.gitCredential(request)),
     )
 
     const host = this.host()

@@ -115,3 +115,33 @@ describe.skipIf(process.platform === 'win32')('JjRunner timeout', () => {
     expect(await timesOut("trap '' TERM\nwhile :; do sleep 0.1; done")).toBeLessThan(5000)
   })
 })
+
+describe.skipIf(process.platform === 'win32')('JjRunner prompts', () => {
+  test('does not count the time a prompt is open against the timeout', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ukemi-runner-'))
+    const fake = join(dir, 'jj')
+    writeFileSync(fake, '#!/bin/sh\nsleep 0.6\necho done\n', { mode: 0o700 })
+    const runner = new JjRunner(fake, NULL_LOGGER, { killGraceMs: 200 })
+    try {
+      const result = runner.run({ cwd: dir, args: ['git', 'push'], timeoutMs: 300 })
+      await runner.whilePrompting(() => new Promise((resolve) => setTimeout(resolve, 500)))
+      expect((await result).stdout).toBe('done\n')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('times out again once the prompt is answered', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ukemi-runner-'))
+    const fake = join(dir, 'jj')
+    writeFileSync(fake, '#!/bin/sh\nsleep 30\n', { mode: 0o700 })
+    const runner = new JjRunner(fake, NULL_LOGGER, { killGraceMs: 200 })
+    try {
+      const result = runner.run({ cwd: dir, args: ['git', 'push'], timeoutMs: 300 })
+      await runner.whilePrompting(() => new Promise((resolve) => setTimeout(resolve, 100)))
+      await expect(result).rejects.toThrow('timed out')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})

@@ -90,8 +90,41 @@ function repoTag(cwd: string): string {
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
+// A timeout that can stop while the user answers a git or ssh prompt, and go on afterwards.
+class Countdown {
+  private timer: ReturnType<typeof setTimeout> | null = null
+  private startedAt = 0
+
+  constructor(
+    private remainingMs: number,
+    private readonly onEnd: () => void,
+  ) {}
+
+  resume(): void {
+    if (this.timer) {
+      return
+    }
+    this.startedAt = Date.now()
+    this.timer = setTimeout(() => {
+      this.timer = null
+      this.onEnd()
+    }, this.remainingMs)
+  }
+
+  pause(): void {
+    if (!this.timer) {
+      return
+    }
+    clearTimeout(this.timer)
+    this.timer = null
+    this.remainingMs = Math.max(0, this.remainingMs - (Date.now() - this.startedAt))
+  }
+}
+
 export class JjRunner {
   private extraEnv: Readonly<Record<string, string>> = {}
+  private readonly countdowns = new Set<Countdown>()
+  private openPrompts = 0
 
   constructor(
     private binaryPath: string,
@@ -114,6 +147,21 @@ export class JjRunner {
   // The variables Ukemi adds for jj and git: askpass, and no terminal prompts.
   hostEnv(overrides: Readonly<Record<string, string>> = {}): Record<string, string> {
     return { ...this.extraEnv, ...overrides, GIT_TERMINAL_PROMPT: '0' }
+  }
+
+  // Stops every timeout while the task runs, so the time the user takes to answer a prompt from
+  // git or ssh does not count against the command that asked.
+  async whilePrompting<T>(task: () => Promise<T>): Promise<T> {
+    if (this.openPrompts++ === 0) {
+      this.countdowns.forEach((countdown) => countdown.pause())
+    }
+    try {
+      return await task()
+    } finally {
+      if (--this.openPrompts === 0) {
+        this.countdowns.forEach((countdown) => countdown.resume())
+      }
+    }
   }
 
   async run(options: RunOptions): Promise<RunResult> {
@@ -162,16 +210,22 @@ export class JjRunner {
       const stderr: Buffer[] = []
       let hasTimedOut = false
       let killTimer: ReturnType<typeof setTimeout> | null = null
-      const timer = setTimeout(() => {
+      const countdown = new Countdown(timeoutMs, () => {
+        this.countdowns.delete(countdown)
         hasTimedOut = true
         killTree(child, 'SIGTERM')
         killTimer = setTimeout(
           () => killTree(child, 'SIGKILL'),
           this.options.killGraceMs ?? KILL_GRACE_MS,
         )
-      }, timeoutMs)
+      })
+      this.countdowns.add(countdown)
+      if (this.openPrompts === 0) {
+        countdown.resume()
+      }
       const settle = () => {
-        clearTimeout(timer)
+        countdown.pause()
+        this.countdowns.delete(countdown)
         if (killTimer) {
           clearTimeout(killTimer)
         }

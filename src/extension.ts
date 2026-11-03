@@ -81,7 +81,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
   const askpass = new AskpassServer(
     process.execPath,
     [vscode.Uri.joinPath(context.extensionUri, 'dist', 'askpass.js').fsPath],
-    (request) => forge.gitCredential(request),
+    (request) => runner.whilePrompting(() => forge.gitCredential(request)),
   )
   try {
     await askpass.start()
