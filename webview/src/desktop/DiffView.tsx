@@ -3,7 +3,14 @@ import type { DiffDocument, DiffFile } from '../../../shared/desktopProtocol'
 import { parserFor } from '../editor/languages'
 import { highlightLines, type Token } from '../editor/syntaxClasses'
 import { FileTypeIcon } from '../graph/FileIcon'
-import { diffHunks, patchHunks, segments, type DiffHunk, type DiffRow } from './diffModel'
+import {
+  diffHunks,
+  isLargeDiff,
+  patchHunks,
+  segments,
+  type DiffHunk,
+  type DiffRow,
+} from './diffModel'
 
 const STATUS_LETTER: Record<DiffFile['status'], string> = {
   added: 'A',
@@ -103,23 +110,26 @@ function lineCounts(hunks: readonly DiffHunk[]): { added: number; removed: numbe
 
 function FileDiff({ file, startOpen }: { file: DiffFile; startOpen: boolean }) {
   const [isOpen, setIsOpen] = useState(startOpen)
+  const [showLarge, setShowLarge] = useState(false)
   const isBinary = Boolean(file.left?.isBinary || file.right?.isBinary)
-  const hunks = useMemo(
-    () => (isBinary ? [] : diffHunks(file.left?.text ?? null, file.right?.text ?? null)),
-    [file, isBinary],
-  )
-  // Only an open file pays for parsing its two sides.
+  const left = file.left?.text ?? null
+  const right = file.right?.text ?? null
+  const isLarge = useMemo(() => !isBinary && isLargeDiff(left, right), [isBinary, left, right])
+  // A large file is diffed only once it is open and asked for.
+  const isDiffed = !isBinary && (!isLarge || (isOpen && showLarge))
+  const hunks = useMemo(() => (isDiffed ? diffHunks(left, right) : null), [isDiffed, left, right])
+  // Only an open file pays for parsing its two sides, and a large one is not colored.
   const tokens = useMemo(
     (): SideTokens =>
-      !isOpen || isBinary
+      !isOpen || !hunks || isLarge
         ? NO_TOKENS
         : {
             old: sideTokens(file.path, file.left?.text),
             new: sideTokens(file.path, file.right?.text),
           },
-    [file, isOpen, isBinary],
+    [file, isOpen, hunks, isLarge],
   )
-  const counts = lineCounts(hunks)
+  const counts = hunks ? lineCounts(hunks) : null
   return (
     <section className="diff-file" data-open={isOpen} id={`diff-${file.path}`}>
       <button className="diff-file-header" onClick={() => setIsOpen((v) => !v)}>
@@ -129,7 +139,7 @@ function FileDiff({ file, startOpen }: { file: DiffFile; startOpen: boolean }) {
         </span>
         <FileTypeIcon path={file.path} />
         <span className="diff-path">{file.path}</span>
-        {!isBinary && (
+        {counts && (
           <span className="diff-counts">
             <span className="diff-count-added">+{counts.added}</span>
             <span className="diff-count-removed">−{counts.removed}</span>
@@ -139,6 +149,13 @@ function FileDiff({ file, startOpen }: { file: DiffFile; startOpen: boolean }) {
       {isOpen &&
         (isBinary ? (
           <p className="diff-placeholder">{file.right?.text || file.left?.text}</p>
+        ) : !hunks ? (
+          <p className="diff-placeholder">
+            This file is too large to show at once.{' '}
+            <button className="link-button" onClick={() => setShowLarge(true)}>
+              Show the diff
+            </button>
+          </p>
         ) : hunks.length === 0 ? (
           <p className="diff-placeholder">No changes in the content.</p>
         ) : (
@@ -158,7 +175,8 @@ function FileView({ path, text }: { path: string; text: string }) {
     [text],
   )
   const tokens = useMemo(
-    (): SideTokens => ({ old: null, new: sideTokens(path, text) }),
+    (): SideTokens =>
+      isLargeDiff(null, text) ? NO_TOKENS : { old: null, new: sideTokens(path, text) },
     [path, text],
   )
   return (

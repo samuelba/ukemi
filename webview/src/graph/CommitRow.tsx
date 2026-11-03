@@ -1,22 +1,22 @@
-import { useEffect, useState, useSyncExternalStore, type DragEvent } from 'react'
+import { memo, useEffect, useState, useSyncExternalStore, type DragEvent } from 'react'
 import { parseFileDrag } from '../../../shared/fileUri'
 import type { ChangedFile } from '../../../shared/model'
 import type { CommitView, ViewSettings } from '../../../shared/protocol'
-import { relativeTime, splitId, title } from '../shared/format'
+import { splitId, title } from '../shared/format'
 import { postMessage, vscodeContext } from '../shared/hostApi'
 import { BOOKMARK_MIME, Badges, RequestRow } from './Badges'
-import { canSquashIntoParent } from './canSquashIntoParent'
 import { dropCommitAction, fileDropAction } from './dropCommit'
 import { dragModifiers, installDragModifiers } from './dragModifiers'
 import { FileList, FILE_LOCKED_MIME, FILE_MIME } from './FileList'
 import { LineStats, lineTotals } from './LineStats'
 import { GraphCell } from './GraphCell'
+import { RelativeTime } from './RelativeTime'
 
 export const COMMIT_MIME = 'application/x-ukemi-commit'
 
 interface CommitRowProps {
   commit: CommitView
-  commitsById: ReadonlyMap<string, CommitView>
+  canSquash: boolean
   repoId: string
   lanes: number
   files: ChangedFile[] | undefined
@@ -25,7 +25,6 @@ interface CommitRowProps {
   hasRemotes: boolean
   hasForge: boolean
   settings: ViewSettings
-  now: number
   onToggle: (commit: CommitView) => void
   onSelect: (commitId: string) => void
   onDescribe: (commit: CommitView) => void
@@ -76,7 +75,9 @@ function RowAction({ title, icon, onClick }: { title: string; icon: string; onCl
   )
 }
 
-export function CommitRow(props: CommitRowProps) {
+// Memoized: a refresh keeps the objects of unchanged commits (see keepUnchanged), so only the
+// rows that changed render again.
+export const CommitRow = memo(function CommitRow(props: CommitRowProps) {
   const { commit, repoId, settings, isExpanded } = props
   const [dropTarget, setDropTarget] = useState<DropKind | null>(null)
   const copyModifier = useCopyModifier()
@@ -226,7 +227,7 @@ export function CommitRow(props: CommitRowProps) {
           {fileCount !== null && fileCount > 0 && <span className="file-count">{fileCount}</span>}
           {totals && <LineStats added={totals.added} removed={totals.removed} />}
           <span className="time" title={`${commit.author.name} · ${commit.committer.timestamp}`}>
-            {relativeTime(commit.committer.timestamp, props.now)}
+            <RelativeTime timestamp={commit.committer.timestamp} />
           </span>
           <span className="actions">
             {!commit.isWorkingCopy && !commit.isImmutable && (
@@ -243,7 +244,7 @@ export function CommitRow(props: CommitRowProps) {
                 onClick={() => props.onDescribe(commit)}
               />
             )}
-            {canSquashIntoParent(commit, props.commitsById) && (
+            {props.canSquash && (
               <RowAction
                 title="Squash into parent"
                 icon="fold-down"
@@ -277,4 +278,4 @@ export function CommitRow(props: CommitRowProps) {
       </div>
     </div>
   )
-}
+})

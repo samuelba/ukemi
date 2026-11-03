@@ -92,12 +92,15 @@ describe('downloadJj', () => {
   test('rejects data with a wrong checksum', async () => {
     const download = async () => new Uint8Array([1, 2, 3])
 
-    await expect(downloadJj(fixture.dir, 'x64', download)).rejects.toThrow('Checksum mismatch')
+    await expect(downloadJj(fixture.dir, 'linux-x64', download)).rejects.toThrow(
+      'Checksum mismatch',
+    )
     expect(existsSync(managedBinaryPath(fixture.dir))).toBe(false)
   })
 
-  test('rejects unsupported architectures', async () => {
-    await expect(downloadJj(fixture.dir, 'riscv64')).rejects.toThrow('No official jj build')
+  test('rejects platforms without an official build', async () => {
+    await expect(downloadJj(fixture.dir, 'linux-riscv64')).rejects.toThrow('No official jj build')
+    await expect(downloadJj(fixture.dir, 'freebsd-x64')).rejects.toThrow('No official jj build')
   })
 
   test('extracts the binary when the checksum matches', async () => {
@@ -107,18 +110,39 @@ describe('downloadJj', () => {
     const archive = join(fixture.dir, 'jj.tar.gz')
     execFileSync('tar', ['-czf', archive, '-C', staging, './jj'])
     const data = new Uint8Array(readFileSync(archive))
-    const asset = releaseAssetFor('x64')
+    const asset = releaseAssetFor('linux-x64')
     if (!asset) {
       throw new Error('missing asset')
     }
     const original = asset.sha256
-    PINNED_RELEASE.assets.x64 = { ...asset, sha256: sha256(data) }
+    PINNED_RELEASE.assets['linux-x64'] = { ...asset, sha256: sha256(data) }
     try {
-      const path = await downloadJj(join(fixture.dir, 'store'), 'x64', async () => data)
+      const path = await downloadJj(join(fixture.dir, 'store'), 'linux-x64', async () => data)
 
       expect(execFileSync(path, ['--version'], { encoding: 'utf8' }).trim()).toBe('jj 0.46.0')
     } finally {
-      PINNED_RELEASE.assets.x64 = { ...asset, sha256: original }
+      PINNED_RELEASE.assets['linux-x64'] = { ...asset, sha256: original }
     }
+  })
+})
+
+describe('releaseAssetFor', () => {
+  test.each([
+    ['linux-x64', 'x86_64-unknown-linux-musl.tar.gz'],
+    ['linux-arm64', 'aarch64-unknown-linux-musl.tar.gz'],
+    ['darwin-x64', 'x86_64-apple-darwin.tar.gz'],
+    ['darwin-arm64', 'aarch64-apple-darwin.tar.gz'],
+    ['win32-x64', 'x86_64-pc-windows-msvc.zip'],
+    ['win32-arm64', 'aarch64-pc-windows-msvc.zip'],
+  ])('picks the official build for %s', (target, suffix) => {
+    expect(releaseAssetFor(target)?.name.endsWith(suffix)).toBe(true)
+    expect(releaseAssetFor(target)?.sha256).toMatch(/^[0-9a-f]{64}$/)
+  })
+})
+
+describe('managedBinaryPath', () => {
+  test('names the binary as the platform runs it', () => {
+    expect(managedBinaryPath('/store', 'linux').endsWith('jj')).toBe(true)
+    expect(managedBinaryPath('/store', 'win32').endsWith('jj.exe')).toBe(true)
   })
 })

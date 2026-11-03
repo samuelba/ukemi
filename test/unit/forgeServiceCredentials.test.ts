@@ -184,3 +184,36 @@ describe('GitLab with glab', () => {
     expect(await forge.gitCredential(git('gitlab.com', 'password'))).toBe('pat')
   })
 })
+
+describe('refreshRequests', () => {
+  test('runs a forced refresh again once the running one ends', async () => {
+    const { forge } = service()
+    let release = () => undefined as void
+    const first = new Promise<never[]>((resolve) => {
+      release = () => resolve([])
+    })
+    const remotes = vi.fn().mockReturnValueOnce(first).mockResolvedValue([])
+    const model = { root: '/repo', repo: { remotes }, setForge: vi.fn() }
+
+    const background = forge.refreshRequests(model as never)
+    // Like creating a request while the 60 s refresh still reads the old list.
+    const forced = forge.refreshRequests(model as never, { force: true })
+    release()
+    await Promise.all([background, forced])
+
+    expect(remotes).toHaveBeenCalledTimes(2)
+  })
+
+  test('skips a background refresh while one is running', async () => {
+    const { forge } = service()
+    const remotes = vi.fn().mockResolvedValue([])
+    const model = { root: '/repo', repo: { remotes }, setForge: vi.fn() }
+
+    await Promise.all([
+      forge.refreshRequests(model as never),
+      forge.refreshRequests(model as never),
+    ])
+
+    expect(remotes).toHaveBeenCalledTimes(1)
+  })
+})

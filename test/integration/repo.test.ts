@@ -523,6 +523,31 @@ describe('mutations', () => {
     expect([...(await repo.pushedBookmarkNames())].sort()).toEqual(['gone', 'tracked'])
   })
 
+  test('bookmark names that look like revset operators only touch that bookmark', async () => {
+    const remote = join(fixture.dir, 'remote.git')
+    execFileSync('git', ['init', '--bare', '-q', remote])
+    jj(root, 'git', 'remote', 'add', 'origin', remote)
+    writeFile(root, 'a.txt', 'a\n')
+    jj(root, 'describe', '-m', 'first')
+    const odd = ['ok|main', 'rel-', 'a,b']
+    await repo.setBookmark('main', '@')
+    await repo.setBookmark('ok', '@')
+    for (const name of odd) {
+      await repo.setBookmark(name, '@')
+    }
+
+    await repo.push(odd)
+    await repo.fetch({ branches: odd })
+    await repo.untrackBookmark('ok|main', 'origin')
+    await repo.trackBookmark('ok|main', 'origin')
+    await repo.renameBookmark('rel-', 'rel+')
+    await repo.deleteBookmark('ok|main')
+    await repo.forgetBookmark('a,b')
+
+    const local = (await repo.bookmarkList()).filter((row) => row.remote === null && row.present)
+    expect(local.map((row) => row.name).sort()).toEqual(['main', 'ok', 'rel+'])
+  })
+
   test('addWorkspace creates a sibling workspace', async () => {
     const wsPath = join(fixture.dir, 'repo-ws')
 

@@ -52,6 +52,7 @@ function workspace(overrides: Partial<WorkspaceRecord> = {}): WorkspaceRecord {
     isCurrent: false,
     isOpen: false,
     rootMissing: false,
+    holdsRepository: false,
     root: '/tmp/ukemi-other',
     ...overrides,
   }
@@ -234,6 +235,12 @@ describe('classifyUndescribed', () => {
 })
 
 describe('classifyWorkspaces', () => {
+  test('never offers to delete the folder that holds the repository', () => {
+    const rows = [workspace({ name: 'default', root: '/main', holdsRepository: true })]
+
+    expect(classifyWorkspaces(rows, REPO_ROOT)[0]?.canDeleteFiles).toBe(false)
+  })
+
   test('checks a missing folder and hides the current workspace', () => {
     const rows = [
       workspace({ name: 'default', isCurrent: true, rootMissing: false }),
@@ -582,6 +589,7 @@ describe('cleanupSteps', () => {
         }),
       ),
     ).toEqual([
+      { kind: 'snapshotWorkspace', root: '/tmp/removed' },
       { kind: 'forgetWorkspace', name: 'kept' },
       { kind: 'forgetWorkspace', name: 'removed' },
       { kind: 'forgetWorkspace', name: 'missing' },

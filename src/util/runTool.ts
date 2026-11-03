@@ -1,21 +1,6 @@
-import { spawn, type ChildProcess } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { hostSpawn } from './hostProcess'
-
-// A tool can start helpers that inherit its output pipes. Killing only the tool would leave
-// them running, and the run would last until they end. In its own process group they all go.
-const OWN_GROUP = process.platform !== 'win32'
-
-function killTree(child: ChildProcess): void {
-  if (OWN_GROUP && child.pid !== undefined) {
-    try {
-      process.kill(-child.pid, 'SIGTERM')
-      return
-    } catch {
-      // The group is gone already.
-    }
-  }
-  child.kill()
-}
+import { killTree, OWN_GROUP } from './processTree'
 
 export interface ToolRunOptions {
   cwd: string

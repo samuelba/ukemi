@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import type { CleanupSelection } from '../../shared/cleanup'
-import { applyCleanup, loadCleanup } from '../../src/repo/loadCleanup'
+import { applyCleanup, applyCleanupSteps, loadCleanup } from '../../src/repo/loadCleanup'
 import {
   JJ_BINARY,
   initRepo,
@@ -218,6 +218,37 @@ describe('cleanup', () => {
 
     const after = await loadCleanup(repo, [])
     expect(after.undescribed.some((commit) => commit.commitId === parent.commitId)).toBe(false)
+  })
+
+  test('keeps the folder that holds the repository when cleaning up from another workspace', async () => {
+    const second = join(fixture.dir, 'second-ws')
+    await repo.addWorkspace(second, 'second', '@')
+    const secondRepo = makeRepo(second)
+
+    const snapshot = await loadCleanup(secondRepo, [])
+    expect(snapshot.workspaces).toContainEqual(
+      expect.objectContaining({ name: 'default', canDeleteFiles: false }),
+    )
+    await applyCleanupSteps(secondRepo, [{ kind: 'deleteWorkspaceFiles', root }])
+
+    expect(existsSync(join(root, '.jj', 'repo'))).toBe(true)
+  })
+
+  test('records unsaved edits of a workspace before deleting its folder', async () => {
+    const removed = join(fixture.dir, 'removed-ws')
+    await repo.addWorkspace(removed, 'removed', '@')
+    writeFile(removed, 'drop.txt', 'gone\n')
+
+    const snapshot = await loadCleanup(repo, [])
+    await applyCleanup(
+      repo,
+      snapshot,
+      selection({ workspaces: ['removed'], deleteWorkspaceFiles: ['removed'] }),
+    )
+
+    expect(existsSync(removed)).toBe(false)
+    const kept = await repo.commitIds('files(root-file:"drop.txt")')
+    expect(kept).toHaveLength(1)
   })
 
   test('forgets a workspace and deletes its folder only when asked', async () => {

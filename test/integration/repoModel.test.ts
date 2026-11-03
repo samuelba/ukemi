@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { JjRepo } from '../../src/jj/repo'
-import { JjRunner } from '../../src/jj/runner'
+import { JjRunner, type RunOptions, type RunResult } from '../../src/jj/runner'
 import { RepoModel } from '../../src/repo/repoModel'
 import { NULL_LOGGER, type Logger } from '../../src/util/logger'
 import {
@@ -45,6 +45,76 @@ describe('RepoModel', () => {
     expect(graph?.workingCopyFiles.map((f) => f.path)).toEqual(['b.txt'])
     expect(graph?.canUndo).toBe(true)
     expect(graph?.hasRemotes).toBe(false)
+  })
+
+  test('a commit id from before a snapshot still names its change', async () => {
+    await model.refresh()
+    const before = model.graph?.commits.find((c) => c.isWorkingCopy)
+    writeFile(root, 'late.txt', 'x\n')
+    model.markDirty()
+    await model.refresh()
+
+    const after = model.graph?.commits.find((c) => c.isWorkingCopy)
+    expect(after?.commitId).not.toBe(before?.commitId)
+    expect(model.latestCommit(before?.commitId ?? '')?.commitId).toBe(after?.commitId)
+    expect(model.revisionFor(before?.commitId ?? '')).toBe(after?.changeId)
+    expect(model.latestCommit('0'.repeat(40))).toBeUndefined()
+  })
+
+  test('describing a working copy that changed since the refresh keeps one change', async () => {
+    await model.refresh()
+    const before = model.graph?.commits.find((c) => c.isWorkingCopy)
+    writeFile(root, 'late.txt', 'x\n')
+
+    await model.repo.describe(model.revisionFor(before?.commitId ?? ''), 'late')
+    model.markDirty()
+    await model.refresh()
+
+    const same = model.graph?.commits.filter((c) => c.changeId === before?.changeId) ?? []
+    expect(same).toHaveLength(1)
+    expect(same[0]?.isDivergent).toBe(false)
+    expect(same[0]?.description).toBe('late\n')
+  })
+
+  test('a command that lands during a refresh shows up on the next one', async () => {
+    jj(root, 'describe', '-m', 'before')
+    // The command lands after the refresh read the head operation and before it read the graph.
+    let landed = false
+    class RacingRunner extends JjRunner {
+      override async run(options: RunOptions): Promise<RunResult> {
+        const result = await super.run(options)
+        if (options.args[0] === 'op' && !landed) {
+          landed = true
+          jj(root, 'describe', '-m', 'during')
+        }
+        return result
+      }
+    }
+    const racing = new RepoModel(
+      new JjRepo(root, new RacingRunner(JJ_BINARY, NULL_LOGGER)),
+      NULL_LOGGER,
+    )
+
+    await racing.refresh()
+    // Every read of that refresh saw the operation it started from.
+    expect(racing.graph?.commits.find((c) => c.isWorkingCopy)?.description).toBe('before\n')
+    // The watcher reports the command's operation.
+    await racing.refreshIfOperationChanged()
+
+    expect(landed).toBe(true)
+    expect(racing.graph?.commits.find((c) => c.isWorkingCopy)?.description).toBe('during\n')
+  })
+
+  test('a refresh reads the operation log once and keeps the remotes', async () => {
+    const commands: string[] = []
+    const logger = { ...NULL_LOGGER, info: (line: string) => commands.push(line) }
+    const counted = new RepoModel(new JjRepo(root, new JjRunner(JJ_BINARY, logger)), NULL_LOGGER)
+    jj(root, 'git', 'remote', 'add', 'origin', 'https://example.com/x.git')
+
+    await counted.refresh()
+
+    expect(commands.filter((line) => line.includes(' jj op log '))).toHaveLength(1)
+    expect(counted.remotes?.map((remote) => remote.name)).toEqual(['origin'])
   })
 
   test('picks up file changes only after markDirty', async () => {

@@ -1,4 +1,5 @@
 import type { CommitView } from '../../../shared/protocol'
+import { changeRevision, bookmarkRevision } from '../../jj/revsets'
 import type { Placement, RebaseMode } from '../../jj/repo'
 import type { RepoModel } from '../../repo/repoModel'
 import { combineDescriptions, validateBookmarkName } from '../../util/text'
@@ -38,6 +39,7 @@ export async function describeCommit(
     env.graphView.post({
       type: 'describe',
       commitId: commit.commitId,
+      changeId: commit.changeId,
       description: commit.description,
     })
     return
@@ -48,7 +50,9 @@ export async function describeCommit(
     prompt: 'Change description',
   })
   if (message !== undefined) {
-    await env.operations.run('Describe', model, () => model.repo.describe(commit.commitId, message))
+    await env.operations.run('Describe', model, () =>
+      model.repo.describe(changeRevision(commit), message),
+    )
   }
 }
 
@@ -58,10 +62,12 @@ export async function editOrNew(
   commit: CommitView,
 ): Promise<void> {
   if (commit.isImmutable) {
-    await env.operations.run('New change', model, () => model.repo.newChange([commit.commitId]))
+    await env.operations.run('New change', model, () =>
+      model.repo.newChange([changeRevision(commit)]),
+    )
     return
   }
-  await env.operations.run('Edit', model, () => model.repo.edit(commit.commitId))
+  await env.operations.run('Edit', model, () => model.repo.edit(changeRevision(commit)))
 }
 
 interface DestinationCommit {
@@ -71,11 +77,13 @@ interface DestinationCommit {
 
 export function destinationItems(commits: readonly DestinationCommit[]): PickItem[] {
   const local = unique(
-    commits.flatMap((commit) => commit.localBookmarks.map((bookmark) => bookmark.name)),
+    commits.flatMap((commit) =>
+      commit.localBookmarks.map((bookmark) => bookmarkRevision(bookmark.name)),
+    ),
   )
   const remote = unique(
     commits.flatMap((commit) =>
-      commit.remoteBookmarks.map((bookmark) => `${bookmark.name}@${bookmark.remote}`),
+      commit.remoteBookmarks.map((bookmark) => bookmarkRevision(bookmark.name, bookmark.remote)),
     ),
   )
   return [
@@ -174,7 +182,7 @@ async function shipNow(env: CommandEnv, { model, commit }: Target): Promise<void
     return
   }
   await env.operations.run('Ship', model, async () => {
-    await model.repo.setBookmark(trunk, commit.commitId)
+    await model.repo.setBookmark(trunk, changeRevision(commit))
     await model.repo.push(trunk)
   })
 }
@@ -188,7 +196,7 @@ function duplicateAt(
   return withTarget(env, async ({ model, commit }) => {
     const destination = await pickDestination(env, model, title)
     if (destination) {
-      const revset = withDescendants ? `${commit.commitId}::` : commit.commitId
+      const revset = withDescendants ? `${changeRevision(commit)}::` : changeRevision(commit)
       await env.operations.run('Duplicate', model, () =>
         model.repo.duplicate(revset, destination, placement),
       )
@@ -206,7 +214,7 @@ function rebaseAt(
     const destination = mutable(env, commit) ? await pickDestination(env, model, title) : undefined
     if (destination) {
       await env.operations.run(mode === 'branch' ? 'Rebase stack' : 'Rebase', model, () =>
-        model.repo.rebase(commit.commitId, destination, mode, placement),
+        model.repo.rebase(changeRevision(commit), destination, mode, placement),
       )
     }
   })
@@ -223,11 +231,11 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
 
   return {
     'ukemi.commit.new': run('New change', ({ model, commit }) =>
-      model.repo.newChange([commit.commitId]),
+      model.repo.newChange([changeRevision(commit)]),
     ),
     'ukemi.commit.newBefore': run(
       'Insert change',
-      ({ model, commit }) => model.repo.newChange([commit.commitId], { insertBefore: true }),
+      ({ model, commit }) => model.repo.newChange([changeRevision(commit)], { insertBefore: true }),
       true,
     ),
     'ukemi.commit.edit': withTarget(env, ({ model, commit }) => editOrNew(env, model, commit)),
@@ -241,7 +249,7 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
         )
       ) {
         await env.operations.run('Edit', model, () =>
-          model.repo.edit(commit.commitId, { ignoreImmutable: true }),
+          model.repo.edit(changeRevision(commit), { ignoreImmutable: true }),
         )
       }
     }),
@@ -262,7 +270,7 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
       const parentDescription = parent?.description ?? ''
       const message = combineDescriptions(parentDescription, commit.description)
       await env.operations.run('Squash', model, () =>
-        model.repo.squashIntoParent(commit.commitId, message),
+        model.repo.squashIntoParent(changeRevision(commit), message),
       )
     }),
     'ukemi.commit.split': withTarget(env, async (target) => {
@@ -281,11 +289,11 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
         mutable(env, commit) &&
         (await confirm(env.ui, `Abandon ${shortId(commit)} "${commitTitle(commit)}"?`, 'Abandon'))
       ) {
-        await env.operations.run('Abandon', model, () => model.repo.abandon(commit.commitId))
+        await env.operations.run('Abandon', model, () => model.repo.abandon(changeRevision(commit)))
       }
     }),
     'ukemi.commit.abandonSubtree': withTarget(env, async ({ model, commit }) => {
-      const count = (await model.repo.commitIds(`${commit.commitId}::`)).length
+      const count = (await model.repo.commitIds(`${changeRevision(commit)}::`)).length
       if (
         mutable(env, commit) &&
         (await confirm(
@@ -294,14 +302,16 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
           'Abandon All',
         ))
       ) {
-        await env.operations.run('Abandon', model, () => model.repo.abandon(`${commit.commitId}::`))
+        await env.operations.run('Abandon', model, () =>
+          model.repo.abandon(`${changeRevision(commit)}::`),
+        )
       }
     }),
     'ukemi.commit.duplicate': run('Duplicate', ({ model, commit }) =>
-      model.repo.duplicate(commit.commitId),
+      model.repo.duplicate(changeRevision(commit)),
     ),
     'ukemi.commit.duplicateSubtree': run('Duplicate', ({ model, commit }) =>
-      model.repo.duplicate(`${commit.commitId}::`),
+      model.repo.duplicate(`${changeRevision(commit)}::`),
     ),
     'ukemi.commit.duplicateOnto': duplicateAt(env, false, 'onto', 'Duplicate onto'),
     'ukemi.commit.duplicateOntoSubtree': duplicateAt(env, true, 'onto', 'Duplicate onto'),
@@ -324,15 +334,17 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
       'before',
       'Duplicate insert before',
     ),
-    'ukemi.commit.revert': run('Revert', ({ model, commit }) => model.repo.revert(commit.commitId)),
+    'ukemi.commit.revert': run('Revert', ({ model, commit }) =>
+      model.repo.revert(changeRevision(commit)),
+    ),
     'ukemi.commit.rebaseTrunk': run(
       'Rebase',
-      ({ model, commit }) => model.repo.rebase(commit.commitId, 'trunk()', 'source'),
+      ({ model, commit }) => model.repo.rebase(changeRevision(commit), 'trunk()', 'source'),
       true,
     ),
     'ukemi.commit.rebaseStackTrunk': run(
       'Rebase stack',
-      ({ model, commit }) => model.repo.rebase(commit.commitId, 'trunk()', 'branch'),
+      ({ model, commit }) => model.repo.rebase(changeRevision(commit), 'trunk()', 'branch'),
       true,
     ),
     'ukemi.commit.rebaseStackOnto': rebaseAt(env, 'onto', 'Rebase stack onto', 'branch'),
@@ -343,14 +355,14 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
       const name = await pickBookmarkName(env, model, commit)
       if (name) {
         await env.operations.run('Set bookmark', model, async () => {
-          await model.repo.setBookmark(name, commit.commitId)
+          await model.repo.setBookmark(name, changeRevision(commit))
           model.placeBookmark(name, commit.commitId)
         })
       }
     }),
     'ukemi.commit.advanceBookmark': withTarget(env, async ({ model, commit }) => {
       await env.operations.run('Advance bookmark', model, () =>
-        model.repo.advanceBookmark(commit.commitId),
+        model.repo.advanceBookmark(changeRevision(commit)),
       )
     }),
     'ukemi.commit.copyChangeId': withTarget(env, async ({ commit }) => {

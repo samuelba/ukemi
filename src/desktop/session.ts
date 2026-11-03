@@ -50,7 +50,7 @@ import {
   webviewMenu,
 } from './menus'
 import { aboutText } from './about'
-import { settingFields } from './settingsSchema'
+import { isValidSettingValue, runsProgram, settingFields } from './settingsSchema'
 import { foldersAfterClosing } from './startup'
 import { Terminals } from './terminals'
 import { zoomPercent } from './zoom'
@@ -878,7 +878,17 @@ export class DesktopSession implements Disposable {
   }
 
   private async setSetting(key: unknown, value: unknown, repoId: unknown): Promise<void> {
-    if (typeof key !== 'string' || !settingFields({}).some((f) => f.key === key)) {
+    const field = settingFields({}).find((f) => f.key === key)
+    if (typeof key !== 'string' || !field) {
+      return
+    }
+    if (!isValidSettingValue(field, value)) {
+      this.context.logger.warn(`ignored an invalid value for the setting ${key}`)
+      this.postSettings()
+      return
+    }
+    if (runsProgram(key) && !(await this.confirmProgram(key, value))) {
+      this.postSettings()
       return
     }
     if (repoId === undefined) {
@@ -890,6 +900,21 @@ export class DesktopSession implements Disposable {
     if (typeof repoId === 'string' && isOpen && isRepositoryKey(key)) {
       await this.context.settings.update(key, value, { root: repoId })
     }
+  }
+
+  // Asked in a native dialog, which the page cannot answer itself.
+  private async confirmProgram(key: string, value: unknown): Promise<boolean> {
+    if (typeof value !== 'string' || value.trim() === '') {
+      return true
+    }
+    const use = 'Use It'
+    const answer = await this.nativeUi().ask(
+      'warning',
+      `Run jj from ${value}?`,
+      `Ukemi runs this program for every jj command. The setting is ${key}.`,
+      [use],
+    )
+    return answer === use
   }
 
   private postSettings(): void {

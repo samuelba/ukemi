@@ -1,4 +1,4 @@
-import { mkdirSync, watch, type FSWatcher } from 'node:fs'
+import { existsSync, mkdirSync, watch, type FSWatcher } from 'node:fs'
 import { basename, dirname, resolve } from 'node:path'
 import { isRepositoryKey } from '../../../shared/settingsScope'
 import { Emitter, type Disposable } from '../../app/events'
@@ -10,7 +10,13 @@ import {
   type SettingValues,
   type UkemiConfig,
 } from '../../app/settings'
-import { readJsonObject, withoutKey, writeJsonObject } from './jsonFile'
+import {
+  invalidCopyPath,
+  readJson,
+  withoutKey,
+  writeJsonObject,
+  type ProblemListener,
+} from './jsonFile'
 
 const RELOAD_DELAY_MS = 100
 // The overrides of each repository, by its root: `{ "repositories": { "/path": { … } } }`.
@@ -58,8 +64,17 @@ export class SettingsFile implements Settings, Disposable {
   private readonly emitter = new Emitter<SettingsChange>()
   readonly onDidChange = this.emitter.event
 
-  constructor(readonly path: string) {
-    this.stored = readJsonObject(path)
+  constructor(
+    readonly path: string,
+    private readonly onProblem: ProblemListener = () => undefined,
+  ) {
+    const read = readJson(path)
+    this.stored = read.values
+    if (read.problem !== null) {
+      onProblem(
+        `${read.problem}. Ukemi uses the default settings until it is fixed. Saving a setting keeps it as ${invalidCopyPath(path)}.`,
+      )
+    }
     this.watch()
   }
 
@@ -112,7 +127,7 @@ export class SettingsFile implements Settings, Disposable {
 
   // Writes the file once, so the user has something to open and edit.
   ensureFile(): void {
-    if (Object.keys(readJsonObject(this.path)).length === 0) {
+    if (!existsSync(this.path)) {
       writeJsonObject(this.path, this.stored, 0o644)
     }
   }
@@ -176,6 +191,16 @@ export class SettingsFile implements Settings, Disposable {
     })
   }
 
+  // A file that does not parse is likely half edited, so the values stay until it parses again.
+  private reload(): void {
+    const read = readJson(this.path)
+    if (read.problem !== null) {
+      this.onProblem(`${read.problem}. Ukemi keeps the previous settings until it is fixed.`)
+      return
+    }
+    this.apply(read.values)
+  }
+
   // Editors often replace the file, so the folder is watched rather than the file.
   private watch(): void {
     try {
@@ -187,7 +212,7 @@ export class SettingsFile implements Settings, Disposable {
         if (this.timer) {
           clearTimeout(this.timer)
         }
-        this.timer = setTimeout(() => this.apply(readJsonObject(this.path)), RELOAD_DELAY_MS)
+        this.timer = setTimeout(() => this.reload(), RELOAD_DELAY_MS)
       })
     } catch {
       this.watcher = null

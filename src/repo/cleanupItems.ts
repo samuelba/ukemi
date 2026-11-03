@@ -31,6 +31,8 @@ export interface WorkspaceRecord {
   isCurrent: boolean
   isOpen: boolean
   rootMissing: boolean
+  // The folder keeps the repository itself, see holdsRepositoryStore.
+  holdsRepository: boolean
   root: string | null
 }
 
@@ -63,6 +65,7 @@ export type CleanupStep =
   | { kind: 'forgetBookmark'; name: string; includeGit: boolean }
   | { kind: 'rebase'; revset: string; onto: string }
   | { kind: 'abandon'; revset: string }
+  | { kind: 'snapshotWorkspace'; root: string }
   | { kind: 'forgetWorkspace'; name: string }
   | { kind: 'deleteWorkspaceFiles'; root: string }
 
@@ -254,7 +257,11 @@ export function removableWorkspaceFolder(repoRoot: string, root: string | null):
 }
 
 export function canDeleteWorkspaceFiles(repoRoot: string, row: WorkspaceRecord): boolean {
-  return !row.rootMissing && removableWorkspaceFolder(repoRoot, row.root) !== null
+  return (
+    !row.rootMissing &&
+    !row.holdsRepository &&
+    removableWorkspaceFolder(repoRoot, row.root) !== null
+  )
 }
 
 export function classifyWorkspaces(
@@ -442,6 +449,7 @@ export function forgottenWorkspaceRoots(
 function workspaceSteps(snapshot: CleanupSnapshot, selection: CleanupSelection): CleanupStep[] {
   const names = new Set(selection.workspaces)
   const deleteFiles = new Set(selection.deleteWorkspaceFiles)
+  const snapshots: CleanupStep[] = []
   const forgets: CleanupStep[] = []
   const deletes: CleanupStep[] = []
   for (const workspace of snapshot.workspaces) {
@@ -450,10 +458,13 @@ function workspaceSteps(snapshot: CleanupSnapshot, selection: CleanupSelection):
     }
     forgets.push({ kind: 'forgetWorkspace', name: workspace.name })
     if (deleteFiles.has(workspace.name) && workspace.canDeleteFiles && workspace.root !== null) {
+      // Edits not yet snapshotted would be lost with the folder. The snapshot keeps them in the
+      // workspace's change, which stays after the workspace is forgotten.
+      snapshots.push({ kind: 'snapshotWorkspace', root: workspace.root })
       deletes.push({ kind: 'deleteWorkspaceFiles', root: workspace.root })
     }
   }
-  return [...forgets, ...deletes]
+  return [...snapshots, ...forgets, ...deletes]
 }
 
 export function cleanupSteps(

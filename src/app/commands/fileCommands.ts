@@ -1,4 +1,5 @@
 import { changedPathsInDirectory } from '../../../shared/fileTree'
+import { changeRevision } from '../../jj/revsets'
 import type { ChangedFile } from '../../../shared/model'
 import { confirm } from '../ui'
 import {
@@ -52,7 +53,7 @@ async function discard(env: CommandEnv, { model, commit, file }: FileTarget): Pr
   }
   if (await confirm(env.ui, `Discard changes to ${file.path} in ${shortId(commit)}?`, 'Discard')) {
     await env.operations.run('Discard', model, () =>
-      model.repo.restoreFiles(commit.commitId, [file.path]),
+      model.repo.restoreFiles(changeRevision(commit), [file.path]),
     )
   }
 }
@@ -68,7 +69,7 @@ async function takeSide(
     return
   }
   await env.operations.run('Resolve', model, () =>
-    model.repo.resolveWithBuiltin(commit.commitId, file.path, tool),
+    model.repo.resolveWithBuiltin(changeRevision(commit), file.path, tool),
   )
 }
 
@@ -100,7 +101,7 @@ async function discardDirectory(env: CommandEnv, arg: unknown): Promise<void> {
   const count = paths.length === 1 ? '1 file' : `${paths.length} files`
   if (await confirm(env.ui, `Discard changes in ${ctx.path} (${count})?`, 'Discard')) {
     await env.operations.run('Discard', target.model, () =>
-      target.model.repo.restoreFiles(target.commit.commitId, paths),
+      target.model.repo.restoreFiles(changeRevision(target.commit), paths),
     )
   }
 }
@@ -121,12 +122,12 @@ export function fileCommands(env: CommandEnv): Record<string, Handler> {
     ),
     'ukemi.file.splitAbove': withFile(env, ({ model, commit, file }) =>
       env.operations.run('Split', model, () =>
-        model.repo.splitFiles(commit.commitId, [file.path], 'above'),
+        model.repo.splitFiles(changeRevision(commit), [file.path], 'above'),
       ),
     ),
     'ukemi.file.splitBelow': withFile(env, ({ model, commit, file }) =>
       env.operations.run('Split', model, () =>
-        model.repo.splitFiles(commit.commitId, [file.path], 'below'),
+        model.repo.splitFiles(changeRevision(commit), [file.path], 'below'),
       ),
     ),
     'ukemi.file.discard': withFile(env, (target) => discard(env, target)),

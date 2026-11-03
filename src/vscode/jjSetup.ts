@@ -1,4 +1,4 @@
-import { dirname } from 'node:path'
+import { delimiter, dirname } from 'node:path'
 import * as vscode from 'vscode'
 import { locateJj as locateAnyJj, versionText } from '../app/jjSetup'
 import { downloadJj, MIN_JJ_VERSION, PINNED_RELEASE, type ResolvedJj } from '../jj/binary'
@@ -40,7 +40,7 @@ export async function installJj(storageDir: string, logger: Logger): Promise<boo
         location: vscode.ProgressLocation.Notification,
         title: `Downloading jj ${PINNED_RELEASE.version}`,
       },
-      () => downloadJj(storageDir, process.arch),
+      () => downloadJj(storageDir),
     )
     logger.info(`installed jj to ${path}`)
     return true
@@ -54,7 +54,7 @@ export function updateTerminalPath(context: vscode.ExtensionContext, jj: Resolve
   const collection = context.environmentVariableCollection
   collection.clear()
   if (jj?.source === 'managed' && readConfig().addJjToTerminalPath) {
-    collection.prepend('PATH', `${dirname(jj.path)}:`)
+    collection.prepend('PATH', `${dirname(jj.path)}${delimiter}`)
     collection.description = 'Adds the jj binary downloaded by Ukemi to PATH'
   }
 }

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { changeRevision } from '../jj/revsets'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
@@ -105,7 +106,7 @@ async function writeText(
   const tool = await ensureWrapper(paths)
   const plan = [{ path, content: Buffer.from(text, 'utf8').toString('base64') }]
   await withPlanTool(tool, plan, (config) =>
-    model.repo.writeFilesWithTool(commit.commitId, [path], config),
+    model.repo.writeFilesWithTool(changeRevision(commit), [path], config),
   )
 }
 

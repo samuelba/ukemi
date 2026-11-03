@@ -17,8 +17,14 @@ import { graphFromAncestors } from '../graph/buildGraph'
 import { ElisionCache } from '../graph/elisionCache'
 import type { ParsedBookmark } from '../jj/parse'
 import { JjRepo, type TrunkRef } from '../jj/repo'
-import { CURRENT_BOOKMARKS_REVSET, graphRevset } from '../jj/revsets'
+import {
+  changeRevision,
+  CURRENT_BOOKMARKS_REVSET,
+  graphRevset,
+  type ChangeRef,
+} from '../jj/revsets'
 import type { Logger } from '../util/logger'
+import { mapLimited } from '../util/mapLimited'
 import { errorMessage } from '../util/logger'
 import { placeBookmark as moveLocalBookmark } from './placeBookmark'
 import { resolveSelectedCommit } from './selection'
@@ -29,14 +35,20 @@ const NETWORK_OPERATION = /^(fetch from git remote|push .*to git remote)/
 
 export type ChangeListener = () => void
 
+const ELISION_LOOKUPS_AT_ONCE = 4
+
 export class RepoModel {
   private filter: GraphFilter = 'recent'
   private depth: HistoryDepth = '7d'
   private current: GraphState | null = null
+  // The commits of the graph before the current one, so ids that a view sent just before a
+  // refresh still find their change.
+  private previousChanges = new Map<string, ChangeRef>()
   private lastError: string | null = null
   private isDirty = true
   private mustReload = false
   private lastOperationId: string | null = null
+  private loadedRemotes: Remote[] | null = null
   private tail: Promise<void> | null = null
   private isRefreshQueued = false
   private opEventDuringLoad = false
@@ -157,8 +169,34 @@ export class RepoModel {
     }
   }
 
+  // The remotes the last refresh read, so other services need not ask jj again.
+  get remotes(): readonly Remote[] | null {
+    return this.loadedRemotes
+  }
+
   findCommit(commitId: string): CommitView | undefined {
     return this.current?.commits.find((c) => c.commitId === commitId)
+  }
+
+  // The commit a view or menu named, or the commit its change has now if a snapshot or another
+  // command rewrote it since.
+  latestCommit(commitId: string): CommitView | undefined {
+    const found = this.findCommit(commitId)
+    if (found) {
+      return found
+    }
+    const known = this.previousChanges.get(commitId)
+    if (!known || known.isDivergent) {
+      return undefined
+    }
+    const same = this.current?.commits.filter((c) => c.changeId === known.changeId) ?? []
+    return same.length === 1 ? same[0] : undefined
+  }
+
+  // The revision to pass to a jj command for a commit a view named. See changeRevision.
+  revisionFor(commitId: string): string {
+    const known = this.findCommit(commitId) ?? this.previousChanges.get(commitId)
+    return known ? changeRevision(known) : commitId
   }
 
   commitFor(commitId: string, changeId: string): CommitView | null {
@@ -258,9 +296,12 @@ export class RepoModel {
       if (this.snapshotOtherWorkspaces) {
         await this.snapshotOthers()
       }
-      if (reload || (await this.operationMoved())) {
+      // The undo history comes along, so a rebuild reads the operation log only once.
+      const operations = await this.repo.operations(UNDO_HISTORY_LIMIT)
+      const head = operations[0]?.id ?? null
+      if (reload || head !== this.lastOperationId) {
         this.lastError = null
-        await this.buildState(generation)
+        await this.buildState(generation, head, operations)
       }
     } catch (error: unknown) {
       this.lastError = errorMessage(error)
@@ -274,9 +315,16 @@ export class RepoModel {
     await this.noteExternalOperation()
   }
 
-  private async buildState(generation: number): Promise<void> {
+  // Every read sees the repository as of `head`, so the graph matches lastOperationId. A command
+  // that lands meanwhile then shows as a new operation, and the next check loads it.
+  private async buildState(
+    generation: number,
+    head: string | null,
+    operations: readonly Operation[],
+  ): Promise<void> {
+    const reader = head === null ? this.repo : this.repo.atOperation(head)
     const revset = graphRevset(this.filter, this.depth)
-    const loaded = await this.loadRevisionData(revset)
+    const loaded = await this.loadRevisionData(reader, revset, operations)
     if (generation !== this.viewGeneration) {
       return
     }
@@ -285,7 +333,7 @@ export class RepoModel {
       loaded.remotes.length > 0
         ? markNeverPushed(loaded.logged, remoteBookmarkNames(bookmarks))
         : loaded.logged
-    const workingCopyFiles = await this.workingCopyFiles(commits)
+    const workingCopyFiles = await this.workingCopyFiles(reader, commits)
     const shared = sharedGraph(loaded, workingCopyFiles)
     const first = graphFromAncestors(commits, (parent) => this.elisionCache.get(revset, parent))
     const trunkId = loaded.trunk.commitId ?? undefined
@@ -297,30 +345,31 @@ export class RepoModel {
     if (first.missing.length === 0) {
       return
     }
-    const nodes = await this.resolveMissingParents(commits, revset, first.missing)
+    const nodes = await this.resolveMissingParents(reader, commits, revset, first.missing)
     this.showGraph(generation, this.assemble(commits, nodes, trunkId, shared), bookmarks)
   }
 
-  private async loadRevisionData(revset: string): Promise<LoadedRepo> {
-    const operationsPromise = this.repo.operations(UNDO_HISTORY_LIMIT).then((operations) => {
-      this.lastOperationId = operations[0]?.id ?? null
-      return operations
-    })
-    const [logged, trunk, operations, workspaces, remotes, listed, currentBookmarks, tracking] =
+  private async loadRevisionData(
+    reader: JjRepo,
+    revset: string,
+    operations: readonly Operation[],
+  ): Promise<LoadedRepo> {
+    this.lastOperationId = operations[0]?.id ?? null
+    const [logged, trunk, workspaces, remotes, listed, currentBookmarks, tracking] =
       await Promise.all([
-        this.repo.log(revset),
-        this.repo.trunk(),
-        operationsPromise,
-        this.repo.workspaces(),
-        this.repo.remotes(),
-        this.repo.bookmarkList({ withTrunk: false }),
-        this.repo.bookmarkNames(CURRENT_BOOKMARKS_REVSET),
-        this.repo.bookmarkTracking(`@ | ${CURRENT_BOOKMARKS_REVSET}`),
+        reader.log(revset),
+        reader.trunk(),
+        reader.workspaces(),
+        reader.remotes(),
+        reader.bookmarkList({ withTrunk: false }),
+        reader.bookmarkNames(CURRENT_BOOKMARKS_REVSET),
+        reader.bookmarkTracking(`@ | ${CURRENT_BOOKMARKS_REVSET}`),
       ])
+    this.loadedRemotes = remotes
     return {
       logged,
       trunk,
-      operations,
+      operations: [...operations],
       workspaces,
       remotes,
       bookmarks: listed,
@@ -329,31 +378,32 @@ export class RepoModel {
     }
   }
 
-  private workingCopyFiles(commits: readonly Commit[]): Promise<ChangedFile[]> {
+  private workingCopyFiles(reader: JjRepo, commits: readonly Commit[]): Promise<ChangedFile[]> {
     const workingCopy = commits.find((commit) => commit.isWorkingCopy)
     if (!workingCopy) {
       return Promise.resolve([])
     }
-    return this.repo.files(workingCopy.commitId, this.showLineStats)
+    return reader.files(workingCopy.commitId, this.showLineStats)
   }
 
   private async resolveMissingParents(
+    reader: JjRepo,
     commits: readonly Commit[],
     revset: string,
     missing: readonly string[],
   ): Promise<GraphNodeInput[]> {
     const found = new Map<string, readonly string[]>()
-    await Promise.all(
-      missing.map(async (parent) => {
-        try {
-          const ancestors = await this.repo.commitIds(`heads(::${parent} & (${revset}))`)
-          this.elisionCache.remember(revset, parent, ancestors)
-          found.set(parent, ancestors)
-        } catch {
-          found.set(parent, [])
-        }
-      }),
-    )
+    // Each lookup is a jj process that loads the repository, so a cold graph with many elided
+    // parents would otherwise start dozens at once.
+    await mapLimited(missing, ELISION_LOOKUPS_AT_ONCE, async (parent) => {
+      try {
+        const ancestors = await reader.commitIds(`heads(::${parent} & (${revset}))`)
+        this.elisionCache.remember(revset, parent, ancestors)
+        found.set(parent, ancestors)
+      } catch {
+        found.set(parent, [])
+      }
+    })
     return graphFromAncestors(commits, (parent) => {
       return found.get(parent) ?? this.elisionCache.get(revset, parent)
     }).nodes
@@ -395,14 +445,10 @@ export class RepoModel {
       return false
     }
     this.listedBookmarks = [...bookmarks]
+    this.previousChanges = changesOf(this.current)
     this.current = state
     this.emit()
     return true
-  }
-
-  private async operationMoved(): Promise<boolean> {
-    const [head] = await this.repo.operations(1)
-    return head?.id !== this.lastOperationId
   }
 
   private async noteExternalOperation(): Promise<void> {
@@ -571,4 +617,17 @@ function markNeverPushed(commits: readonly Commit[], pushed: ReadonlySet<string>
 
 function hasUnsyncedBookmarks(commits: readonly Commit[]): boolean {
   return commits.some((c) => c.localBookmarks.some((b) => !b.synced))
+}
+
+function changesOf(state: GraphState | null): Map<string, ChangeRef> {
+  const changes = new Map<string, ChangeRef>()
+  for (const commit of state?.commits ?? []) {
+    changes.set(commit.commitId, {
+      commitId: commit.commitId,
+      changeId: commit.changeId,
+      isDivergent: commit.isDivergent,
+      isHidden: commit.isHidden,
+    })
+  }
+  return changes
 }

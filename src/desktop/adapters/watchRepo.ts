@@ -4,10 +4,11 @@ import type { RepoWatchHandlers, WatchRepo } from '../../app/host'
 import type { Logger } from '../../util/logger'
 import { errorMessage } from '../../util/logger'
 
-const INTERNAL = [`.jj${sep}`, `.git${sep}`, '.jj', '.git']
+const INTERNAL = ['.jj', '.git']
 
-function isInternal(name: string): boolean {
-  return INTERNAL.some((prefix) => name === prefix || name.startsWith(prefix))
+// Only the .jj and .git folders themselves: .gitignore and .github are the user's files.
+export function isInternal(name: string): boolean {
+  return INTERNAL.some((folder) => name === folder || name.startsWith(`${folder}${sep}`))
 }
 
 function tryWatch(

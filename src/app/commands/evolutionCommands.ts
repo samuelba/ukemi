@@ -1,4 +1,5 @@
 import { canRestoreVersion } from '../../../shared/evolution'
+import { changeRevision } from '../../jj/revsets'
 import { isEvolutionVersionNode } from '../../repo/evolutionItems'
 import type { RepoModel } from '../../repo/repoModel'
 import { errorMessage } from '../../util/logger'
@@ -64,7 +65,7 @@ async function restoreVersion(env: CommandEnv, arg: unknown): Promise<void> {
   )
   if (answer === 'Restore') {
     await env.operations.run('Restore version', model, () =>
-      model.repo.restoreVersion(version.commitId, commit.commitId),
+      model.repo.restoreVersion(version.commitId, changeRevision(commit)),
     )
   }
 }

@@ -5,6 +5,37 @@ export function quoteRevsetString(text: string): string {
   return jjString(text)
 }
 
+// jj reads `ok|main`, `rel-` or `a,b` as expressions, not as names. Git allows such branch names,
+// so a fetch can bring them in. Plain names stay bare, so pickers and labels look as jj shows them.
+const PLAIN_SYMBOL = /^[\p{L}\p{N}_/]+(?:[.+-][\p{L}\p{N}_/]+)*$/u
+
+export function revsetSymbol(name: string): string {
+  return PLAIN_SYMBOL.test(name) ? name : jjString(name)
+}
+
+export function bookmarkRevision(name: string, remote?: string | null): string {
+  return remote ? `${revsetSymbol(name)}@${revsetSymbol(remote)}` : revsetSymbol(name)
+}
+
+export function exactBookmark(name: string): string {
+  return `exact:${jjString(name)}`
+}
+
+export interface ChangeRef {
+  commitId: string
+  changeId: string
+  isDivergent: boolean
+  isHidden: boolean
+}
+
+// jj snapshots the working copy before each command, which gives it a new commit id. A commit id
+// from the last refresh can then name the hidden predecessor, and rewriting that one makes the
+// change divergent. The change id follows the snapshot. Only a divergent or hidden commit needs
+// its commit id, since its change id names other commits too.
+export function changeRevision(commit: ChangeRef): string {
+  return commit.isDivergent || commit.isHidden ? commit.commitId : commit.changeId
+}
+
 export function rootFileset(path: string): string {
   return `root-file:${quoteRevsetString(path)}`
 }

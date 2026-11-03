@@ -30,6 +30,7 @@ import {
 import { splitController } from '../app/splitController'
 import type { RepoModel } from '../repo/repoModel'
 import type { SplitToolPaths } from '../split/toolRun'
+import { mapLimited } from '../util/mapLimited'
 
 // Bigger files are left out of the diff pane. Open them in an editor instead.
 export const MAX_DIFF_BYTES = 2_000_000
@@ -95,23 +96,6 @@ async function sideText(model: RepoModel, side: FileSide): Promise<DiffSideText>
   return text.length > MAX_DIFF_BYTES
     ? { text: TOO_LARGE, isBinary: true }
     : { text, isBinary: false }
-}
-
-async function mapLimited<T, R>(
-  items: readonly T[],
-  limit: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length)
-  let next = 0
-  const worker = async () => {
-    while (next < items.length) {
-      const index = next++
-      results[index] = await fn(items[index] as T)
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
-  return results
 }
 
 async function diffFiles(

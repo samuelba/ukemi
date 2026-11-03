@@ -54,6 +54,12 @@ describe('describeArgs', () => {
     ).toBe('log -r @ -T <template> --config=merge-tools.ukemi-split.program=…')
   })
 
+  test('shortens the operation a read is pinned to', () => {
+    expect(describeArgs(['log', '-r', '@', `--at-op=${'ab12'.repeat(32)}`])).toBe(
+      'log -r @ --at-op=ab12ab12ab12…',
+    )
+  })
+
   test('hides the password of a remote url', () => {
     expect(describeArgs(['git', 'clone', 'https://sam:secret@host/x.git', 'dir'])).toBe(
       'git clone https://***@host/x.git dir',
@@ -80,5 +86,32 @@ describe('summarizeStderr', () => {
 
   test('falls back to a generic message', () => {
     expect(summarizeStderr('')).toBe('jj failed')
+  })
+})
+
+describe.skipIf(process.platform === 'win32')('JjRunner timeout', () => {
+  async function timesOut(script: string): Promise<number> {
+    const dir = mkdtempSync(join(tmpdir(), 'ukemi-runner-'))
+    const fake = join(dir, 'jj')
+    writeFileSync(fake, `#!/bin/sh\n${script}\n`, { mode: 0o700 })
+    const runner = new JjRunner(fake, NULL_LOGGER, { killGraceMs: 200 })
+    const started = Date.now()
+    try {
+      await expect(
+        runner.run({ cwd: dir, args: ['git', 'fetch'], timeoutMs: 200 }),
+      ).rejects.toThrow('timed out')
+      return Date.now() - started
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+
+  test('ends a helper that holds the output pipes open', async () => {
+    // Like ssh started by git: it inherits jj's pipes and outlives a SIGTERM to jj alone.
+    expect(await timesOut('sleep 30 &\nwait')).toBeLessThan(5000)
+  })
+
+  test('kills a process that ignores SIGTERM', async () => {
+    expect(await timesOut("trap '' TERM\nwhile :; do sleep 0.1; done")).toBeLessThan(5000)
   })
 })
