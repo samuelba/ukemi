@@ -1,4 +1,5 @@
 import type { CommitView } from '../../../shared/protocol'
+import { bookmarkRevision } from '../../jj/revsets'
 import type { Placement, RebaseMode } from '../../jj/repo'
 import type { RepoModel } from '../../repo/repoModel'
 import { combineDescriptions, validateBookmarkName } from '../../util/text'
@@ -71,11 +72,13 @@ interface DestinationCommit {
 
 export function destinationItems(commits: readonly DestinationCommit[]): PickItem[] {
   const local = unique(
-    commits.flatMap((commit) => commit.localBookmarks.map((bookmark) => bookmark.name)),
+    commits.flatMap((commit) =>
+      commit.localBookmarks.map((bookmark) => bookmarkRevision(bookmark.name)),
+    ),
   )
   const remote = unique(
     commits.flatMap((commit) =>
-      commit.remoteBookmarks.map((bookmark) => `${bookmark.name}@${bookmark.remote}`),
+      commit.remoteBookmarks.map((bookmark) => bookmarkRevision(bookmark.name, bookmark.remote)),
     ),
   )
   return [

@@ -1,4 +1,5 @@
 import { isAbsolute, relative, resolve } from 'node:path'
+import { bookmarkRevision } from '../jj/revsets'
 import type { Workspace } from '../../shared/model'
 
 export interface BookmarkRef {
@@ -221,18 +222,18 @@ export function workspaceBaseItems(
   for (const bookmark of local) {
     items.push({
       label: `$(bookmark) ${bookmark.name}`,
-      revision: bookmark.name,
+      revision: bookmarkRevision(bookmark.name),
       suggestedName: bookmark.name,
       shown: bookmark.name,
     })
   }
   for (const bookmark of remote) {
-    const revision = `${bookmark.name}@${bookmark.remote}`
+    const shown = `${bookmark.name}@${bookmark.remote}`
     items.push({
-      label: `$(cloud) ${revision}`,
-      revision,
+      label: `$(cloud) ${shown}`,
+      revision: bookmarkRevision(bookmark.name, bookmark.remote),
       suggestedName: bookmark.name,
-      shown: revision,
+      shown,
     })
   }
   return items

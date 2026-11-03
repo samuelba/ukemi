@@ -8,7 +8,7 @@ import {
 } from '../../forge/requestBase'
 import { isAllowedForgeUrl } from '../../forge/hostName'
 import type { MergeMethod } from '../../forge/types'
-import { quoteRevsetString } from '../../jj/revsets'
+import { bookmarkRevision, quoteRevsetString } from '../../jj/revsets'
 import type { RepoModel } from '../../repo/repoModel'
 import { isBookmarkTreeElement } from '../../repo/bookmarkItems'
 import { bodyAfterTitle, bookmarkSlug, firstLine, validateBookmarkName } from '../../util/text'
@@ -408,7 +408,7 @@ async function newChangeFromBookmark(env: CommandEnv, target: BookmarkTarget): P
   if (!target.commitId) {
     return
   }
-  const revision = target.remote ? `${target.name}@${target.remote}` : target.name
+  const revision = bookmarkRevision(target.name, target.remote)
   await env.operations.run('New working copy', target.model, () =>
     target.model.repo.newChange([revision]),
   )

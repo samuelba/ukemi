@@ -27,7 +27,7 @@ import {
   parseTracking,
   parseWorkspaces,
 } from './parse'
-import { rootFileset } from './revsets'
+import { bookmarkRevision, exactBookmark, rootFileset } from './revsets'
 import { JjError, JjRunner, NETWORK_TIMEOUT_MS, type RunResult } from './runner'
 import { jjString } from './templates'
 import {
@@ -457,7 +457,7 @@ export class JjRepo {
   }
 
   setBookmark(name: string, commitId: string) {
-    return this.mutate(['bookmark', 'set', name, '-r', commitId, '--allow-backwards'])
+    return this.mutate(['bookmark', 'set', jjString(name), '-r', commitId, '--allow-backwards'])
   }
 
   advanceBookmark(commitId: string) {
@@ -465,27 +465,27 @@ export class JjRepo {
   }
 
   deleteBookmark(name: string) {
-    return this.mutate(['bookmark', 'delete', `exact:${name}`])
+    return this.mutate(['bookmark', 'delete', exactBookmark(name)])
   }
 
   forgetBookmark(name: string) {
-    return this.mutate(['bookmark', 'forget', `exact:${name}`])
+    return this.mutate(['bookmark', 'forget', exactBookmark(name)])
   }
 
   forgetCleanupBookmark(name: string) {
-    return this.mutate(['bookmark', 'forget', `exact:${jjString(name)}`])
+    return this.mutate(['bookmark', 'forget', exactBookmark(name)])
   }
 
   trackBookmark(name: string, remote: string) {
-    return this.mutate(['bookmark', 'track', `${name}@${remote}`])
+    return this.mutate(['bookmark', 'track', bookmarkRevision(name, remote)])
   }
 
   untrackBookmark(name: string, remote: string) {
-    return this.mutate(['bookmark', 'untrack', `${name}@${remote}`])
+    return this.mutate(['bookmark', 'untrack', bookmarkRevision(name, remote)])
   }
 
   renameBookmark(oldName: string, newName: string) {
-    return this.mutate(['bookmark', 'rename', oldName, newName])
+    return this.mutate(['bookmark', 'rename', jjString(oldName), jjString(newName)])
   }
 
   // A clone made with `-b` limits plain fetches to those bookmarks, so branches can be named here.
@@ -494,7 +494,7 @@ export class JjRepo {
     const branches = [...new Set(options.branches ?? [])]
     const args =
       branches.length > 0
-        ? ['git', 'fetch', ...branches.flatMap((name) => ['--branch', `exact:${name}`])]
+        ? ['git', 'fetch', ...branches.flatMap((name) => ['--branch', exactBookmark(name)])]
         : ['git', 'fetch', '--all-remotes']
     return this.mutate(args, { timeoutMs: NETWORK_TIMEOUT_MS, env })
   }
@@ -571,7 +571,7 @@ export class JjRepo {
 
 function pushArgs(names: readonly string[]): readonly string[] {
   const targets =
-    names.length > 0 ? names.flatMap((name) => ['--bookmark', `exact:${name}`]) : ['--tracked']
+    names.length > 0 ? names.flatMap((name) => ['--bookmark', exactBookmark(name)]) : ['--tracked']
   return ['git', 'push', ...targets]
 }
 
@@ -691,7 +691,7 @@ async function createLocalRepo(
   try {
     await runner.run({
       cwd: directory,
-      args: ['bookmark', 'create', options.branch, '-r', '@'],
+      args: ['bookmark', 'create', jjString(options.branch), '-r', '@'],
     })
     if (options.remoteUrl) {
       await runner.run({

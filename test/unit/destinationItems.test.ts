@@ -19,4 +19,15 @@ describe('destinationItems', () => {
       ]).map((item) => item.label),
     ).toEqual(['trunk()', 'main', 'feature', 'main@origin', 'topic@upstream'])
   })
+
+  test('quotes bookmark names that jj would read as an expression', () => {
+    expect(
+      destinationItems([
+        {
+          localBookmarks: [{ name: 'ok|main' }],
+          remoteBookmarks: [{ name: 'rel-', remote: 'origin' }],
+        },
+      ]).map((item) => item.label),
+    ).toEqual(['trunk()', '"ok|main"', '"rel-"@origin'])
+  })
 })

@@ -5,6 +5,22 @@ export function quoteRevsetString(text: string): string {
   return jjString(text)
 }
 
+// jj reads `ok|main`, `rel-` or `a,b` as expressions, not as names. Git allows such branch names,
+// so a fetch can bring them in. Plain names stay bare, so pickers and labels look as jj shows them.
+const PLAIN_SYMBOL = /^[\p{L}\p{N}_/]+(?:[.+-][\p{L}\p{N}_/]+)*$/u
+
+export function revsetSymbol(name: string): string {
+  return PLAIN_SYMBOL.test(name) ? name : jjString(name)
+}
+
+export function bookmarkRevision(name: string, remote?: string | null): string {
+  return remote ? `${revsetSymbol(name)}@${revsetSymbol(remote)}` : revsetSymbol(name)
+}
+
+export function exactBookmark(name: string): string {
+  return `exact:${jjString(name)}`
+}
+
 export function rootFileset(path: string): string {
   return `root-file:${quoteRevsetString(path)}`
 }

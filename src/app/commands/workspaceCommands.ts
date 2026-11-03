@@ -1,4 +1,5 @@
 import { rm } from 'node:fs/promises'
+import { bookmarkRevision } from '../../jj/revsets'
 import { basename, dirname, join } from 'node:path'
 import type { Workspace } from '../../../shared/model'
 import type { RepoModel } from '../../repo/repoModel'
@@ -257,11 +258,10 @@ export function workspaceCommands(env: CommandEnv): Record<string, Handler> {
       if (!model) {
         return
       }
-      const revision = picked.remote ? `${picked.name}@${picked.remote}` : picked.name
       await addWorkspace(env, model, {
-        revision,
+        revision: bookmarkRevision(picked.name, picked.remote),
         suggestedName: picked.name,
-        shown: revision,
+        shown: picked.remote ? `${picked.name}@${picked.remote}` : picked.name,
       })
     },
     'ukemi.workspace.openHere': onWorkspace((model, name) => openHere(env, model, name)),
