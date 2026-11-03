@@ -76,7 +76,16 @@ export class JjRepo {
   constructor(
     readonly root: string,
     private readonly runner: JjRunner,
+    // Reads see the repository as of this operation. See atOperation.
+    private readonly operationId: string | null = null,
   ) {}
+
+  // A view for reads that must agree with each other, like the parallel reads of one refresh:
+  // without it, a command that lands between them gives some reads the new state and others the
+  // old one. It cannot run commands.
+  atOperation(operationId: string): JjRepo {
+    return new JjRepo(this.root, this.runner, operationId)
+  }
 
   get isColocated(): boolean {
     return existsSync(join(this.root, '.git'))
@@ -87,13 +96,17 @@ export class JjRepo {
   }
 
   private read(args: readonly string[]): Promise<RunResult> {
-    return this.runner.run({ cwd: this.root, args, ignoreWorkingCopy: true })
+    const pinned = this.operationId === null ? args : [...args, `--at-op=${this.operationId}`]
+    return this.runner.run({ cwd: this.root, args: pinned, ignoreWorkingCopy: true })
   }
 
   private mutate(
     args: readonly string[],
     options: { stdin?: string; timeoutMs?: number; env?: Readonly<Record<string, string>> } = {},
   ) {
+    if (this.operationId !== null) {
+      throw new Error('jj commands cannot run at an old operation')
+    }
     return this.mutations.run(() => this.runner.run({ cwd: this.root, args, ...options }))
   }
 

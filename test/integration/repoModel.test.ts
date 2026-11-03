@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { JjRepo } from '../../src/jj/repo'
-import { JjRunner } from '../../src/jj/runner'
+import { JjRunner, type RunOptions, type RunResult } from '../../src/jj/runner'
 import { RepoModel } from '../../src/repo/repoModel'
 import { NULL_LOGGER, type Logger } from '../../src/util/logger'
 import {
@@ -74,6 +74,43 @@ describe('RepoModel', () => {
     expect(same).toHaveLength(1)
     expect(same[0]?.isDivergent).toBe(false)
     expect(same[0]?.description).toBe('late\n')
+  })
+
+  test('a command that lands during a refresh shows up on the next one', async () => {
+    jj(root, 'describe', '-m', 'before')
+    // The graph is read before the command and the operation log after it, which is the order
+    // the parallel reads of a refresh can take.
+    let landed = false
+    let land = () => undefined as void
+    const hasLanded = new Promise<void>((resolve) => {
+      land = resolve
+    })
+    class RacingRunner extends JjRunner {
+      override async run(options: RunOptions): Promise<RunResult> {
+        const isOpLog = options.args[0] === 'op' && !options.args.includes('--limit=1')
+        if (isOpLog && !landed) {
+          await hasLanded
+        }
+        const result = await super.run(options)
+        if (options.args[0] === 'log' && options.args.includes('--limit=2000') && !landed) {
+          landed = true
+          jj(root, 'describe', '-m', 'during')
+          land()
+        }
+        return result
+      }
+    }
+    const racing = new RepoModel(
+      new JjRepo(root, new RacingRunner(JJ_BINARY, NULL_LOGGER)),
+      NULL_LOGGER,
+    )
+
+    await racing.refresh()
+    // The watcher reports the command's operation.
+    await racing.refreshIfOperationChanged()
+
+    expect(landed).toBe(true)
+    expect(racing.graph?.commits.find((c) => c.isWorkingCopy)?.description).toBe('during\n')
   })
 
   test('picks up file changes only after markDirty', async () => {

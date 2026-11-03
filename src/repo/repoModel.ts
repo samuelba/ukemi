@@ -287,9 +287,10 @@ export class RepoModel {
       if (this.snapshotOtherWorkspaces) {
         await this.snapshotOthers()
       }
-      if (reload || (await this.operationMoved())) {
+      const head = await this.headOperation()
+      if (reload || head !== this.lastOperationId) {
         this.lastError = null
-        await this.buildState(generation)
+        await this.buildState(generation, head)
       }
     } catch (error: unknown) {
       this.lastError = errorMessage(error)
@@ -303,9 +304,12 @@ export class RepoModel {
     await this.noteExternalOperation()
   }
 
-  private async buildState(generation: number): Promise<void> {
+  // Every read sees the repository as of `head`, so the graph matches lastOperationId. A command
+  // that lands meanwhile then shows as a new operation, and the next check loads it.
+  private async buildState(generation: number, head: string | null): Promise<void> {
+    const reader = head === null ? this.repo : this.repo.atOperation(head)
     const revset = graphRevset(this.filter, this.depth)
-    const loaded = await this.loadRevisionData(revset)
+    const loaded = await this.loadRevisionData(reader, revset)
     if (generation !== this.viewGeneration) {
       return
     }
@@ -314,7 +318,7 @@ export class RepoModel {
       loaded.remotes.length > 0
         ? markNeverPushed(loaded.logged, remoteBookmarkNames(bookmarks))
         : loaded.logged
-    const workingCopyFiles = await this.workingCopyFiles(commits)
+    const workingCopyFiles = await this.workingCopyFiles(reader, commits)
     const shared = sharedGraph(loaded, workingCopyFiles)
     const first = graphFromAncestors(commits, (parent) => this.elisionCache.get(revset, parent))
     const trunkId = loaded.trunk.commitId ?? undefined
@@ -326,25 +330,25 @@ export class RepoModel {
     if (first.missing.length === 0) {
       return
     }
-    const nodes = await this.resolveMissingParents(commits, revset, first.missing)
+    const nodes = await this.resolveMissingParents(reader, commits, revset, first.missing)
     this.showGraph(generation, this.assemble(commits, nodes, trunkId, shared), bookmarks)
   }
 
-  private async loadRevisionData(revset: string): Promise<LoadedRepo> {
-    const operationsPromise = this.repo.operations(UNDO_HISTORY_LIMIT).then((operations) => {
+  private async loadRevisionData(reader: JjRepo, revset: string): Promise<LoadedRepo> {
+    const operationsPromise = reader.operations(UNDO_HISTORY_LIMIT).then((operations) => {
       this.lastOperationId = operations[0]?.id ?? null
       return operations
     })
     const [logged, trunk, operations, workspaces, remotes, listed, currentBookmarks, tracking] =
       await Promise.all([
-        this.repo.log(revset),
-        this.repo.trunk(),
+        reader.log(revset),
+        reader.trunk(),
         operationsPromise,
-        this.repo.workspaces(),
-        this.repo.remotes(),
-        this.repo.bookmarkList({ withTrunk: false }),
-        this.repo.bookmarkNames(CURRENT_BOOKMARKS_REVSET),
-        this.repo.bookmarkTracking(`@ | ${CURRENT_BOOKMARKS_REVSET}`),
+        reader.workspaces(),
+        reader.remotes(),
+        reader.bookmarkList({ withTrunk: false }),
+        reader.bookmarkNames(CURRENT_BOOKMARKS_REVSET),
+        reader.bookmarkTracking(`@ | ${CURRENT_BOOKMARKS_REVSET}`),
       ])
     return {
       logged,
@@ -358,15 +362,16 @@ export class RepoModel {
     }
   }
 
-  private workingCopyFiles(commits: readonly Commit[]): Promise<ChangedFile[]> {
+  private workingCopyFiles(reader: JjRepo, commits: readonly Commit[]): Promise<ChangedFile[]> {
     const workingCopy = commits.find((commit) => commit.isWorkingCopy)
     if (!workingCopy) {
       return Promise.resolve([])
     }
-    return this.repo.files(workingCopy.commitId, this.showLineStats)
+    return reader.files(workingCopy.commitId, this.showLineStats)
   }
 
   private async resolveMissingParents(
+    reader: JjRepo,
     commits: readonly Commit[],
     revset: string,
     missing: readonly string[],
@@ -375,7 +380,7 @@ export class RepoModel {
     await Promise.all(
       missing.map(async (parent) => {
         try {
-          const ancestors = await this.repo.commitIds(`heads(::${parent} & (${revset}))`)
+          const ancestors = await reader.commitIds(`heads(::${parent} & (${revset}))`)
           this.elisionCache.remember(revset, parent, ancestors)
           found.set(parent, ancestors)
         } catch {
@@ -430,9 +435,9 @@ export class RepoModel {
     return true
   }
 
-  private async operationMoved(): Promise<boolean> {
+  private async headOperation(): Promise<string | null> {
     const [head] = await this.repo.operations(1)
-    return head?.id !== this.lastOperationId
+    return head?.id ?? null
   }
 
   private async noteExternalOperation(): Promise<void> {
