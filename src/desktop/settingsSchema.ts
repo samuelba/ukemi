@@ -239,3 +239,44 @@ export function settingFields(
   const all = [...desktop, ...fields]
   return GROUP_ORDER.flatMap((group) => all.filter((field) => field.group === group))
 }
+
+// The settings form runs in the renderer, so what it sends is checked against the field before
+// it reaches settings.json. Undefined resets the setting.
+export function isValidSettingValue(field: SettingField, value: unknown): boolean {
+  if (value === undefined) {
+    return true
+  }
+  switch (field.type) {
+    case 'boolean':
+      return typeof value === 'boolean'
+    case 'number':
+      return (
+        typeof value === 'number' &&
+        Number.isFinite(value) &&
+        (field.minimum === undefined || value >= field.minimum) &&
+        (field.maximum === undefined || value <= field.maximum)
+      )
+    case 'enum':
+      return (field.options ?? []).some((option) => option.value === value)
+    case 'string':
+      return typeof value === 'string' && (!field.pattern || new RegExp(field.pattern).test(value))
+    case 'list':
+      return Array.isArray(value) && value.every((item) => typeof item === 'string')
+    case 'map':
+    case 'shortcuts':
+      return (
+        typeof value === 'object' &&
+        value !== null &&
+        !Array.isArray(value) &&
+        Object.values(value).every((item) => typeof item === 'string')
+      )
+  }
+}
+
+// Settings that choose a program Ukemi runs. A renderer that could set them freely could run
+// anything, so the app asks in a native dialog first.
+const PROGRAM_KEYS = new Set(['jjPath'])
+
+export function runsProgram(key: string): boolean {
+  return PROGRAM_KEYS.has(key)
+}

@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest'
-import { settingFields, settingTitle } from '../../src/desktop/settingsSchema'
+import {
+  isValidSettingValue,
+  runsProgram,
+  settingFields,
+  settingTitle,
+} from '../../src/desktop/settingsSchema'
 
 describe('settingFields', () => {
   const fields = settingFields({ 'autoFetch.enabled': true, 'gitlab.hosts': ['git.example.com'] })
@@ -102,4 +107,41 @@ test('settingTitle reads like the VS Code settings editor', () => {
   expect(settingTitle('autoFetch.enabled')).toBe('Auto Fetch: Enabled')
   expect(settingTitle('repoScanDepth')).toBe('Repo Scan Depth')
   expect(settingTitle('gitlab.oauthApplications')).toBe('Gitlab: Oauth Applications')
+})
+
+describe('isValidSettingValue', () => {
+  const fields = settingFields({})
+  const valid = (key: string, value: unknown) => {
+    const field = fields.find((f) => f.key === key)
+    if (!field) {
+      throw new Error(`no field ${key}`)
+    }
+    return isValidSettingValue(field, value)
+  }
+
+  test('accepts values of the field type, and a reset', () => {
+    expect(valid('showGitTags', false)).toBe(true)
+    expect(valid('historyDepth', '30d')).toBe(true)
+    expect(valid('changeIdLength', 8)).toBe(true)
+    expect(valid('repoScanExclude', ['node_modules'])).toBe(true)
+    expect(valid('describeSuggest.models', { claude: 'haiku' })).toBe(true)
+    expect(valid('showGitTags', undefined)).toBe(true)
+  })
+
+  test('rejects values of another type, outside the options or the range', () => {
+    expect(valid('showGitTags', 'yes')).toBe(false)
+    expect(valid('historyDepth', 'forever')).toBe(false)
+    expect(valid('changeIdLength', Number.NaN)).toBe(false)
+    expect(valid('changeIdLength', 10_000)).toBe(false)
+    expect(valid('repoScanExclude', ['ok', 3])).toBe(false)
+    expect(valid('describeSuggest.models', { claude: { nested: true } })).toBe(false)
+    expect(valid('describeSuggest.models', ['haiku'])).toBe(false)
+  })
+})
+
+describe('runsProgram', () => {
+  test('names the settings that pick a program to run', () => {
+    expect(runsProgram('jjPath')).toBe(true)
+    expect(runsProgram('showGitTags')).toBe(false)
+  })
 })
