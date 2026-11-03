@@ -9,6 +9,7 @@ import {
   type MenuManifest,
 } from '../../shared/menus'
 import packageJson from '../../package.json'
+import { isAccelerator } from '../../shared/accelerators'
 import { recentLabel } from './recentRepos'
 
 // Commands of the standalone app alone. The extension never registers them, so they are not in
@@ -122,6 +123,82 @@ export function paletteCommands(offers: (command: string) => boolean) {
     .map((c) => ({ command: c.command, title: c.title, category: c.category }))
 }
 
+// A command of the app menu that takes a keyboard shortcut. `key` is the shortcut it has out of
+// the box, empty for none.
+export interface ShortcutAction {
+  id: string
+  menu: 'File' | 'Repository' | 'View'
+  title: string
+  key: string
+}
+
+function shortcut(
+  menu: ShortcutAction['menu'],
+  id: string,
+  key = '',
+  title = commandTitle(id),
+): ShortcutAction {
+  return { id, menu, title, key }
+}
+
+// The commands of the File, Repository and View menus, in menu order. Ids of commands that run
+// a `ukemi.*` command are that command. The others name what the item does.
+export const SHORTCUT_ACTIONS: readonly ShortcutAction[] = [
+  shortcut('File', 'app.openRepository', 'CmdOrCtrl+O', 'Open Repository…'),
+  shortcut('File', 'app.newWindow', 'CmdOrCtrl+Shift+N', 'New Window'),
+  shortcut('File', 'ukemi.initRepo'),
+  shortcut('File', 'app.settings', 'CmdOrCtrl+,', 'Settings'),
+  shortcut('File', 'app.keyboardShortcuts', '', 'Keyboard Shortcuts'),
+  shortcut('Repository', 'ukemi.fetch', 'CmdOrCtrl+Shift+F'),
+  shortcut('Repository', 'ukemi.push', 'CmdOrCtrl+Shift+P'),
+  shortcut('Repository', 'ukemi.pushCurrent'),
+  shortcut('Repository', 'ukemi.newFromTrunk', 'CmdOrCtrl+Shift+T'),
+  shortcut('Repository', 'ukemi.goTo', 'CmdOrCtrl+G'),
+  shortcut('Repository', 'ukemi.undo'),
+  shortcut('Repository', 'ukemi.redo'),
+  shortcut('Repository', 'ukemi.selectRepository'),
+  shortcut('Repository', 'ukemi.addWorkspace'),
+  shortcut('Repository', 'ukemi.cleanup'),
+  shortcut('Repository', 'ukemi.forge.signIn'),
+  shortcut('Repository', 'ukemi.forge.signOut'),
+  shortcut('Repository', 'ukemi.refresh', 'F5'),
+  shortcut('View', 'app.palette', 'CmdOrCtrl+K', 'Command Palette…'),
+  shortcut('View', 'app.toggleSidebar', 'CmdOrCtrl+B', 'Toggle Sidebar'),
+  shortcut('View', 'app.toggleTerminal', 'CmdOrCtrl+`', 'Terminal'),
+  shortcut('View', 'app.toggleLog', 'CmdOrCtrl+Shift+U', 'Log'),
+  shortcut('View', 'app.toggleDetail', 'CmdOrCtrl+J', 'Toggle Details'),
+  shortcut('View', 'ukemi.toggleAutoFetch'),
+  shortcut('View', 'ukemi.toggleGitTags'),
+  shortcut('View', 'ukemi.view.asList'),
+  shortcut('View', 'ukemi.view.asTree'),
+  // Ctrl+= zooms in as in VS Code and browsers. Electron's own role wants Ctrl+Shift+= on most
+  // keyboards.
+  shortcut('View', 'app.zoomIn', 'CmdOrCtrl+=', 'Zoom In'),
+  shortcut('View', 'app.zoomOut', 'CmdOrCtrl+-', 'Zoom Out'),
+  shortcut('View', 'app.resetZoom', 'CmdOrCtrl+0', 'Reset Zoom'),
+]
+
+// The setting with the user's shortcuts, by action id, like `{ "ukemi.fetch": "Alt+F" }`.
+export const KEYBINDINGS = 'desktop.keybindings'
+
+export type ShortcutKeys = Readonly<Record<string, string>>
+
+// The shortcut of every action: the user's own from settings.json, else the default. An empty
+// string removes a shortcut. Unknown actions and keys the menu cannot bind are left out.
+export function shortcutKeys(stored: unknown): ShortcutKeys {
+  const own =
+    typeof stored === 'object' && stored !== null && !Array.isArray(stored)
+      ? (stored as Record<string, unknown>)
+      : {}
+  return Object.fromEntries(
+    SHORTCUT_ACTIONS.map(({ id, key }) => {
+      const value = own[id]
+      const isValid = typeof value === 'string' && (value === '' || isAccelerator(value))
+      return [id, isValid ? value : key]
+    }),
+  )
+}
+
 export interface AppMenuActions {
   run: RunCommand
   shell: (action: ShellAction) => void
@@ -132,8 +209,11 @@ export interface AppMenuActions {
   clearRecent: () => void
   // The zoom of the windows, as a percentage.
   zoom: { percent: number; step: (step: ZoomStep) => void }
+  // The shortcut of each action in SHORTCUT_ACTIONS, by its id.
+  keys: ShortcutKeys
   newWindow: () => void
   openSettings: () => void
+  openKeyboardShortcuts: () => void
   openLog: () => void
   about: () => void
   openExternal: (url: string) => void
@@ -160,41 +240,42 @@ function recentMenu(actions: AppMenuActions): MenuItemConstructorOptions[] {
   ]
 }
 
-// Ctrl+= zooms in as in VS Code and browsers. Electron's own role wants Ctrl+Shift+= on most
-// keyboards. Ctrl with the mouse wheel zooms too, in the window.
-function zoomMenu(zoom: AppMenuActions['zoom']): MenuItemConstructorOptions[] {
-  const isZoomed = zoom.percent !== 100
-  return [
-    { label: 'Zoom In', accelerator: 'CmdOrCtrl+=', click: () => zoom.step('in') },
-    { label: 'Zoom Out', accelerator: 'CmdOrCtrl+-', click: () => zoom.step('out') },
-    {
-      label: isZoomed ? `Reset Zoom (${zoom.percent}%)` : 'Reset Zoom',
-      accelerator: 'CmdOrCtrl+0',
-      enabled: isZoomed,
-      click: () => zoom.step('reset'),
-    },
-  ]
-}
-
-function command(id: string, run: RunCommand, accelerator?: string): MenuItemConstructorOptions {
-  return { label: commandTitle(id), click: () => run(id), ...(accelerator ? { accelerator } : {}) }
-}
+const shortcutTitles = new Map(SHORTCUT_ACTIONS.map((a) => [a.id, a.title]))
 
 export function appMenuTemplate(actions: AppMenuActions): MenuItemConstructorOptions[] {
-  const { run } = actions
+  const { run, keys } = actions
   const isMac = process.platform === 'darwin'
+  // An item of SHORTCUT_ACTIONS, with the user's shortcut.
+  const item = (
+    id: string,
+    click: () => void,
+    options: MenuItemConstructorOptions = {},
+  ): MenuItemConstructorOptions => {
+    const key = keys[id]
+    return {
+      label: shortcutTitles.get(id) ?? commandTitle(id),
+      click,
+      ...(key ? { accelerator: key } : {}),
+      ...options,
+    }
+  }
+  const command = (id: string) => item(id, () => run(id))
+  const shell = (id: string, action: ShellAction) => item(id, () => actions.shell(action))
+  const { zoom } = actions
+  const isZoomed = zoom.percent !== 100
   return [
     ...(isMac ? [{ role: 'appMenu' as const }] : []),
     {
       label: '&File',
       submenu: [
-        { label: 'Open Repository…', accelerator: 'CmdOrCtrl+O', click: actions.openRepository },
+        item('app.openRepository', actions.openRepository),
         { label: 'Open &Recent', submenu: recentMenu(actions) },
-        { label: 'New Window', accelerator: 'CmdOrCtrl+Shift+N', click: actions.newWindow },
+        item('app.newWindow', actions.newWindow),
         { type: 'separator' },
-        command('ukemi.initRepo', run),
+        command('ukemi.initRepo'),
         { type: 'separator' },
-        { label: 'Settings', accelerator: 'CmdOrCtrl+,', click: actions.openSettings },
+        item('app.settings', actions.openSettings),
+        item('app.keyboardShortcuts', actions.openKeyboardShortcuts),
         { type: 'separator' },
         isMac ? { role: 'close' } : { role: 'quit' },
       ],
@@ -203,66 +284,48 @@ export function appMenuTemplate(actions: AppMenuActions): MenuItemConstructorOpt
     {
       label: '&Repository',
       submenu: [
-        command('ukemi.fetch', run, 'CmdOrCtrl+Shift+F'),
-        command('ukemi.push', run, 'CmdOrCtrl+Shift+P'),
-        command('ukemi.pushCurrent', run),
+        command('ukemi.fetch'),
+        command('ukemi.push'),
+        command('ukemi.pushCurrent'),
         { type: 'separator' },
-        command('ukemi.newFromTrunk', run, 'CmdOrCtrl+Shift+T'),
-        {
-          label: commandTitle('ukemi.goTo'),
-          accelerator: 'CmdOrCtrl+G',
-          click: () => actions.shell('goTo'),
-        },
+        command('ukemi.newFromTrunk'),
+        shell('ukemi.goTo', 'goTo'),
         { type: 'separator' },
-        command('ukemi.undo', run),
-        command('ukemi.redo', run),
+        command('ukemi.undo'),
+        command('ukemi.redo'),
         { type: 'separator' },
-        command('ukemi.selectRepository', run),
-        command('ukemi.addWorkspace', run),
-        command('ukemi.cleanup', run),
+        command('ukemi.selectRepository'),
+        command('ukemi.addWorkspace'),
+        command('ukemi.cleanup'),
         { type: 'separator' },
-        command('ukemi.forge.signIn', run),
-        command('ukemi.forge.signOut', run),
+        command('ukemi.forge.signIn'),
+        command('ukemi.forge.signOut'),
         { type: 'separator' },
-        command('ukemi.refresh', run, 'F5'),
+        command('ukemi.refresh'),
       ],
     },
     {
       label: '&View',
       submenu: [
-        {
-          label: 'Command Palette…',
-          accelerator: 'CmdOrCtrl+K',
-          click: () => actions.shell('palette'),
-        },
+        shell('app.palette', 'palette'),
         { type: 'separator' },
-        {
-          label: 'Toggle Sidebar',
-          accelerator: 'CmdOrCtrl+B',
-          click: () => actions.shell('toggleSidebar'),
-        },
-        {
-          label: 'Terminal',
-          accelerator: 'CmdOrCtrl+`',
-          click: () => actions.shell('toggleTerminal'),
-        },
-        {
-          label: 'Log',
-          accelerator: 'CmdOrCtrl+Shift+U',
-          click: () => actions.shell('toggleLog'),
-        },
-        {
-          label: 'Toggle Details',
-          accelerator: 'CmdOrCtrl+J',
-          click: () => actions.shell('toggleDetail'),
-        },
+        shell('app.toggleSidebar', 'toggleSidebar'),
+        shell('app.toggleTerminal', 'toggleTerminal'),
+        shell('app.toggleLog', 'toggleLog'),
+        shell('app.toggleDetail', 'toggleDetail'),
         { type: 'separator' },
-        command('ukemi.toggleAutoFetch', run),
-        command('ukemi.toggleGitTags', run),
-        command('ukemi.view.asList', run),
-        command('ukemi.view.asTree', run),
+        command('ukemi.toggleAutoFetch'),
+        command('ukemi.toggleGitTags'),
+        command('ukemi.view.asList'),
+        command('ukemi.view.asTree'),
         { type: 'separator' },
-        ...zoomMenu(actions.zoom),
+        // Ctrl with the mouse wheel zooms too, in the window.
+        item('app.zoomIn', () => zoom.step('in')),
+        item('app.zoomOut', () => zoom.step('out')),
+        item('app.resetZoom', () => zoom.step('reset'), {
+          ...(isZoomed ? { label: `Reset Zoom (${zoom.percent}%)` } : {}),
+          enabled: isZoomed,
+        }),
         { type: 'separator' },
         { role: 'togglefullscreen' },
         ...(actions.isDevelopment

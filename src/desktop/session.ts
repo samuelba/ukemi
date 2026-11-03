@@ -271,9 +271,10 @@ export class DesktopSession implements Disposable {
     this.scheduleState()
   }
 
-  showSettings(): void {
+  // Shows the settings form, or its keyboard shortcuts.
+  showSettings(action: 'settings' | 'keyboardShortcuts' = 'settings'): void {
     this.postSettings()
-    this.shell('settings')
+    this.shell(action)
   }
 
   async showRepositorySettings(root: string): Promise<void> {
@@ -608,6 +609,9 @@ export class DesktopSession implements Disposable {
       case 'desktop.clearLog':
         this.context.logger.clear()
         this.context.broadcastLog()
+        return
+      case 'desktop.recordShortcut':
+        this.window.webContents.setIgnoreMenuShortcuts(message.isRecording === true)
         return
       case 'desktop.zoom':
         if (message.step === 'in' || message.step === 'out' || message.step === 'reset') {

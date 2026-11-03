@@ -42,6 +42,7 @@ describe('settingFields', () => {
     expect([...new Set(fields.map((f) => f.group))]).toEqual([
       'General',
       'Fonts',
+      'Keyboard Shortcuts',
       'Graph',
       'Descriptions',
       'Workspaces',
@@ -50,6 +51,17 @@ describe('settingFields', () => {
     ])
     const graph = fields.filter((f) => f.group === 'Graph').map((f) => f.key)
     expect(graph.indexOf('defaultFilter')).toBeLessThan(graph.indexOf('changedFilesView'))
+  })
+
+  test('lists every menu command with its default keys in the shortcuts field', () => {
+    const shortcuts = fields.find((f) => f.key === 'desktop.keybindings')
+    expect(shortcuts).toMatchObject({ type: 'shortcuts', group: 'Keyboard Shortcuts' })
+    expect(shortcuts?.shortcuts).toContainEqual({
+      id: 'ukemi.fetch',
+      menu: 'Repository',
+      title: 'Fetch',
+      default: 'CmdOrCtrl+Shift+F',
+    })
   })
 
   test('offers the settings of the standalone app first', () => {

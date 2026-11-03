@@ -1,12 +1,31 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react'
+import {
+  acceleratorOf,
+  formatAccelerator,
+  normalizeAccelerator,
+} from '../../../shared/accelerators'
 import type {
   DesktopRendererMessage,
   SettingField,
   SettingsRepository,
+  ShortcutField,
 } from '../../../shared/desktopProtocol'
 import { postMessage } from '../shared/hostApi'
 
 export type SettingsScope = 'global' | 'repository'
+
+// The setting of the keyboard shortcuts, which File > Keyboard Shortcuts scrolls to.
+export const KEYBINDINGS_KEY = 'desktop.keybindings'
+
+const PLATFORM = /Mac/.test(navigator.platform) ? 'darwin' : navigator.platform
 
 type Save = (key: string, value: unknown) => void
 
@@ -157,6 +176,165 @@ function TextControl({
   )
 }
 
+function ownKeys(value: unknown): Record<string, string> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? Object.fromEntries(
+        Object.entries(value).filter(
+          (entry): entry is [string, string] => typeof entry[1] === 'string',
+        ),
+      )
+    : {}
+}
+
+function recordShortcut(isRecording: boolean): void {
+  send({ type: 'desktop.recordShortcut', isRecording })
+}
+
+interface ShortcutRowProps {
+  action: ShortcutField
+  shortcut: string
+  isOwn: boolean
+  // The other commands with the same keys.
+  clashes: string[]
+  onSet: (key: string) => void
+  onReset: () => void
+}
+
+// One command with its keys. Clicking the keys records new ones: the next key press with a
+// modifier, or a function key. Escape cancels.
+function ShortcutRow({ action, shortcut, isOwn, clashes, onSet, onReset }: ShortcutRowProps) {
+  const [isRecording, setIsRecording] = useState(false)
+  useEffect(() => {
+    if (!isRecording) {
+      return
+    }
+    recordShortcut(true)
+    return () => recordShortcut(false)
+  }, [isRecording])
+
+  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (!isRecording) {
+      return
+    }
+    event.preventDefault()
+    event.stopPropagation()
+    const hasModifier = event.ctrlKey || event.metaKey || event.altKey || event.shiftKey
+    if (event.key === 'Escape' && !hasModifier) {
+      setIsRecording(false)
+      return
+    }
+    const key = acceleratorOf(event, PLATFORM)
+    if (key) {
+      setIsRecording(false)
+      onSet(key)
+    }
+  }
+
+  return (
+    <tr className={`shortcut${clashes.length > 0 ? ' has-clash' : ''}`}>
+      <th scope="row" className="shortcut-title">
+        {action.title}
+      </th>
+      <td className="shortcut-keys">
+        <button
+          className={`shortcut-key${isRecording ? ' is-recording' : ''}${shortcut ? '' : ' is-empty'}`}
+          title={isRecording ? 'Press the new keys, or Escape to cancel' : 'Change the shortcut'}
+          aria-label={`Shortcut of ${action.title}: ${shortcut ? formatAccelerator(shortcut, PLATFORM) : 'none'}`}
+          onClick={() => setIsRecording(true)}
+          onKeyDown={onKeyDown}
+          onBlur={() => setIsRecording(false)}
+        >
+          {isRecording ? (
+            'Press keys…'
+          ) : shortcut ? (
+            <kbd>{formatAccelerator(shortcut, PLATFORM)}</kbd>
+          ) : (
+            'None'
+          )}
+        </button>
+        {clashes.length > 0 && (
+          <p className="setting-problem shortcut-clash">Also {clashes.join(', ')}</p>
+        )}
+      </td>
+      <td className="shortcut-tools">
+        {shortcut && (
+          <button
+            className="icon-button"
+            title="Remove the shortcut"
+            aria-label={`Remove the shortcut of ${action.title}`}
+            onClick={() => onSet('')}
+          >
+            <span className="codicon codicon-close" aria-hidden />
+          </button>
+        )}
+        {isOwn && (
+          <button
+            className="icon-button"
+            title={`Reset to ${action.default ? formatAccelerator(action.default, PLATFORM) : 'none'}`}
+            aria-label={`Reset the shortcut of ${action.title}`}
+            onClick={onReset}
+          >
+            <span className="codicon codicon-discard" aria-hidden />
+          </button>
+        )}
+      </td>
+    </tr>
+  )
+}
+
+// The keyboard shortcuts of the menu commands, by menu. The setting keeps only the ones the
+// user changed.
+function ShortcutsControl({ field }: { field: SettingField }) {
+  const save = useContext(SaveContext)
+  const own = ownKeys(field.value)
+  const actions = field.shortcuts ?? []
+  const keyOf = (action: ShortcutField) => own[action.id] ?? action.default
+  const byKey = new Map<string, string[]>()
+  for (const action of actions) {
+    const normal = normalizeAccelerator(keyOf(action), PLATFORM)
+    if (normal) {
+      byKey.set(normal, [...(byKey.get(normal) ?? []), action.title])
+    }
+  }
+  const store = (next: Record<string, string>) =>
+    save(field.key, Object.keys(next).length > 0 ? next : undefined)
+  const without = (id: string) => Object.fromEntries(Object.entries(own).filter(([k]) => k !== id))
+  const set = (action: ShortcutField, key: string) =>
+    store(key === action.default ? without(action.id) : { ...without(action.id), [action.id]: key })
+  const menus = [...new Set(actions.map((action) => action.menu))]
+  return (
+    <div className="shortcuts">
+      {menus.map((menu) => (
+        <table key={menu} className="shortcut-table">
+          <caption>{menu}</caption>
+          <tbody>
+            {actions
+              .filter((action) => action.menu === menu)
+              .map((action) => {
+                const shortcut = keyOf(action)
+                const normal = normalizeAccelerator(shortcut, PLATFORM)
+                const clashes = normal
+                  ? (byKey.get(normal) ?? []).filter((title) => title !== action.title)
+                  : []
+                return (
+                  <ShortcutRow
+                    key={action.id}
+                    action={action}
+                    shortcut={shortcut}
+                    isOwn={action.id in own}
+                    clashes={clashes}
+                    onSet={(key) => set(action, key)}
+                    onReset={() => store(without(action.id))}
+                  />
+                )
+              })}
+          </tbody>
+        </table>
+      ))}
+    </div>
+  )
+}
+
 function Control({ field }: { field: SettingField }) {
   const save = useContext(SaveContext)
   switch (field.type) {
@@ -196,6 +374,8 @@ function Control({ field }: { field: SettingField }) {
       return <TextControl field={field} multiline toText={listText} fromText={parseList} />
     case 'map':
       return <TextControl field={field} multiline toText={mapText} fromText={parseMap} />
+    case 'shortcuts':
+      return <ShortcutsControl field={field} />
     case 'number':
       return (
         <TextControl
@@ -258,7 +438,10 @@ function Field({ field, scope }: { field: SettingField; scope: SettingsScope }) 
 function matches(field: SettingField, query: string): boolean {
   const needle = query.trim().toLowerCase()
   return (
-    !needle || `${field.title} ${field.key} ${field.description}`.toLowerCase().includes(needle)
+    !needle ||
+    `${field.title} ${field.key} ${field.description} ${(field.shortcuts ?? []).map((s) => s.title).join(' ')}`
+      .toLowerCase()
+      .includes(needle)
   )
 }
 
@@ -267,6 +450,8 @@ interface SettingsViewProps {
   path: string
   repository: SettingsRepository | null
   scope: SettingsScope
+  // The setting to scroll to. A new object scrolls again.
+  focus?: { key: string } | null
   onScope: (scope: SettingsScope) => void
 }
 
@@ -308,10 +493,28 @@ export function SettingsView({
   path,
   repository,
   scope,
+  focus = null,
   onScope,
 }: SettingsViewProps): ReactNode {
   const [query, setQuery] = useState('')
   const [onlyModified, setOnlyModified] = useState(false)
+  const hasFields = fields.length > 0
+  useEffect(() => {
+    if (!focus || !hasFields) {
+      return
+    }
+    setQuery('')
+    setOnlyModified(false)
+    // After the filters clear, so the setting is in the form.
+    const frame = requestAnimationFrame(() => {
+      const target = document.getElementById(`setting-${focus.key}`)
+      // Clear of the sticky header, so the title of the setting shows.
+      const header = document.querySelector<HTMLElement>('.settings-header')
+      target?.style.setProperty('scroll-margin-top', `${(header?.offsetHeight ?? 0) + 8}px`)
+      target?.scrollIntoView({ block: 'start' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [focus, hasFields])
   useEffect(() => send({ type: 'desktop.loadSettings' }), [])
   // Without a repository, the form falls back to the settings of all repositories.
   const repo = scope === 'repository' ? repository : null

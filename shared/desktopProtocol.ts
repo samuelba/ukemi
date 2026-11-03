@@ -112,6 +112,16 @@ export interface PanelTab {
   title: string
 }
 
+// A command whose keyboard shortcut the settings form can change.
+export interface ShortcutField {
+  id: string
+  // The menu it is in, which groups it in the form.
+  menu: string
+  title: string
+  // In Electron's accelerator syntax, empty for none.
+  default: string
+}
+
 export interface SettingOption {
   value: string
   description?: string
@@ -124,7 +134,7 @@ export interface SettingField {
   group: string
   title: string
   description: string
-  type: 'boolean' | 'string' | 'number' | 'enum' | 'list' | 'map'
+  type: 'boolean' | 'string' | 'number' | 'enum' | 'list' | 'map' | 'shortcuts'
   options?: SettingOption[]
   minimum?: number
   maximum?: number
@@ -133,6 +143,8 @@ export interface SettingField {
   default: unknown
   // Undefined when the user has not set it.
   value: unknown
+  // The commands a `shortcuts` field binds. Its value maps their ids to the user's own keys.
+  shortcuts?: ShortcutField[]
   // A repository may override it. See shared/settingsScope.ts.
   isRepositoryScoped: boolean
   // The labels of the repositories that override it.
@@ -195,6 +207,7 @@ export type ShellAction =
   | 'toggleSidebar'
   | 'toggleDetail'
   | 'settings'
+  | 'keyboardShortcuts'
   | 'repositorySettings'
   | 'toggleLog'
   | 'showLog'
@@ -254,6 +267,8 @@ export type DesktopRendererMessage =
   | { type: 'desktop.openSettingsFile' }
   | { type: 'desktop.openRepo' }
   | { type: 'desktop.zoom'; step: ZoomStep }
+  // The settings form records a shortcut, so the menu must not act on the keys meanwhile.
+  | { type: 'desktop.recordShortcut'; isRecording: boolean }
   | { type: 'desktop.closeRepo'; repoId: string }
   | { type: 'desktop.clearLog' }
   | { type: 'desktop.copy'; text: string }
