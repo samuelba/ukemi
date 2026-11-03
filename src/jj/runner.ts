@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { basename } from 'node:path'
 import { hostSpawn } from '../util/hostProcess'
 import type { Logger } from '../util/logger'
 import { redactUrlCredentials } from '../util/text'
@@ -73,6 +74,11 @@ export function describeArgs(args: readonly string[]): string {
     .join(' ')
 }
 
+// Which repository a log line is about, when several are open.
+function repoTag(cwd: string): string {
+  return `[${basename(cwd) || cwd}]`
+}
+
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
 export class JjRunner {
@@ -106,12 +112,12 @@ export class JjRunner {
         return await this.runOnce(options)
       } catch (error: unknown) {
         if (error instanceof JjError && error.isIndexLocked && attempt < INDEX_LOCK_RETRIES) {
-          this.logger.warn('git index is locked, retrying')
+          this.logger.warn(`${repoTag(options.cwd)} git index is locked, retrying`)
           await sleep(INDEX_LOCK_DELAY_MS)
           continue
         }
         if (error instanceof JjError && error.isStaleWorkingCopy && attempt === 0) {
-          this.logger.warn('working copy is stale, updating')
+          this.logger.warn(`${repoTag(options.cwd)} working copy is stale, updating`)
           await this.runOnce({ cwd: options.cwd, args: ['workspace', 'update-stale'] })
           continue
         }
@@ -158,14 +164,16 @@ export class JjRunner {
         const out = Buffer.concat(stdout).toString('utf8')
         const err = Buffer.concat(stderr).toString('utf8')
         const elapsed = Date.now() - started
-        this.logger.info(`jj ${describeArgs(options.args)} (${elapsed} ms, exit ${code ?? signal})`)
+        this.logger.info(
+          `${repoTag(options.cwd)} jj ${describeArgs(options.args)} (${elapsed} ms, exit ${code ?? signal})`,
+        )
         if (hasTimedOut) {
           reject(new JjError(`jj timed out after ${timeoutMs / 1000} s`, args, err, code))
           return
         }
         if (code !== 0) {
           if (err.trim()) {
-            this.logger.error(redactUrlCredentials(err.trim()))
+            this.logger.error(`${repoTag(options.cwd)} ${redactUrlCredentials(err.trim())}`)
           }
           reject(new JjError(summarizeStderr(err), args, err, code))
           return
@@ -175,7 +183,7 @@ export class JjRunner {
 
       child.stdin.on('error', (error: NodeJS.ErrnoException) => {
         if (error.code !== 'EPIPE') {
-          this.logger.warn(`jj stdin: ${error.message}`)
+          this.logger.warn(`${repoTag(options.cwd)} jj stdin: ${error.message}`)
         }
       })
       child.stdin.end(options.stdin ?? '')
