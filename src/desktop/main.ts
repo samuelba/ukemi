@@ -1,11 +1,12 @@
 import { existsSync, statSync } from 'node:fs'
-import { release } from 'node:os'
+import { homedir, release } from 'node:os'
 import { isAbsolute, join, normalize, relative, resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import {
   BrowserWindow,
   Menu,
   app,
+  dialog,
   ipcMain,
   nativeTheme,
   net,
@@ -28,6 +29,7 @@ import { SecretsFile } from './adapters/secretsFile'
 import { SettingsFile } from './adapters/settingsFile'
 import { TrustStore } from './adapters/trustStore'
 import { RepoTabStore } from './adapters/repoTabStore'
+import { RecentRepoStore } from './adapters/recentRepoStore'
 import { TO_MAIN, type DesktopContext, type DesktopPaths, type Page } from './context'
 import { fileLogger } from './fileLogger'
 import { detectSystemFont, resolveFonts, type SystemFont } from './fonts'
@@ -113,6 +115,7 @@ class DesktopApp implements DesktopContext {
   readonly state = new KeyValueFile(join(this.paths.userData, 'state.json'))
   readonly trust = new TrustStore(this.state)
   readonly repoTabs = new RepoTabStore(this.state)
+  readonly recentRepos = new RecentRepoStore(this.state)
   readonly jj: { path: string | null; version: string | null } = { path: null, version: null }
   private systemFont: SystemFont | null = null
   readonly secrets: SecretsFile
@@ -161,6 +164,7 @@ class DesktopApp implements DesktopContext {
     this.serveFiles()
     this.routeMessages()
     this.installMenu()
+    this.recentRepos.onDidChange(() => this.installMenu())
     const fromArgs = await foldersFromArgs(process.argv, process.cwd())
     const windows = startupWindows(
       fromArgs,
@@ -370,6 +374,9 @@ class DesktopApp implements DesktopContext {
           this.openWindow([])
         }
       },
+      recent: { roots: this.recentRepos.read(), home: homedir() },
+      openRecent: (root) => void this.openRecent(root),
+      clearRecent: () => void this.recentRepos.clear(),
       newWindow: () => this.openWindow([]),
       openSettings: () => this.focusedSession()?.showSettings(),
       openLog: () => this.focusedSession()?.shell('showLog'),
@@ -378,6 +385,28 @@ class DesktopApp implements DesktopContext {
       isDevelopment,
     })
     Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+  }
+
+  // Opens a repository of File > Open Recent as a tab of the focused window.
+  private async openRecent(root: string): Promise<void> {
+    if (!existsSync(root)) {
+      await this.recentRepos.forget(root)
+      const options = {
+        type: 'warning' as const,
+        message: `${root} no longer exists.`,
+        detail: 'It was removed from the recent repositories.',
+      }
+      const parent = this.focusedSession()?.window
+      await (parent ? dialog.showMessageBox(parent, options) : dialog.showMessageBox(options))
+      return
+    }
+    const session = this.focusedSession()
+    if (session) {
+      session.focus()
+      await session.addFolder(root)
+    } else {
+      this.openWindow([root])
+    }
   }
 
   private async openFromSecondInstance(argv: readonly string[], cwd: string): Promise<void> {
