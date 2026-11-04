@@ -4,13 +4,8 @@ import type { RepoWatchHandlers, WatchRepo } from '../../app/host'
 import type { Logger } from '../../util/logger'
 import { errorMessage } from '../../util/logger'
 import { repositoryStore } from '../../repo/workspaceFolder'
-
-const INTERNAL = ['.jj', '.git']
-
-// Only the .jj and .git folders themselves: .gitignore and .github are the user's files.
-export function isInternal(name: string): boolean {
-  return INTERNAL.some((folder) => name === folder || name.startsWith(`${folder}${sep}`))
-}
+import { IgnoreRules, isInternal, isRulesFile, parentRel } from './ignoreRules'
+import { FolderTreeWatcher } from './treeWatcher'
 
 function tryWatch(
   path: string,
@@ -28,21 +23,69 @@ function tryWatch(
   }
 }
 
+// Reports a change unless jj ignores the path, so build output does not trigger snapshots.
+export function changeFilter(
+  rules: IgnoreRules,
+  onChange: () => void,
+  logger: Logger,
+): (name: string | null) => void {
+  return (name) => {
+    if (name === null) {
+      onChange()
+      return
+    }
+    const rel = name.split(sep).join('/')
+    if (isInternal(rel)) {
+      return
+    }
+    if (isRulesFile(rel)) {
+      rules.invalidate(parentRel(rel))
+      onChange()
+      return
+    }
+    rules.isIgnored(rel, false).then(
+      (ignored) => {
+        if (!ignored) {
+          onChange()
+        }
+      },
+      (error: unknown) => {
+        logger.warn(`checking ignore rules for ${rel}: ${errorMessage(error)}`)
+        onChange()
+      },
+    )
+  }
+}
+
+// macOS and Windows watch a tree with one native handle, so only the events need filtering.
+// Node's recursive watch on Linux adds an inotify watch for every file and folder, ignored ones
+// included, so there the app walks the tree itself and skips what jj ignores.
+function watchWorkingCopy(
+  root: string,
+  onChange: () => void,
+  logger: Logger,
+  platform: NodeJS.Platform,
+): { close(): void } | null {
+  const rules = new IgnoreRules(root)
+  if (platform !== 'linux') {
+    return tryWatch(root, { recursive: true }, changeFilter(rules, onChange, logger), logger)
+  }
+  const tree = new FolderTreeWatcher({ root, rules, onChange, logger })
+  tree
+    .start()
+    .catch((error: unknown) => logger.warn(`cannot watch ${root}: ${errorMessage(error)}`))
+  return { close: () => tree.dispose() }
+}
+
 // Watches the working copy and jj's operation heads, which a second workspace finds through the
 // pointer in its .jj/repo. When the system runs out of watches for a
 // big tree, the app still refreshes on new operations and when the window gets focus.
-export function fsWatchRepo(logger: Logger): WatchRepo {
+export function fsWatchRepo(
+  logger: Logger,
+  platform: NodeJS.Platform = process.platform,
+): WatchRepo {
   return (root: string, handlers: RepoWatchHandlers) => {
-    const files = tryWatch(
-      root,
-      { recursive: true },
-      (name) => {
-        if (name === null || !isInternal(name)) {
-          handlers.onFile()
-        }
-      },
-      logger,
-    )
+    const files = watchWorkingCopy(root, () => handlers.onFile(), logger, platform)
     const ops = tryWatch(
       join(repositoryStore(root), 'op_heads', 'heads'),
       { recursive: false },
