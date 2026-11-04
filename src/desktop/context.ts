@@ -1,4 +1,4 @@
-import type { BrowserWindow, Rectangle } from 'electron'
+import type { BrowserWindow } from 'electron'
 import type { AboutInfo, Fonts, ZoomStep } from '../../shared/desktopProtocol'
 import type { Ui } from '../app/ui'
 import type { KeyValueFile } from './adapters/keyValueFile'
@@ -10,6 +10,7 @@ import type { RepoTabStore } from './adapters/repoTabStore'
 import type { RecentRepoStore } from './adapters/recentRepoStore'
 import type { LogBuffer } from './logBuffer'
 import type { DesktopSession } from './session'
+import type { WindowPlacement } from './windowBounds'
 
 export const TO_RENDERER = 'ukemi:host'
 export const TO_MAIN = 'ukemi:renderer'
@@ -47,8 +48,9 @@ export interface DesktopContext {
   fonts(): Fonts
   pageUrl(page: Page): string
   backgroundColor(): string
-  windowBounds(): { width: number; height: number }
-  saveWindowBounds(bounds: Rectangle): void
+  // The size, place and maximized state of the window that last moved.
+  windowBounds(): WindowPlacement
+  saveWindowBounds(placement: WindowPlacement): void
   guardNavigation(window: BrowserWindow): void
   openWindow(folders: string[]): void
   // The zoom factor of every window, and a change of it from the menu, a key or the status bar.
