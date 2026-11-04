@@ -823,6 +823,84 @@ button.detail-tag-conflict:hover {
   font-style: italic;
 }
 
+/* Side by side: two columns that wrap, since one table cannot scroll them apart. */
+.diff-split {
+  table-layout: fixed;
+}
+
+.diff-split .diff-col-num {
+  width: calc(3.2em + 16px);
+}
+
+.diff-split .diff-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.diff-split td:nth-child(3) {
+  border-left: 1px solid var(--vscode-widget-border);
+}
+
+.diff-empty {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0 6px,
+    color-mix(in srgb, var(--vscode-widget-border) 35%, transparent) 6px 7px
+  );
+}
+
+.diff-file-tools {
+  margin: 0;
+  padding: 6px 22px 0;
+}
+
+.diff-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 14px 22px;
+}
+
+.diff-image {
+  display: flex;
+  flex: 1 1 200px;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+}
+
+/* A checkerboard behind the image, so transparent pixels show as such. */
+.diff-image-frame {
+  display: grid;
+  place-items: center;
+  min-height: 64px;
+  padding: 8px;
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: var(--shell-radius);
+  background: repeating-conic-gradient(
+      color-mix(in srgb, var(--vscode-foreground) 10%, transparent) 0 25%,
+      transparent 0 50%
+    )
+    0 0 / 16px 16px;
+}
+
+.diff-image-frame img {
+  max-width: 100%;
+  max-height: 480px;
+  object-fit: contain;
+}
+
+.diff-image-frame img.is-scaled {
+  image-rendering: pixelated;
+}
+
+.diff-image figcaption {
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Prompts ----------------------------------------------------------------------------------- */
 
 .scrim {

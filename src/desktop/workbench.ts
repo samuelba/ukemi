@@ -23,7 +23,8 @@ import {
   commitDiffTitle,
   fileAtRevision,
   interdiffText,
-  revisionText,
+  looksBinary,
+  revisionBytes,
   versionDiffEntries,
   versionDiffTitle,
   type DiffEntry,
@@ -63,8 +64,43 @@ export interface DesktopWorkbenchDeps {
   splitPaths: SplitToolPaths
 }
 
-function looksBinary(data: Buffer): boolean {
-  return data.subarray(0, 8000).includes(0)
+const IMAGE_TYPES: Readonly<Record<string, string>> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  bmp: 'image/bmp',
+  ico: 'image/x-icon',
+  avif: 'image/avif',
+}
+
+// The media type of a raster image the diff pane can show. An SVG is text, and the pane shows
+// it from that.
+export function imageMime(path: string): string | undefined {
+  const dot = path.lastIndexOf('.')
+  return dot === -1 ? undefined : IMAGE_TYPES[path.slice(dot + 1).toLowerCase()]
+}
+
+const LFS_POINTER = Buffer.from('version https://git-lfs')
+
+// What the diff pane shows of a file's bytes. An image goes as a data URL, unless it is a
+// Git LFS pointer, which is text.
+export function sideFromBytes(path: string, data: Buffer): DiffSideText {
+  if (data.length > MAX_DIFF_BYTES) {
+    return { text: TOO_LARGE, isBinary: true }
+  }
+  const mime = imageMime(path)
+  if (mime && data.length > 0 && !data.subarray(0, LFS_POINTER.length).equals(LFS_POINTER)) {
+    return {
+      text: BINARY_PLACEHOLDER,
+      isBinary: true,
+      image: `data:${mime};base64,${data.toString('base64')}`,
+    }
+  }
+  return looksBinary(data)
+    ? { text: BINARY_PLACEHOLDER, isBinary: true }
+    : { text: data.toString('utf8'), isBinary: false }
 }
 
 async function diskText(path: string): Promise<DiffSideText> {
@@ -74,10 +110,7 @@ async function diskText(path: string): Promise<DiffSideText> {
     if (size > MAX_DIFF_BYTES) {
       return { text: TOO_LARGE, isBinary: true }
     }
-    const data = await handle.readFile()
-    return looksBinary(data)
-      ? { text: BINARY_PLACEHOLDER, isBinary: true }
-      : { text: data.toString('utf8'), isBinary: false }
+    return sideFromBytes(path, await handle.readFile())
   } finally {
     await handle.close()
   }
@@ -91,13 +124,7 @@ async function sideText(model: RepoModel, side: FileSide): Promise<DiffSideText>
       return { text: '', isBinary: false }
     }
   }
-  const text = await revisionText(model, side.commitId, side.path)
-  if (text === BINARY_PLACEHOLDER) {
-    return { text, isBinary: true }
-  }
-  return text.length > MAX_DIFF_BYTES
-    ? { text: TOO_LARGE, isBinary: true }
-    : { text, isBinary: false }
+  return sideFromBytes(side.path, await revisionBytes(model, side.commitId, side.path))
 }
 
 async function diffFiles(
@@ -196,7 +223,13 @@ export function desktopWorkbench(deps: DesktopWorkbenchDeps, env: () => CommandE
     },
     openFileAtRevision: async (model, commit, path) => {
       const side = await sideText(model, fileAtRevision(commit, path))
-      show({ kind: 'file', title: `${path} @ ${shortId(commit)}`, path, text: side.text })
+      show({
+        kind: 'file',
+        title: `${path} @ ${shortId(commit)}`,
+        path,
+        text: side.text,
+        ...(side.image ? { image: side.image } : {}),
+      })
     },
     openEditor,
     openFileExternally: (fsPath) => deps.openPath(fsPath),
