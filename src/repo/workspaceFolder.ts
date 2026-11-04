@@ -1,6 +1,6 @@
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
-import { join } from 'node:path'
+import { isAbsolute, join, resolve } from 'node:path'
 import { removableWorkspaceFolder } from './cleanupItems'
 
 // The workspace made by `jj git init` or `jj git clone` keeps the repository in .jj/repo. In the
@@ -12,6 +12,25 @@ export function holdsRepositoryStore(root: string): boolean {
   } catch {
     return false
   }
+}
+
+// The folder that holds the repository store, like op_heads. In a second workspace, .jj/repo is a
+// file with the store's path, relative to that .jj folder. Falls back to .jj/repo when the file
+// cannot be read, so a caller still gets a path to try.
+export function repositoryStore(root: string): string {
+  const pointer = join(root, '.jj', 'repo')
+  try {
+    if (statSync(pointer).isDirectory()) {
+      return pointer
+    }
+    const target = readFileSync(pointer, 'utf8').trim()
+    if (target) {
+      return isAbsolute(target) ? target : resolve(root, '.jj', target)
+    }
+  } catch {
+    // Not a jj workspace (yet), or not readable.
+  }
+  return pointer
 }
 
 export function canDeleteWorkspaceFolder(repoRoot: string, root: string | null): boolean {

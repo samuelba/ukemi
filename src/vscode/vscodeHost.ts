@@ -1,8 +1,9 @@
-import { sep } from 'node:path'
+import { join, sep } from 'node:path'
 import * as vscode from 'vscode'
 import type { Event } from '../app/events'
 import type { FolderSource, Host, WatchRepo, WindowState } from '../app/host'
 import type { Settings } from '../app/settings'
+import { repositoryStore } from '../repo/workspaceFolder'
 import type { OpenPick, PickItem, TypedPickOptions, Ui } from '../app/ui'
 
 function pickOrType<T extends PickItem>(
@@ -150,8 +151,9 @@ export const watchRepo: WatchRepo = (root, handlers) => {
   files.onDidCreate(onFile)
   files.onDidDelete(onFile)
 
+  // A second workspace keeps a pointer to the repository store in .jj/repo.
   const ops = vscode.workspace.createFileSystemWatcher(
-    new vscode.RelativePattern(root, '.jj/repo/op_heads/heads/*'),
+    new vscode.RelativePattern(join(repositoryStore(root), 'op_heads', 'heads'), '*'),
   )
   ops.onDidCreate(() => handlers.onOperation())
   ops.onDidChange(() => handlers.onOperation())
