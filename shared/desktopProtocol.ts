@@ -83,6 +83,8 @@ export interface SidePanels {
 export interface DiffSideText {
   text: string
   isBinary: boolean
+  // A `data:` URL of a raster image, which the diff shows instead of its placeholder text.
+  image?: string
 }
 
 export interface DiffFile {
@@ -96,7 +98,7 @@ export interface DiffFile {
 export type DiffDocument =
   | { kind: 'files'; title: string; files: DiffFile[]; focus?: string }
   | { kind: 'patch'; title: string; text: string }
-  | { kind: 'file'; title: string; path: string; text: string }
+  | { kind: 'file'; title: string; path: string; text: string; image?: string }
 
 export interface ChangeDetail {
   repoId: string

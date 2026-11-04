@@ -7,6 +7,7 @@ import type {
   FileHistoryHostMessage,
   FileHistoryWebviewMessage,
 } from '../../../shared/fileHistory'
+import { DiffOptionButtons } from '../desktop/diffOptions'
 import { DiffView } from '../desktop/DiffView'
 import { Splitter } from '../desktop/Splitter'
 import { RelativeTime } from '../graph/RelativeTime'
@@ -325,6 +326,9 @@ function ChangeDetail({
           >
             <span className="codicon codicon-go-to-file" aria-hidden /> Open file at this change
           </button>
+          <span className="history-diff-options">
+            <DiffOptionButtons />
+          </span>
         </div>
       </header>
       {diff === null ? (

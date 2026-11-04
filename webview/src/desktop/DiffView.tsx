@@ -4,13 +4,20 @@ import { parserFor } from '../editor/languages'
 import { highlightLines, type Token } from '../editor/syntaxClasses'
 import { FileTypeIcon } from '../graph/FileIcon'
 import {
+  dataUrlBytes,
   diffHunks,
+  formatBytes,
   isLargeDiff,
   patchHunks,
   segments,
+  splitRows,
+  svgDataUrl,
   type DiffHunk,
+  type DiffPart,
   type DiffRow,
+  type SplitRow,
 } from './diffModel'
+import { useDiffOptions, type DiffOptions } from './diffOptions'
 
 const STATUS_LETTER: Record<DiffFile['status'], string> = {
   added: 'A',
@@ -27,25 +34,58 @@ interface SideTokens {
   new: Token[][] | null
 }
 
+type Side = 'old' | 'new'
+type Layout = DiffOptions['layout']
+
 const NO_TOKENS: SideTokens = { old: null, new: null }
 
 function sideTokens(path: string, text: string | undefined): Token[][] | null {
   return text === undefined ? null : highlightLines(text, parserFor(path, text))
 }
 
-// A removed line has the old side's colors, every other line the new side's.
-function rowTokens(row: DiffRow, tokens: SideTokens): Token[] | undefined {
+// A line's colors come from the side it is shown for. In one column, a removed line has the old
+// side's colors and every other line the new side's.
+function rowTokens(
+  row: DiffRow,
+  tokens: SideTokens,
+  side: Side = row.kind === 'removed' ? 'old' : 'new',
+): Token[] | undefined {
   if (row.kind === 'note') {
     return undefined
   }
-  if (row.kind === 'removed') {
+  if (side === 'old') {
     return row.oldLine === null ? undefined : tokens.old?.[row.oldLine - 1]
   }
   return row.newLine === null ? undefined : tokens.new?.[row.newLine - 1]
 }
 
+function LineText({
+  text,
+  tokens,
+  parts,
+}: {
+  text: string
+  tokens: Token[] | undefined
+  parts: DiffPart[] | undefined
+}) {
+  if (!parts && !tokens) {
+    return <>{text || ' '}</>
+  }
+  return (
+    <>
+      {segments(text, tokens, parts).map((part, index) => {
+        const span = <span className={part.cls}>{part.text}</span>
+        return part.changed ? (
+          <mark key={index}>{span}</mark>
+        ) : (
+          <Fragment key={index}>{span}</Fragment>
+        )
+      })}
+    </>
+  )
+}
+
 function Line({ row, tokens }: { row: DiffRow; tokens: SideTokens }) {
-  const lineTokens = rowTokens(row, tokens)
   return (
     <tr className={`diff-row diff-${row.kind}`}>
       <td className="diff-num">{row.oldLine ?? ''}</td>
@@ -54,34 +94,100 @@ function Line({ row, tokens }: { row: DiffRow; tokens: SideTokens }) {
         {row.kind === 'added' ? '+' : row.kind === 'removed' ? '−' : ''}
       </td>
       <td className="diff-text">
-        {row.parts || lineTokens
-          ? segments(row.text, lineTokens, row.parts).map((part, index) => {
-              const text = <span className={part.cls}>{part.text}</span>
-              return part.changed ? (
-                <mark key={index}>{text}</mark>
-              ) : (
-                <Fragment key={index}>{text}</Fragment>
-              )
-            })
-          : row.text || ' '}
+        <LineText text={row.text} tokens={rowTokens(row, tokens)} parts={row.parts} />
       </td>
     </tr>
   )
 }
 
-function Hunks({ hunks, tokens = NO_TOKENS }: { hunks: readonly DiffHunk[]; tokens?: SideTokens }) {
+// One side of a side-by-side row. A missing line is padding across from a longer run.
+function SplitCells({
+  row,
+  side,
+  tokens,
+}: {
+  row: DiffRow | null
+  side: Side
+  tokens: SideTokens
+}) {
+  if (!row) {
+    return (
+      <>
+        <td className="diff-num diff-empty" />
+        <td className="diff-text diff-empty" />
+      </>
+    )
+  }
+  const text = side === 'old' ? (row.oldText ?? row.text) : row.text
   return (
-    <table className="diff-table">
+    <>
+      <td className={`diff-num diff-${row.kind}`}>
+        {(side === 'old' ? row.oldLine : row.newLine) ?? ''}
+      </td>
+      <td className={`diff-text diff-${row.kind}`}>
+        <LineText text={text} tokens={rowTokens(row, tokens, side)} parts={row.parts} />
+      </td>
+    </>
+  )
+}
+
+function SplitLine({ row, tokens }: { row: SplitRow; tokens: SideTokens }) {
+  if (row.left?.kind === 'note') {
+    return (
+      <tr className="diff-row diff-note">
+        <td className="diff-num" />
+        <td className="diff-text" colSpan={3}>
+          {row.left.text || ' '}
+        </td>
+      </tr>
+    )
+  }
+  return (
+    <tr className="diff-row">
+      <SplitCells row={row.left} side="old" tokens={tokens} />
+      <SplitCells row={row.right} side="new" tokens={tokens} />
+    </tr>
+  )
+}
+
+function Hunks({
+  hunks,
+  tokens = NO_TOKENS,
+  layout = 'unified',
+}: {
+  hunks: readonly DiffHunk[]
+  tokens?: SideTokens
+  layout?: Layout
+}) {
+  const isSplit = layout === 'split'
+  return (
+    <table className={`diff-table${isSplit ? ' diff-split' : ''}`}>
+      {isSplit && (
+        <colgroup>
+          <col className="diff-col-num" />
+          <col />
+          <col className="diff-col-num" />
+          <col />
+        </colgroup>
+      )}
       <tbody>
         {hunks.map((hunk, index) => (
-          <HunkRows key={index} hunk={hunk} tokens={tokens} />
+          <HunkRows key={index} hunk={hunk} tokens={tokens} isSplit={isSplit} />
         ))}
       </tbody>
     </table>
   )
 }
 
-function HunkRows({ hunk, tokens }: { hunk: DiffHunk; tokens: SideTokens }) {
+function HunkRows({
+  hunk,
+  tokens,
+  isSplit,
+}: {
+  hunk: DiffHunk
+  tokens: SideTokens
+  isSplit: boolean
+}) {
   return (
     <>
       {hunk.header && (
@@ -89,10 +195,61 @@ function HunkRows({ hunk, tokens }: { hunk: DiffHunk; tokens: SideTokens }) {
           <td colSpan={4}>{hunk.header}</td>
         </tr>
       )}
-      {hunk.rows.map((row, index) => (
-        <Line key={index} row={row} tokens={tokens} />
-      ))}
+      {isSplit
+        ? splitRows(hunk.rows).map((row, index) => (
+            <SplitLine key={index} row={row} tokens={tokens} />
+          ))
+        : hunk.rows.map((row, index) => <Line key={index} row={row} tokens={tokens} />)}
     </>
+  )
+}
+
+// A smaller image, like an icon, is scaled up by a whole factor so its pixels stay sharp.
+const MIN_IMAGE_SIZE = 64
+
+function ImageSide({ label, src }: { label: string; src: string }) {
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null)
+  const [isBroken, setIsBroken] = useState(false)
+  const scale = size
+    ? Math.max(1, Math.floor(MIN_IMAGE_SIZE / Math.max(size.width, size.height, 1)))
+    : 1
+  return (
+    <figure className="diff-image">
+      <div className="diff-image-frame">
+        {isBroken ? (
+          <p className="diff-placeholder">This image cannot be shown.</p>
+        ) : (
+          <img
+            src={src}
+            alt={label}
+            className={scale > 1 ? 'is-scaled' : undefined}
+            style={size && scale > 1 ? { width: size.width * scale } : undefined}
+            onLoad={(e) =>
+              setSize({
+                width: e.currentTarget.naturalWidth,
+                height: e.currentTarget.naturalHeight,
+              })
+            }
+            onError={() => setIsBroken(true)}
+          />
+        )}
+      </div>
+      <figcaption>
+        {[label, size && `${size.width} × ${size.height}`, formatBytes(dataUrlBytes(src))]
+          .filter(Boolean)
+          .join(' · ')}
+      </figcaption>
+    </figure>
+  )
+}
+
+// The two versions of an image next to each other. An added or removed image has one side.
+function ImageDiff({ left, right }: { left: string | null; right: string | null }) {
+  return (
+    <div className="diff-images">
+      {left && <ImageSide label={right ? 'Before' : 'Removed'} src={left} />}
+      {right && <ImageSide label={left ? 'After' : 'Added'} src={right} />}
+    </div>
   )
 }
 
@@ -108,16 +265,39 @@ function lineCounts(hunks: readonly DiffHunk[]): { added: number; removed: numbe
   return { added, removed }
 }
 
-function FileDiff({ file, startOpen }: { file: DiffFile; startOpen: boolean }) {
+function FileDiff({
+  file,
+  startOpen,
+  options,
+}: {
+  file: DiffFile
+  startOpen: boolean
+  options: DiffOptions
+}) {
   const [isOpen, setIsOpen] = useState(startOpen)
   const [showLarge, setShowLarge] = useState(false)
+  const [showSvg, setShowSvg] = useState(false)
   const isBinary = Boolean(file.left?.isBinary || file.right?.isBinary)
   const left = file.left?.text ?? null
   const right = file.right?.text ?? null
+  const isSvg = !isBinary && /\.svg$/i.test(file.path)
+  const images =
+    file.left?.image || file.right?.image
+      ? { left: file.left?.image ?? null, right: file.right?.image ?? null }
+      : isSvg && showSvg
+        ? {
+            left: left === null ? null : svgDataUrl(left),
+            right: right === null ? null : svgDataUrl(right),
+          }
+        : null
   const isLarge = useMemo(() => !isBinary && isLargeDiff(left, right), [isBinary, left, right])
   // A large file is diffed only once it is open and asked for.
   const isDiffed = !isBinary && (!isLarge || (isOpen && showLarge))
-  const hunks = useMemo(() => (isDiffed ? diffHunks(left, right) : null), [isDiffed, left, right])
+  const { ignoreWhitespace } = options
+  const hunks = useMemo(
+    () => (isDiffed ? diffHunks(left, right, { ignoreWhitespace }) : null),
+    [isDiffed, left, right, ignoreWhitespace],
+  )
   // Only an open file pays for parsing its two sides, and a large one is not colored.
   const tokens = useMemo(
     (): SideTokens =>
@@ -146,8 +326,17 @@ function FileDiff({ file, startOpen }: { file: DiffFile; startOpen: boolean }) {
           </span>
         )}
       </button>
+      {isOpen && isSvg && (
+        <p className="diff-file-tools">
+          <button className="link-button" onClick={() => setShowSvg((v) => !v)}>
+            {showSvg ? 'Show the text' : 'Show the image'}
+          </button>
+        </p>
+      )}
       {isOpen &&
-        (isBinary ? (
+        (images ? (
+          <ImageDiff left={images.left} right={images.right} />
+        ) : isBinary ? (
           <p className="diff-placeholder">{file.right?.text || file.left?.text}</p>
         ) : !hunks ? (
           <p className="diff-placeholder">
@@ -157,15 +346,19 @@ function FileDiff({ file, startOpen }: { file: DiffFile; startOpen: boolean }) {
             </button>
           </p>
         ) : hunks.length === 0 ? (
-          <p className="diff-placeholder">No changes in the content.</p>
+          <p className="diff-placeholder">
+            {ignoreWhitespace && left !== right
+              ? 'Only whitespace changed.'
+              : 'No changes in the content.'}
+          </p>
         ) : (
-          <Hunks hunks={hunks} tokens={tokens} />
+          <Hunks hunks={hunks} tokens={tokens} layout={options.layout} />
         ))}
     </section>
   )
 }
 
-function FileView({ path, text }: { path: string; text: string }) {
+function FileView({ path, text, image }: { path: string; text: string; image?: string }) {
   const rows = useMemo(
     (): DiffRow[] =>
       text
@@ -176,12 +369,18 @@ function FileView({ path, text }: { path: string; text: string }) {
   )
   const tokens = useMemo(
     (): SideTokens =>
-      isLargeDiff(null, text) ? NO_TOKENS : { old: null, new: sideTokens(path, text) },
-    [path, text],
+      image || isLargeDiff(null, text) ? NO_TOKENS : { old: null, new: sideTokens(path, text) },
+    [path, text, image],
   )
   return (
     <div className="diff-view">
-      <Hunks hunks={[{ header: '', rows }]} tokens={tokens} />
+      {image ? (
+        <div className="diff-images">
+          <ImageSide label={path.slice(path.lastIndexOf('/') + 1)} src={image} />
+        </div>
+      ) : (
+        <Hunks hunks={[{ header: '', rows }]} tokens={tokens} />
+      )}
     </div>
   )
 }
@@ -189,15 +388,16 @@ function FileView({ path, text }: { path: string; text: string }) {
 const OPEN_FILE_LIMIT = 12
 
 export function DiffView({ document }: { document: DiffDocument }) {
+  const options = useDiffOptions()
   if (document.kind === 'patch') {
     return (
       <div className="diff-view">
-        <Hunks hunks={patchHunks(document.text)} />
+        <Hunks hunks={patchHunks(document.text)} layout={options.layout} />
       </div>
     )
   }
   if (document.kind === 'file') {
-    return <FileView path={document.path} text={document.text} />
+    return <FileView path={document.path} text={document.text} image={document.image} />
   }
   return (
     <div className="diff-view">
@@ -205,6 +405,7 @@ export function DiffView({ document }: { document: DiffDocument }) {
         <FileDiff
           key={`${document.title}\n${file.path}`}
           file={file}
+          options={options}
           startOpen={
             document.focus ? file.path === document.focus : document.files.length <= OPEN_FILE_LIMIT
           }

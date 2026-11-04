@@ -1,10 +1,14 @@
 import { describe, expect, test } from 'vitest'
 import {
+  dataUrlBytes,
   diffHunks,
+  formatBytes,
   isLargeDiff,
   LARGE_DIFF_LINES,
   patchHunks,
   segments,
+  splitRows,
+  svgDataUrl,
 } from '../../webview/src/desktop/diffModel'
 
 const lines = (...items: string[]) => `${items.join('\n')}\n`
@@ -54,6 +58,69 @@ describe('diffHunks', () => {
     const long = 'x'.repeat(2_000)
     const [hunk] = diffHunks(lines(long), lines(`${long}y`))
     expect(hunk?.rows.every((r) => r.parts === undefined)).toBe(true)
+  })
+})
+
+describe('diffHunks ignoring whitespace', () => {
+  const ignore = { ignoreWhitespace: true }
+
+  test('has no hunks when only indentation and spacing changed', () => {
+    const left = lines('if (a) {', '  call(x,  y)', '}')
+    const right = lines('if (a) {', '\tcall(x, y)  ', '}')
+    expect(diffHunks(left, right, ignore)).toEqual([])
+    expect(diffHunks(left, right)).toHaveLength(1)
+  })
+
+  test('still shows a space removed between words', () => {
+    const [hunk] = diffHunks(lines('a b'), lines('ab'), ignore)
+    expect(hunk?.rows.map((r) => r.kind)).toEqual(['removed', 'added'])
+  })
+
+  test('keeps the old text of an unchanged line that was re-indented', () => {
+    const [hunk] = diffHunks(lines('  keep', 'old'), lines('    keep', 'new'), ignore)
+    const kept = hunk?.rows.find((r) => r.kind === 'same')
+    expect([kept?.text, kept?.oldText]).toEqual(['    keep', '  keep'])
+    const same = diffHunks(lines('keep', 'old'), lines('keep', 'new'), ignore)[0]?.rows[0]
+    expect(same?.oldText).toBeUndefined()
+  })
+
+  test('does not mark changed spacing inside a changed line', () => {
+    const marked = (options = {}) =>
+      diffHunks(lines('let  x =  1'), lines('let x = 2'), options)[0]
+        ?.rows.find((r) => r.kind === 'removed')
+        ?.parts?.filter((p) => p.changed)
+        .map((p) => p.text)
+    expect(marked(ignore)).toEqual([' 1'])
+    expect(marked()).toEqual(['  ', '  1'])
+  })
+})
+
+describe('splitRows', () => {
+  test('puts an unchanged line on both sides and pads the shorter run', () => {
+    const [hunk] = diffHunks(lines('keep', 'a', 'b', 'end'), lines('keep', 'c', 'end'))
+    expect(
+      splitRows(hunk?.rows ?? []).map((r) => [r.left?.text ?? null, r.right?.text ?? null]),
+    ).toEqual([
+      ['keep', 'keep'],
+      ['a', 'c'],
+      ['b', null],
+      ['end', 'end'],
+    ])
+  })
+
+  test('pairs the rows whose words are marked against each other', () => {
+    const [hunk] = diffHunks(lines('let total = 1'), lines('let sum = 1'))
+    const [row] = splitRows(hunk?.rows ?? [])
+    expect(row?.left?.parts?.some((p) => p.changed)).toBe(true)
+    expect(row?.right?.parts?.some((p) => p.changed)).toBe(true)
+  })
+
+  test('keeps a lone added run on the right and notes on both sides', () => {
+    const [hunk] = diffHunks(null, lines('a'))
+    expect(splitRows(hunk?.rows ?? [])).toEqual([{ left: null, right: hunk?.rows[0] }])
+    const [notes] = patchHunks('Commit description changed\n')
+    const [row] = splitRows(notes?.rows ?? [])
+    expect(row?.left).toBe(row?.right)
   })
 })
 
@@ -116,5 +183,26 @@ describe('isLargeDiff', () => {
   test('flags a side with too many lines or too many characters', () => {
     expect(isLargeDiff(many(LARGE_DIFF_LINES + 1), null)).toBe(true)
     expect(isLargeDiff(null, 'x'.repeat(1_000_001))).toBe(true)
+  })
+})
+
+describe('image sizes', () => {
+  test('counts the bytes of a base64 data URL', () => {
+    for (const bytes of ['', 'a', 'ab', 'abc', 'abcd']) {
+      const url = `data:image/png;base64,${Buffer.from(bytes).toString('base64')}`
+      expect(dataUrlBytes(url)).toBe(bytes.length)
+    }
+  })
+
+  test('counts the UTF-8 bytes of an SVG data URL', () => {
+    expect(dataUrlBytes(svgDataUrl('<svg>é</svg>'))).toBe(13)
+  })
+
+  test('formats sizes in B, KB and MB', () => {
+    expect([formatBytes(512), formatBytes(2048), formatBytes(3 * 1024 * 1024)]).toEqual([
+      '512 B',
+      '2.0 KB',
+      '3.0 MB',
+    ])
   })
 })

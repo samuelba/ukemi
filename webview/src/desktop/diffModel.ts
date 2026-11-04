@@ -1,4 +1,4 @@
-import { diffWordsWithSpace, structuredPatch } from 'diff'
+import { diffWords, diffWordsWithSpace, structuredPatch } from 'diff'
 import type { Token } from '../editor/syntaxClasses'
 
 export interface DiffPart {
@@ -13,6 +13,18 @@ export interface DiffRow {
   newLine: number | null
   // Word-level marks, only on a changed line paired with its counterpart.
   parts?: DiffPart[]
+  // The old side's text of an unchanged line, when whitespace is ignored and it differs.
+  oldText?: string
+}
+
+// One row of the side-by-side view. A missing side is padding across from a longer run.
+export interface SplitRow {
+  left: DiffRow | null
+  right: DiffRow | null
+}
+
+export interface DiffHunkOptions {
+  ignoreWhitespace?: boolean
 }
 
 // A run of a line with one syntax class and one word mark.
@@ -31,7 +43,7 @@ const CONTEXT_LINES = 3
 // Word marks on very long lines cost a lot and help little.
 const MAX_WORD_DIFF_LENGTH = 1_000
 
-function markWords(removed: DiffRow[], added: DiffRow[]): void {
+function markWords(removed: DiffRow[], added: DiffRow[], ignoreWhitespace: boolean): void {
   const pairs = Math.min(removed.length, added.length)
   for (let i = 0; i < pairs; i++) {
     const left = removed[i]
@@ -44,7 +56,9 @@ function markWords(removed: DiffRow[], added: DiffRow[]): void {
     ) {
       continue
     }
-    const changes = diffWordsWithSpace(left.text, right.text)
+    const changes = ignoreWhitespace
+      ? diffWords(left.text, right.text)
+      : diffWordsWithSpace(left.text, right.text)
     left.parts = changes
       .filter((change) => !change.added)
       .map((change) => ({ text: change.value, changed: Boolean(change.removed) }))
@@ -54,8 +68,13 @@ function markWords(removed: DiffRow[], added: DiffRow[]): void {
   }
 }
 
-// Pairs each run of removed lines with the added run after it, as a reviewer reads them.
-function withWordMarks(rows: DiffRow[]): DiffRow[] {
+// Calls back with each run of removed lines and the added run after it, as a reviewer reads
+// them, or with a lone row that is neither.
+function eachRun(
+  rows: readonly DiffRow[],
+  onRun: (removed: DiffRow[], added: DiffRow[]) => void,
+  onOther: (row: DiffRow) => void,
+): void {
   let i = 0
   while (i < rows.length) {
     const removed: DiffRow[] = []
@@ -68,17 +87,50 @@ function withWordMarks(rows: DiffRow[]): DiffRow[] {
       added.push(rows[i] as DiffRow)
       i++
     }
-    if (removed.length > 0 && added.length > 0) {
-      markWords(removed, added)
-    }
-    if (removed.length === 0 && added.length === 0) {
+    if (removed.length > 0 || added.length > 0) {
+      onRun(removed, added)
+    } else {
+      onOther(rows[i] as DiffRow)
       i++
     }
   }
+}
+
+function withWordMarks(rows: DiffRow[], ignoreWhitespace = false): DiffRow[] {
+  eachRun(
+    rows,
+    (removed, added) => {
+      if (removed.length > 0 && added.length > 0) {
+        markWords(removed, added, ignoreWhitespace)
+      }
+    },
+    () => {},
+  )
   return rows
 }
 
-function hunkRows(lines: readonly string[], oldStart: number, newStart: number): DiffRow[] {
+// Lines up the rows in two columns. A removed run sits across from the added run after it,
+// paired as their word marks are, and the shorter run is padded.
+export function splitRows(rows: readonly DiffRow[]): SplitRow[] {
+  const result: SplitRow[] = []
+  eachRun(
+    rows,
+    (removed, added) => {
+      for (let i = 0; i < Math.max(removed.length, added.length); i++) {
+        result.push({ left: removed[i] ?? null, right: added[i] ?? null })
+      }
+    },
+    (row) => result.push({ left: row, right: row }),
+  )
+  return result
+}
+
+function hunkRows(
+  lines: readonly string[],
+  oldStart: number,
+  newStart: number,
+  ignoreWhitespace = false,
+): DiffRow[] {
   let oldLine = oldStart
   let newLine = newStart
   const rows: DiffRow[] = []
@@ -93,7 +145,7 @@ function hunkRows(lines: readonly string[], oldStart: number, newStart: number):
       rows.push({ kind: 'same', text, oldLine: oldLine++, newLine: newLine++ })
     }
   }
-  return withWordMarks(rows)
+  return withWordMarks(rows, ignoreWhitespace)
 }
 
 // The hunks between two versions of a file. A missing side is an added or removed file.
@@ -117,14 +169,38 @@ function lineCount(text: string): number {
   return count
 }
 
-export function diffHunks(left: string | null, right: string | null): DiffHunk[] {
+// Like `git diff -b`, but also blind to indentation: a re-indented or re-aligned line is the
+// same line, while `a b` and `ab` still differ.
+function sameIgnoringWhitespace(left: string, right: string): boolean {
+  return left.trim().replace(/\s+/g, ' ') === right.trim().replace(/\s+/g, ' ')
+}
+
+export function diffHunks(
+  left: string | null,
+  right: string | null,
+  options: DiffHunkOptions = {},
+): DiffHunk[] {
+  const ignoreWhitespace = options.ignoreWhitespace ?? false
   const patch = structuredPatch('a', 'b', left ?? '', right ?? '', '', '', {
     context: CONTEXT_LINES,
+    ...(ignoreWhitespace ? { comparator: sameIgnoringWhitespace } : {}),
   })
-  return patch.hunks.map((hunk) => ({
-    header: `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@`,
-    rows: hunkRows(hunk.lines, hunk.oldStart, hunk.newStart),
-  }))
+  // The text of an unchanged line comes from the new side, so keep the old one for its column.
+  const oldLines = ignoreWhitespace ? (left ?? '').split('\n') : null
+  return patch.hunks.map((hunk) => {
+    const rows = hunkRows(hunk.lines, hunk.oldStart, hunk.newStart, ignoreWhitespace)
+    for (const row of oldLines ? rows : []) {
+      const oldText =
+        row.kind === 'same' && row.oldLine !== null ? oldLines?.[row.oldLine - 1] : undefined
+      if (oldText !== undefined && oldText !== row.text) {
+        row.oldText = oldText
+      }
+    }
+    return {
+      header: `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@`,
+      rows,
+    }
+  })
 }
 
 const HUNK_HEADER = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/
@@ -213,4 +289,28 @@ export function segments(
     }
   }
   return result
+}
+
+// An SVG file shows as an image through a data URL of its text.
+export function svgDataUrl(text: string): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(text)}`
+}
+
+// The size of the file a data URL holds.
+export function dataUrlBytes(url: string): number {
+  const comma = url.indexOf(',')
+  const data = url.slice(comma + 1)
+  if (!url.slice(0, comma).endsWith(';base64')) {
+    return new TextEncoder().encode(decodeURIComponent(data)).length
+  }
+  const padding = data.endsWith('==') ? 2 : data.endsWith('=') ? 1 : 0
+  return (data.length / 4) * 3 - padding
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`
+  }
+  const kb = bytes / 1024
+  return kb < 1024 ? `${kb.toFixed(1)} KB` : `${(kb / 1024).toFixed(1)} MB`
 }

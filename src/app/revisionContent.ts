@@ -86,22 +86,30 @@ export function fileAtRevision(commit: CommitView, path: string): FileSide {
     : { kind: 'revision', commitId: commit.commitId, path }
 }
 
-function looksBinary(data: Buffer): boolean {
+export function looksBinary(data: Buffer): boolean {
   return data.subarray(0, 8000).includes(0)
 }
 
 // A file that does not exist at the revision reads as empty.
+export async function revisionBytes(
+  model: RepoModel,
+  commitId: string,
+  path: string,
+): Promise<Buffer> {
+  try {
+    return await model.repo.fileContent(commitId, path)
+  } catch {
+    return Buffer.alloc(0)
+  }
+}
+
 export async function revisionText(
   model: RepoModel,
   commitId: string,
   path: string,
 ): Promise<string> {
-  try {
-    const data = await model.repo.fileContent(commitId, path)
-    return looksBinary(data) ? BINARY_PLACEHOLDER : data.toString('utf8')
-  } catch {
-    return ''
-  }
+  const data = await revisionBytes(model, commitId, path)
+  return looksBinary(data) ? BINARY_PLACEHOLDER : data.toString('utf8')
 }
 
 export async function interdiffText(model: RepoModel, from: string, to: string): Promise<string> {

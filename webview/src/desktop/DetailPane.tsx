@@ -9,6 +9,7 @@ import type { ViewSettings } from '../../../shared/protocol'
 import { FileList } from '../graph/FileList'
 import { relativeTime, splitId } from '../shared/format'
 import { postMessage } from '../shared/hostApi'
+import { DiffOptionButtons } from './diffOptions'
 import { DiffView } from './DiffView'
 import { openRowMenu, RowActions } from './RowActions'
 import { Splitter } from './Splitter'
@@ -176,6 +177,7 @@ function DiffPanel({
         <h2 className="detail-diff-title" title={diff.title}>
           {diff.title}
         </h2>
+        {diff.kind !== 'file' && <DiffOptionButtons canIgnoreWhitespace={diff.kind === 'files'} />}
         <button
           className="icon-button"
           title={isMaximized ? 'Restore' : 'Maximize'}

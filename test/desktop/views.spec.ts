@@ -107,6 +107,65 @@ test('shows a large file only when asked', async () => {
   }
 })
 
+test('shows a diff side by side and without whitespace changes, and keeps the choice', async () => {
+  const repo = fixtureRepo()
+  writeFileSync(join(repo, 'src', 'cart.js'), '  let total = 0\nexport {  total }\n')
+  const { app, page } = await launch(repo)
+  try {
+    const openDiff = async () => {
+      await page.locator('.commit.is-wc').click({ position: { x: 60, y: 8 } })
+      await page.locator('.detail-file-list .file', { hasText: 'cart.js' }).click()
+    }
+    await openDiff()
+    const diff = page.locator('.detail-diff')
+    await expect(diff.locator('.diff-row')).toHaveCount(4)
+
+    await diff.locator('.detail-diff-bar button[title="Side by side"]').click()
+    await expect(diff.locator('.diff-split .diff-row')).toHaveCount(2)
+    await expect(diff.locator('.diff-split .diff-row').first().locator('.diff-text')).toHaveText([
+      'let total = 0',
+      '  let total = 0',
+    ])
+
+    await diff.locator('.detail-diff-bar button[title="Ignore whitespace"]').click()
+    await expect(diff.getByText('Only whitespace changed.')).toBeVisible()
+
+    await diff.locator('.detail-diff-bar button[title^="Close"]').click()
+    await openDiff()
+    await expect(
+      diff.locator('.detail-diff-bar button[title="Side by side"][aria-pressed="true"]'),
+    ).toBeVisible()
+    await expect(diff.getByText('Only whitespace changed.')).toBeVisible()
+  } finally {
+    await app.close()
+  }
+})
+
+test('shows both versions of a changed image', async () => {
+  const transparent =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+  const red =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=='
+  const repo = fixtureRepo()
+  writeFileSync(join(repo, 'logo.png'), Buffer.from(transparent, 'base64'))
+  execFileSync('jj', ['new'], { cwd: repo })
+  writeFileSync(join(repo, 'logo.png'), Buffer.from(red, 'base64'))
+  const { app, page } = await launch(repo)
+  try {
+    await page.locator('.commit.is-wc').click({ position: { x: 60, y: 8 } })
+    await page.locator('.detail-file-list .file', { hasText: 'logo.png' }).click()
+    const images = page.locator('.detail-diff .diff-image')
+    await expect(images).toHaveCount(2)
+    await expect(images.locator('img').first()).toHaveAttribute('src', /^data:image\/png;base64,/)
+    await expect(images.locator('figcaption')).toHaveText([
+      /^Before · 1 × 1 · /,
+      /^After · 1 × 1 · /,
+    ])
+  } finally {
+    await app.close()
+  }
+})
+
 test('fits the title bar and every pane into a narrow window', async () => {
   const { app, page } = await launch(fixtureRepo())
   try {
