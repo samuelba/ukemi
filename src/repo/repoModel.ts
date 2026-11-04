@@ -357,17 +357,26 @@ export class RepoModel {
         : loaded.logged
     const workingCopyFiles = await this.workingCopyFiles(reader, commits)
     const shared = sharedGraph(loaded, workingCopyFiles)
-    const first = graphFromAncestors(commits, (parent) => this.elisionCache.get(revset, parent))
+    // Entries from an earlier operation draw provisional edges, so the graph does not flash
+    // disconnected nodes, and are looked up again below.
+    const unresolved: string[] = []
+    const first = graphFromAncestors(commits, (parent) => {
+      const hit = this.elisionCache.lookup(revset, parent, head)
+      if (!hit?.fresh) {
+        unresolved.push(parent)
+      }
+      return hit?.ancestors
+    })
     const trunkId = loaded.trunk.commitId ?? undefined
     if (
       !this.showGraph(generation, this.assemble(commits, first.nodes, trunkId, shared), bookmarks)
     ) {
       return
     }
-    if (first.missing.length === 0) {
+    if (unresolved.length === 0) {
       return
     }
-    const nodes = await this.resolveMissingParents(reader, commits, revset, first.missing)
+    const nodes = await this.resolveMissingParents(reader, commits, revset, head, unresolved)
     this.showGraph(generation, this.assemble(commits, nodes, trunkId, shared), bookmarks)
   }
 
@@ -413,6 +422,7 @@ export class RepoModel {
     reader: JjRepo,
     commits: readonly Commit[],
     revset: string,
+    head: string | null,
     missing: readonly string[],
   ): Promise<GraphNodeInput[]> {
     const found = new Map<string, readonly string[]>()
@@ -421,14 +431,14 @@ export class RepoModel {
     await mapLimited(missing, ELISION_LOOKUPS_AT_ONCE, async (parent) => {
       try {
         const ancestors = await reader.commitIds(`heads(::${parent} & (${revset}))`)
-        this.elisionCache.remember(revset, parent, ancestors)
+        this.elisionCache.remember(revset, parent, head, ancestors)
         found.set(parent, ancestors)
       } catch {
         found.set(parent, [])
       }
     })
     return graphFromAncestors(commits, (parent) => {
-      return found.get(parent) ?? this.elisionCache.get(revset, parent)
+      return found.get(parent) ?? this.elisionCache.lookup(revset, parent, head)?.ancestors
     }).nodes
   }
 

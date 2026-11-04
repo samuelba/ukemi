@@ -60,7 +60,7 @@ describe('buildGraphNodes', () => {
   test('does not resolve a parent again when the cache is warm', async () => {
     const cache = new ElisionCache()
     let calls = 0
-    const resolve = cachingResolver(cache, 'revset', async () => {
+    const resolve = cachingResolver(cache, 'revset', 'op1', async () => {
       calls += 1
       return ['trunk']
     })
