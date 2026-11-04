@@ -34,6 +34,31 @@ export function fixtureRepo(): string {
   return repo
 }
 
+// A straight history of `length` commits on `main`, plus `side`, a newer commit that branches off
+// the tenth one. Git writes it in one go, which is much faster than a jj command per commit.
+export function longRepo(length: number): string {
+  const repo = mkdtempSync(join(tmpdir(), 'ukemi-desktop-long-'))
+  execFileSync('git', ['init', '--quiet', '--initial-branch=main', repo])
+  const start = 1_700_000_000
+  const commit = (branch: string, mark: number, time: number, message: string, from?: number) =>
+    [
+      `commit refs/heads/${branch}`,
+      `mark :${mark}`,
+      `committer Ukemi Test <test@example.com> ${time} +0000`,
+      `data ${Buffer.byteLength(message)}`,
+      message,
+      ...(from === undefined ? [] : [`from :${from}`]),
+      '',
+    ].join('\n')
+  const stream = [
+    ...Array.from({ length }, (_, i) => commit('main', i + 1, start + i * 60, `main ${i + 1}`)),
+    commit('side', length + 1, start + length * 60, 'side', 10),
+  ].join('')
+  execFileSync('git', ['fast-import', '--quiet'], { cwd: repo, input: stream })
+  jj(repo, 'git', 'init', '--colocate')
+  return repo
+}
+
 // base → `mine` and `theirs` edit one line, merged into a conflicted `merge`, with an empty `@` above.
 export function conflictRepo(): string {
   const repo = mkdtempSync(join(tmpdir(), 'ukemi-desktop-conflict-'))

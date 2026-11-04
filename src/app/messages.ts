@@ -61,6 +61,9 @@ export function createMessageHandler(env: CommandEnv, dispatch: CommandDispatche
         await applyRevset(env, model, message.revset.trim())
         return
       }
+      case 'loadMore':
+        await env.operations.track('Loading', () => model.loadMore())
+        return
       case 'listRevsets':
         env.graphView.post({
           type: 'revsetHistory',

@@ -2,32 +2,30 @@ import type { GraphEdgeInput, GraphNodeInput } from '../../shared/graphLayout'
 import type { Commit } from '../../shared/model'
 
 export const ROOT_COMMIT_ID = '0'.repeat(40)
-const MAX_ELIDED_LOOKUPS = 64
+export const MAX_ELIDED_LOOKUPS = 64
 
-export type AncestorResolver = (parentId: string) => Promise<string[]>
-
-export async function buildGraphNodes(
-  commits: readonly Commit[],
-  resolveAncestors: AncestorResolver,
-): Promise<GraphNodeInput[]> {
-  const resolved = new Map<string, readonly string[]>()
-  await Promise.all(
-    hiddenParents(commits).map(async (parent) => {
-      const ancestors = await resolveAncestors(parent).catch(() => [] as string[])
-      resolved.set(parent, ancestors)
-    }),
-  )
-  return graphFromAncestors(commits, (parent) => resolved.get(parent) ?? []).nodes
+export interface GraphNodes {
+  nodes: GraphNodeInput[]
+  // Hidden parents that need a lookup, because the cache had nothing for them.
+  missing: string[]
+  // Hidden parents past MAX_ELIDED_LOOKUPS, which get no edge.
+  dropped: number
 }
 
+// `cutOff` holds parents that the revset matches but that fell past the end of a truncated
+// graph. They keep a plain edge to their id, so the lane runs off the bottom of the graph
+// instead of ending at the commit, and they need no lookup.
 export function graphFromAncestors(
   commits: readonly Commit[],
   ancestorsOf: (parentId: string) => readonly string[] | undefined,
-): { nodes: GraphNodeInput[]; missing: string[] } {
+  cutOff: ReadonlySet<string> = new Set(),
+): GraphNodes {
   const displayed = new Set(commits.map((commit) => commit.commitId))
+  const hidden = hiddenParents(commits, cutOff)
+  const looked = hidden.slice(0, MAX_ELIDED_LOOKUPS)
   const resolved = new Map<string, readonly string[]>()
   const missing: string[] = []
-  for (const parent of hiddenParents(commits)) {
+  for (const parent of looked) {
     const ancestors = ancestorsOf(parent)
     if (ancestors === undefined) {
       missing.push(parent)
@@ -38,42 +36,51 @@ export function graphFromAncestors(
       ancestors.filter((id) => displayed.has(id)),
     )
   }
-  return { nodes: nodesFor(commits, displayed, resolved), missing }
+  return {
+    nodes: nodesFor(commits, { displayed, cutOff, resolved }),
+    missing,
+    dropped: hidden.length - looked.length,
+  }
 }
 
-function hiddenParents(commits: readonly Commit[]): string[] {
+// The parents that are neither shown nor cut off, top of the graph first.
+export function hiddenParents(
+  commits: readonly Commit[],
+  cutOff: ReadonlySet<string> = new Set(),
+): string[] {
   const displayed = new Set(commits.map((commit) => commit.commitId))
   return [
     ...new Set(
       commits
         .flatMap((commit) => commit.parents)
-        .filter((parent) => !displayed.has(parent) && parent !== ROOT_COMMIT_ID),
+        .filter(
+          (parent) => !displayed.has(parent) && !cutOff.has(parent) && parent !== ROOT_COMMIT_ID,
+        ),
     ),
-  ].slice(0, MAX_ELIDED_LOOKUPS)
+  ]
 }
 
-function nodesFor(
-  commits: readonly Commit[],
-  displayed: ReadonlySet<string>,
-  resolved: ReadonlyMap<string, readonly string[]>,
-): GraphNodeInput[] {
+interface EdgeSources {
+  displayed: ReadonlySet<string>
+  cutOff: ReadonlySet<string>
+  resolved: ReadonlyMap<string, readonly string[]>
+}
+
+function nodesFor(commits: readonly Commit[], sources: EdgeSources): GraphNodeInput[] {
   return commits.map((commit) => ({
     id: commit.commitId,
-    parents: edgesFor(commit, displayed, resolved),
+    parents: edgesFor(commit, sources),
   }))
 }
 
-function edgesFor(
-  commit: Commit,
-  displayed: ReadonlySet<string>,
-  resolved: ReadonlyMap<string, readonly string[]>,
-): GraphEdgeInput[] {
+function edgesFor(commit: Commit, sources: EdgeSources): GraphEdgeInput[] {
   const edges: GraphEdgeInput[] = []
   const seen = new Set<string>()
   for (const parent of commit.parents) {
-    const targets = displayed.has(parent)
+    const isDirect = sources.displayed.has(parent) || sources.cutOff.has(parent)
+    const targets = isDirect
       ? [{ id: parent, isElided: false }]
-      : (resolved.get(parent) ?? []).map((id) => ({ id, isElided: true }))
+      : (sources.resolved.get(parent) ?? []).map((id) => ({ id, isElided: true }))
     for (const target of targets) {
       if (!seen.has(target.id)) {
         seen.add(target.id)

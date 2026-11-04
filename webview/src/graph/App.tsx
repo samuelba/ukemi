@@ -18,6 +18,7 @@ import { EmptyState } from './EmptyState'
 import { FileIconFonts, FileIconThemeContext } from './FileIcon'
 import { GraphSearch } from './GraphSearch'
 import { withUnchangedObjects } from './keepUnchanged'
+import { LoadMoreRow } from './LoadMoreRow'
 import { searchCommits, stepMatch } from './matchCommit'
 import { RevsetBar, type RevsetReply } from './RevsetBar'
 import { selectedRow, type Selection } from './selection'
@@ -342,6 +343,13 @@ export function App() {
                 onDescribe={startDescribe}
               />
             ))}
+            {graph.isTruncated && (
+              // A new view starts with a fresh row, which may ask again at the same count.
+              <LoadMoreRow
+                key={`${repoId}\0${graph.filter}\0${graph.depth}\0${graph.revset ?? ''}`}
+                shown={graph.commits.length}
+              />
+            )}
             {graph.commits.length === 0 && (
               <div className="muted padded">No changes match this filter.</div>
             )}

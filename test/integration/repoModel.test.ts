@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { JjRepo } from '../../src/jj/repo'
+import { GRAPH_PAGE_SIZE, JjRepo } from '../../src/jj/repo'
 import { JjRunner, type RunOptions, type RunResult } from '../../src/jj/runner'
 import { RepoModel } from '../../src/repo/repoModel'
 import { NULL_LOGGER, type Logger } from '../../src/util/logger'
@@ -14,6 +14,9 @@ import {
   writeFile,
   type Fixture,
 } from '../helpers/jjFixture'
+
+// The graph asks for one commit more than a page, to tell whether more exist.
+const GRAPH_LOAD = `--limit=${GRAPH_PAGE_SIZE + 1}`
 
 let fixture: Fixture
 let root: string
@@ -182,7 +185,7 @@ describe('RepoModel', () => {
     }
     const watched = new RepoModel(new JjRepo(root, new JjRunner(JJ_BINARY, logger)), logger)
     await watched.refresh()
-    const graphLoads = () => lines.filter((line) => line.includes('--limit=2000')).length
+    const graphLoads = () => lines.filter((line) => line.includes(GRAPH_LOAD)).length
     const before = graphLoads()
 
     await watched.refreshIfOperationChanged()
@@ -202,7 +205,7 @@ describe('RepoModel', () => {
     }
     const watched = new RepoModel(new JjRepo(root, new JjRunner(JJ_BINARY, logger)), logger)
     await watched.refresh()
-    const graphLoads = () => lines.filter((line) => line.includes('--limit=2000')).length
+    const graphLoads = () => lines.filter((line) => line.includes(GRAPH_LOAD)).length
     const before = graphLoads()
 
     await watched.refreshWorkingCopy()
@@ -228,7 +231,7 @@ describe('RepoModel', () => {
     }
     const watched = new RepoModel(new JjRepo(root, new JjRunner(JJ_BINARY, logger)), logger)
     await watched.refresh()
-    const graphLoads = () => lines.filter((line) => line.includes('--limit=2000')).length
+    const graphLoads = () => lines.filter((line) => line.includes(GRAPH_LOAD)).length
     const before = graphLoads()
     jj(root, 'describe', '-m', 'external')
 
@@ -423,5 +426,107 @@ describe('RepoModel', () => {
     model.markDirty()
     await model.refresh()
     expect(model.evolutionFor(id)).not.toBe(first)
+  })
+})
+
+describe('RepoModel paging', () => {
+  const ELISION_LOOKUP = /heads\(::[0-9a-f]{40} & /
+
+  function chain(length: number): void {
+    for (let i = 0; i < length; i++) {
+      jj(root, 'new', '-m', `c${i}`)
+    }
+  }
+
+  function countingModel(options: ConstructorParameters<typeof RepoModel>[2]): {
+    model: RepoModel
+    commands: string[]
+  } {
+    const commands: string[] = []
+    const logger = { ...NULL_LOGGER, info: (line: string) => commands.push(line) }
+    const repo = new JjRepo(root, new JjRunner(JJ_BINARY, logger))
+    return { model: new RepoModel(repo, NULL_LOGGER, options), commands }
+  }
+
+  test('loads one page, says it is truncated and loads more on request', async () => {
+    chain(5)
+    const { model: paged, commands } = countingModel({ depth: 'all', pageSize: 2 })
+
+    await paged.refresh()
+
+    expect(paged.graph?.commits).toHaveLength(2)
+    expect(paged.graph?.isTruncated).toBe(true)
+    // The parent past the end keeps a plain edge, and costs no elision lookup.
+    expect(paged.graph?.commits[1]?.row.outgoing).toEqual([{ toColumn: 0, isElided: false }])
+    expect(commands.filter((line) => ELISION_LOOKUP.test(line))).toEqual([])
+
+    await paged.loadMore()
+    expect(paged.graph?.commits).toHaveLength(4)
+
+    await paged.refresh()
+    expect(paged.graph?.commits).toHaveLength(4)
+
+    await paged.loadMore()
+    await paged.loadMore()
+    expect(paged.graph?.isTruncated).toBe(false)
+    const shown = paged.graph?.commits.length ?? 0
+    await paged.loadMore()
+    expect(paged.graph?.commits).toHaveLength(shown)
+  })
+
+  test('a new view starts from one page again', async () => {
+    chain(5)
+    const paged = new RepoModel(makeRepo(root), NULL_LOGGER, { depth: 'all', pageSize: 2 })
+    await paged.refresh()
+    await paged.loadMore()
+    expect(paged.graph?.commits).toHaveLength(4)
+
+    await paged.setView('recent', 'all')
+
+    expect(paged.graph?.commits).toHaveLength(2)
+    expect(paged.graph?.isTruncated).toBe(true)
+  })
+
+  test('a graph that fits is not truncated', async () => {
+    chain(1)
+    await model.refresh()
+
+    expect(model.graph?.isTruncated).toBe(false)
+  })
+
+  test('a failed elision lookup keeps the edge from the last refresh', async () => {
+    jj(root, 'describe', '-m', 'base')
+    jj(root, 'new', '-m', 'hidden')
+    jj(root, 'new')
+    const baseId = jj(root, 'log', '--no-graph', '-r', '@--', '-T', 'commit_id').trim()
+    let failLookups = false
+    class FailingRunner extends JjRunner {
+      override async run(options: RunOptions): Promise<RunResult> {
+        if (failLookups && options.args.some((arg) => ELISION_LOOKUP.test(arg))) {
+          throw new Error('lookup failed')
+        }
+        return super.run(options)
+      }
+    }
+    const warnings: string[] = []
+    const logger: Logger = { ...NULL_LOGGER, warn: (line) => warnings.push(line) }
+    const elided = new RepoModel(
+      new JjRepo(root, new FailingRunner(JJ_BINARY, NULL_LOGGER)),
+      logger,
+      {
+        revset: baseId,
+      },
+    )
+    await elided.refresh()
+    const elidedEdge = [{ toColumn: 0, isElided: true }]
+    expect(elided.graph?.commits[0]?.row.outgoing).toEqual(elidedEdge)
+
+    failLookups = true
+    jj(root, 'describe', '-m', 'top')
+    await elided.refresh()
+
+    expect(elided.graph?.commits[0]?.description).toBe('top\n')
+    expect(elided.graph?.commits[0]?.row.outgoing).toEqual(elidedEdge)
+    expect(warnings.some((line) => line.includes('looking up the ancestors'))).toBe(true)
   })
 })

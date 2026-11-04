@@ -13,10 +13,10 @@ import type {
 } from '../../shared/model'
 import type { CommitView, ForgeState, GraphState, RequestBadge } from '../../shared/protocol'
 import { withStackInfo } from '../../shared/stack'
-import { graphFromAncestors } from '../graph/buildGraph'
+import { graphFromAncestors, hiddenParents, MAX_ELIDED_LOOKUPS } from '../graph/buildGraph'
 import { ElisionCache } from '../graph/elisionCache'
 import type { ParsedBookmark } from '../jj/parse'
-import { JjRepo, type TrunkRef } from '../jj/repo'
+import { GRAPH_PAGE_SIZE, JjRepo, type TrunkRef } from '../jj/repo'
 import {
   changeRevision,
   CURRENT_BOOKMARKS_REVSET,
@@ -42,6 +42,11 @@ export class RepoModel {
   private filter: GraphFilter = 'recent'
   private depth: HistoryDepth = '7d'
   private revset: string | null = null
+  private readonly pageSize: number
+  // How many commits the graph loads. It grows by a page each time the view asks for more, and
+  // starts over when the view changes.
+  private limit: number
+  private droppedParents = 0
   private current: GraphState | null = null
   // The commits of the graph before the current one, so ids that a view sent just before a
   // refresh still find their change.
@@ -78,8 +83,11 @@ export class RepoModel {
       revset?: string | null
       snapshotOtherWorkspaces?: boolean
       showLineStats?: boolean
+      pageSize?: number
     } = {},
   ) {
+    this.pageSize = options.pageSize ?? GRAPH_PAGE_SIZE
+    this.limit = this.pageSize
     this.depth = options.depth ?? this.depth
     this.filter = options.filter ?? this.filter
     this.revset = options.revset ?? null
@@ -141,7 +149,18 @@ export class RepoModel {
     this.filter = filter
     this.depth = depth
     this.revset = revset
+    this.limit = this.pageSize
     this.elisionCache.clear()
+    return this.refresh()
+  }
+
+  // Loads the next page of a truncated graph. A refresh keeps the larger limit, so an operation
+  // does not collapse history the user scrolled to.
+  loadMore(): Promise<void> {
+    if (!this.current?.isTruncated) {
+      return Promise.resolve()
+    }
+    this.limit += this.pageSize
     return this.refresh()
   }
 
@@ -357,16 +376,24 @@ export class RepoModel {
         : loaded.logged
     const workingCopyFiles = await this.workingCopyFiles(reader, commits)
     const shared = sharedGraph(loaded, workingCopyFiles)
+    const cutOff = loaded.isTruncated
+      ? await this.cutOffParents(reader, revset, commits)
+      : new Set<string>()
     // Entries from an earlier operation draw provisional edges, so the graph does not flash
     // disconnected nodes, and are looked up again below.
     const unresolved: string[] = []
-    const first = graphFromAncestors(commits, (parent) => {
-      const hit = this.elisionCache.lookup(revset, parent, head)
-      if (!hit?.fresh) {
-        unresolved.push(parent)
-      }
-      return hit?.ancestors
-    })
+    const first = graphFromAncestors(
+      commits,
+      (parent) => {
+        const hit = this.elisionCache.lookup(revset, parent, head)
+        if (!hit?.fresh) {
+          unresolved.push(parent)
+        }
+        return hit?.ancestors
+      },
+      cutOff,
+    )
+    this.noteDroppedParents(first.dropped)
     const trunkId = loaded.trunk.commitId ?? undefined
     if (
       !this.showGraph(generation, this.assemble(commits, first.nodes, trunkId, shared), bookmarks)
@@ -376,8 +403,45 @@ export class RepoModel {
     if (unresolved.length === 0) {
       return
     }
-    const nodes = await this.resolveMissingParents(reader, commits, revset, head, unresolved)
+    const nodes = await this.resolveMissingParents(
+      reader,
+      commits,
+      revset,
+      head,
+      unresolved,
+      cutOff,
+    )
     this.showGraph(generation, this.assemble(commits, nodes, trunkId, shared), bookmarks)
+  }
+
+  // In a truncated graph, the parents that the revset matches lie past its end. One query finds
+  // them, so each draws a plain edge off the bottom instead of costing an elision lookup that
+  // could only come back empty.
+  private async cutOffParents(
+    reader: JjRepo,
+    revset: string,
+    commits: readonly Commit[],
+  ): Promise<Set<string>> {
+    const hidden = hiddenParents(commits)
+    if (hidden.length === 0) {
+      return new Set()
+    }
+    try {
+      return new Set(await reader.commitIds(`(${revset}) & (${hidden.join(' | ')})`))
+    } catch (error: unknown) {
+      this.logger.warn(`graph: finding the parents past the end failed: ${errorMessage(error)}`)
+      return new Set()
+    }
+  }
+
+  // Logged when the count changes, so a refresh of the same graph does not repeat it.
+  private noteDroppedParents(dropped: number): void {
+    if (dropped > 0 && dropped !== this.droppedParents) {
+      this.logger.warn(
+        `graph: ${dropped} hidden parents are past the lookup limit of ${MAX_ELIDED_LOOKUPS} and draw no edge`,
+      )
+    }
+    this.droppedParents = dropped
   }
 
   private async loadRevisionData(
@@ -387,9 +451,9 @@ export class RepoModel {
   ): Promise<LoadedRepo> {
     this.lastOperationId = operations[0]?.id ?? null
     this.loadedOperations = operations
-    const [logged, trunk, workspaces, remotes, listed, currentBookmarks, tracking] =
+    const [page, trunk, workspaces, remotes, listed, currentBookmarks, tracking] =
       await Promise.all([
-        reader.log(revset),
+        reader.logPage(revset, this.limit),
         reader.trunk(),
         reader.workspaces(),
         reader.remotes(),
@@ -399,7 +463,8 @@ export class RepoModel {
       ])
     this.loadedRemotes = remotes
     return {
-      logged,
+      logged: page.commits,
+      isTruncated: page.isTruncated,
       trunk,
       operations: [...operations],
       workspaces,
@@ -424,6 +489,7 @@ export class RepoModel {
     revset: string,
     head: string | null,
     missing: readonly string[],
+    cutOff: ReadonlySet<string>,
   ): Promise<GraphNodeInput[]> {
     const found = new Map<string, readonly string[]>()
     // Each lookup is a jj process that loads the repository, so a cold graph with many elided
@@ -433,13 +499,19 @@ export class RepoModel {
         const ancestors = await reader.commitIds(`heads(::${parent} & (${revset}))`)
         this.elisionCache.remember(revset, parent, head, ancestors)
         found.set(parent, ancestors)
-      } catch {
-        found.set(parent, [])
+      } catch (error: unknown) {
+        // Nothing is stored, so a provisional edge from the cache stays and the next refresh
+        // tries again.
+        this.logger.warn(
+          `graph: looking up the ancestors of ${parent} failed: ${errorMessage(error)}`,
+        )
       }
     })
-    return graphFromAncestors(commits, (parent) => {
-      return found.get(parent) ?? this.elisionCache.lookup(revset, parent, head)?.ancestors
-    }).nodes
+    return graphFromAncestors(
+      commits,
+      (parent) => found.get(parent) ?? this.elisionCache.lookup(revset, parent, head)?.ancestors,
+      cutOff,
+    ).nodes
   }
 
   private assemble(
@@ -458,6 +530,7 @@ export class RepoModel {
       filter: this.filter,
       depth: this.depth,
       revset: this.revset,
+      isTruncated: shared.isTruncated,
       hasRemotes: shared.hasRemotes,
       hasUnpushed: shared.hasRemotes && hasUnsyncedBookmarks(commits),
       canUndo: shared.head !== undefined && !NETWORK_OPERATION.test(shared.head.description),
@@ -579,6 +652,7 @@ export class RepoModel {
 
 interface LoadedRepo {
   logged: Commit[]
+  isTruncated: boolean
   trunk: TrunkRef
   operations: Operation[]
   workspaces: Workspace[]
@@ -589,6 +663,7 @@ interface LoadedRepo {
 }
 
 interface SharedGraph {
+  isTruncated: boolean
   workingCopyFiles: ChangedFile[]
   workspaces: Workspace[]
   hasRemotes: boolean
@@ -601,6 +676,7 @@ interface SharedGraph {
 
 function sharedGraph(loaded: LoadedRepo, workingCopyFiles: ChangedFile[]): SharedGraph {
   return {
+    isTruncated: loaded.isTruncated,
     workingCopyFiles,
     workspaces: loaded.workspaces,
     hasRemotes: loaded.remotes.length > 0,
