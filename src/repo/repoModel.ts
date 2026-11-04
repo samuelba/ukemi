@@ -20,6 +20,7 @@ import { JjRepo, type TrunkRef } from '../jj/repo'
 import {
   changeRevision,
   CURRENT_BOOKMARKS_REVSET,
+  customGraphRevset,
   graphRevset,
   type ChangeRef,
 } from '../jj/revsets'
@@ -40,6 +41,7 @@ const ELISION_LOOKUPS_AT_ONCE = 4
 export class RepoModel {
   private filter: GraphFilter = 'recent'
   private depth: HistoryDepth = '7d'
+  private revset: string | null = null
   private current: GraphState | null = null
   // The commits of the graph before the current one, so ids that a view sent just before a
   // refresh still find their change.
@@ -73,12 +75,14 @@ export class RepoModel {
     options: {
       depth?: HistoryDepth
       filter?: GraphFilter
+      revset?: string | null
       snapshotOtherWorkspaces?: boolean
       showLineStats?: boolean
     } = {},
   ) {
     this.depth = options.depth ?? this.depth
     this.filter = options.filter ?? this.filter
+    this.revset = options.revset ?? null
     this.snapshotOtherWorkspaces = options.snapshotOtherWorkspaces ?? false
     this.showLineStats = options.showLineStats ?? false
   }
@@ -133,9 +137,10 @@ export class RepoModel {
     return this.refresh()
   }
 
-  setView(filter: GraphFilter, depth: HistoryDepth): Promise<void> {
+  setView(filter: GraphFilter, depth: HistoryDepth, revset: string | null = null): Promise<void> {
     this.filter = filter
     this.depth = depth
+    this.revset = revset
     this.elisionCache.clear()
     return this.refresh()
   }
@@ -329,7 +334,8 @@ export class RepoModel {
     operations: readonly Operation[],
   ): Promise<void> {
     const reader = head === null ? this.repo : this.repo.atOperation(head)
-    const revset = graphRevset(this.filter, this.depth)
+    const revset =
+      this.revset === null ? graphRevset(this.filter, this.depth) : customGraphRevset(this.revset)
     const loaded = await this.loadRevisionData(reader, revset, operations)
     if (generation !== this.viewGeneration) {
       return
@@ -431,6 +437,7 @@ export class RepoModel {
       workspaces: shared.workspaces,
       filter: this.filter,
       depth: this.depth,
+      revset: this.revset,
       hasRemotes: shared.hasRemotes,
       hasUnpushed: shared.hasRemotes && hasUnsyncedBookmarks(commits),
       canUndo: shared.head !== undefined && !NETWORK_OPERATION.test(shared.head.description),

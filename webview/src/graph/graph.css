@@ -48,6 +48,104 @@
   font-size: 0.92em;
 }
 
+.revset-bar,
+.graph-search {
+  padding: 2px 0 4px;
+}
+
+.revset-field,
+.graph-search {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.revset-input,
+.graph-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 4px;
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  font: inherit;
+  user-select: text;
+}
+
+.revset-input {
+  font-family: var(--vscode-editor-font-family);
+}
+
+.revset-input:focus-visible,
+.graph-search-input:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.revset-input[aria-invalid='true'] {
+  border-color: var(--vscode-inputValidation-errorBorder);
+}
+
+.revset-candidates {
+  max-height: 240px;
+  margin: 2px 0 0;
+  padding: 2px 0;
+  overflow-y: auto;
+  border: 1px solid
+    var(--vscode-editorSuggestWidget-border, var(--vscode-widget-border, transparent));
+  border-radius: 2px;
+  background: var(--vscode-editorSuggestWidget-background, var(--vscode-dropdown-background));
+  list-style: none;
+}
+
+.revset-candidates li {
+  display: flex;
+  gap: 8px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.revset-candidates li:hover {
+  background: var(--ukemi-hover);
+}
+
+.revset-candidates li.is-active {
+  color: var(--vscode-editorSuggestWidget-selectedForeground, inherit);
+  background: var(--vscode-editorSuggestWidget-selectedBackground, var(--ukemi-selected));
+}
+
+.revset-candidate-label {
+  font-family: var(--vscode-editor-font-family);
+  white-space: nowrap;
+}
+
+.revset-candidate-detail {
+  overflow: hidden;
+  color: var(--vscode-descriptionForeground);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.revset-error {
+  margin: 4px 0 0;
+  padding: 4px 6px;
+  overflow-x: auto;
+  border: 1px solid var(--vscode-inputValidation-errorBorder);
+  border-radius: 2px;
+  background: var(--vscode-inputValidation-errorBackground);
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.92em;
+  white-space: pre;
+  user-select: text;
+}
+
+.graph-search-count {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.92em;
+  white-space: nowrap;
+}
+
 .busy {
   position: relative;
   overflow: hidden;
@@ -109,6 +207,11 @@
 
 .commit.is-selected {
   background: var(--ukemi-selected);
+}
+
+/* Rows that do not match an open search fade, but the graph lines stay. */
+.commit.is-dimmed .commit-body {
+  opacity: 0.4;
 }
 
 .commit.drop-commit,

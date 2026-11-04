@@ -31,7 +31,14 @@ interface ToolbarProps {
   isBusy: boolean
   autoFetch: AutoFetchState
   showGitTags: boolean
+  isSearching: boolean
+  onCustomRevset: () => void
+  onSearch: () => void
+  // Bars that stay under the toolbar while the graph scrolls.
+  children?: ReactNode
 }
+
+const CUSTOM = 'custom'
 
 function everyLabel(interval: string): string {
   const text = interval.trim()
@@ -151,9 +158,14 @@ export function Toolbar({
   isBusy,
   autoFetch,
   showGitTags,
+  isSearching,
+  onCustomRevset,
+  onSearch,
+  children,
 }: ToolbarProps) {
   const repoId = graph?.repoId
-  const ignoresDepth = graph !== null && DEPTHLESS_FILTERS.includes(graph.filter)
+  const hasRevset = graph !== null && graph.revset !== null
+  const ignoresDepth = graph !== null && (hasRevset || DEPTHLESS_FILTERS.includes(graph.filter))
   const singleLabel = repos.length === 1 ? (repos[0]?.label ?? '') : ''
   // The standalone app shows repositories as tabs and has its own settings.
   const showRepoRow = !isDesktop && (repos.length > 1 || singleLabel !== '')
@@ -261,23 +273,40 @@ export function Toolbar({
         <div className="toolbar-row filters">
           <select
             className="compact-select"
-            value={graph.filter}
-            title={FILTERS.find((f) => f.id === graph.filter)?.hint}
-            aria-label="Filter"
-            onChange={(e) =>
-              postMessage({ type: 'setFilter', filter: e.target.value as GraphFilter })
+            value={hasRevset ? CUSTOM : graph.filter}
+            title={
+              hasRevset
+                ? (graph.revset ?? undefined)
+                : FILTERS.find((f) => f.id === graph.filter)?.hint
             }
+            aria-label="Filter"
+            onChange={(e) => {
+              if (e.target.value === CUSTOM) {
+                onCustomRevset()
+                return
+              }
+              postMessage({ type: 'setFilter', filter: e.target.value as GraphFilter })
+            }}
           >
             {FILTERS.map((f) => (
               <option key={f.id} value={f.id} title={f.hint}>
                 {f.label}
               </option>
             ))}
+            <option value={CUSTOM} title="Show the changes of a revset you type">
+              Revset…
+            </option>
           </select>
           <select
             className="compact-select"
             value={graph.depth}
-            title={ignoresDepth ? 'This filter ignores the time range' : 'History depth'}
+            title={
+              hasRevset
+                ? 'A revset sets its own range'
+                : ignoresDepth
+                  ? 'This filter ignores the time range'
+                  : 'History depth'
+            }
             aria-label="History depth"
             disabled={ignoresDepth}
             onChange={(e) =>
@@ -290,6 +319,13 @@ export function Toolbar({
               </option>
             ))}
           </select>
+          <ToolButton
+            icon="search"
+            label="Search changes (Ctrl+F)"
+            isOn={isSearching}
+            isPressed={isSearching}
+            onClick={onSearch}
+          />
           <span className="toolbar-spacer" />
           {graph.hasRemotes && (
             <ToolButton
@@ -308,6 +344,7 @@ export function Toolbar({
           />
         </div>
       )}
+      {children}
     </div>
   )
 }

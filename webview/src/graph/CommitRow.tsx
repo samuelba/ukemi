@@ -22,6 +22,8 @@ interface CommitRowProps {
   files: ChangedFile[] | undefined
   isExpanded: boolean
   isSelected: boolean
+  // A search is open and this change does not match it.
+  isDimmed: boolean
   hasRemotes: boolean
   hasForge: boolean
   settings: ViewSettings
@@ -154,6 +156,7 @@ export const CommitRow = memo(function CommitRow(props: CommitRowProps) {
     commit.isImmutable && 'is-immutable',
     !commit.isMine && 'is-other',
     props.isSelected && 'is-selected',
+    props.isDimmed && 'is-dimmed',
     dropTarget && `drop-${dropTarget}`,
   ]
     .filter(Boolean)

@@ -8,7 +8,13 @@ import { RepoModel } from '../repo/repoModel'
 import type { Logger } from '../util/logger'
 import { Emitter, type Disposable } from './events'
 import type { Host } from './host'
-import { readView, rememberView, type GraphView } from './rememberedView'
+import {
+  readRevsetHistory,
+  readView,
+  rememberRevset,
+  rememberView,
+  type GraphView,
+} from './rememberedView'
 import type { SettingsChange } from './settings'
 
 const ACTIVE_REFRESH_DELAY_MS = 400
@@ -155,6 +161,14 @@ export class RepoRegistry implements Disposable {
     return rememberView(this.host.store, root, view, this.defaultView(root))
   }
 
+  revsetHistory(root: string): string[] {
+    return readRevsetHistory(this.host.store, root)
+  }
+
+  rememberRevset(root: string, revset: string): PromiseLike<void> {
+    return rememberRevset(this.host.store, root, revset)
+  }
+
   private defaultView(root: string): GraphView {
     const config = this.host.settings.read(root)
     return { filter: config.defaultFilter, depth: config.historyDepth }
@@ -212,6 +226,7 @@ export class RepoRegistry implements Disposable {
     const model = new RepoModel(new JjRepo(root, this.runner), this.logger, {
       depth: view?.depth ?? config.historyDepth,
       filter: view?.filter ?? config.defaultFilter,
+      revset: view?.revset ?? null,
       snapshotOtherWorkspaces: config.snapshotOnRefresh,
       showLineStats: config.showLineStats,
     })

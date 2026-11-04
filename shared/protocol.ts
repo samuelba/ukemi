@@ -58,6 +58,8 @@ export interface GraphState {
   workspaces: Workspace[]
   filter: GraphFilter
   depth: HistoryDepth
+  // A revset the user typed. It replaces the filter while set.
+  revset: string | null
   hasRemotes: boolean
   hasUnpushed: boolean
   canUndo: boolean
@@ -130,12 +132,16 @@ export type HostMessage =
   | { type: 'describe'; commitId: string; changeId: string; description: string }
   | { type: 'suggesters'; suggesters: SuggesterView[] }
   | { type: 'descriptionSuggestion'; requestId: string; text?: string; error?: string }
+  | { type: 'revsetResult'; revset: string; error: string | null }
+  | { type: 'revsetHistory'; repoId: string; history: string[] }
 
 export type WebviewMessage =
   | { type: 'ready' }
   | { type: 'selectRepo'; repoId: string }
   | { type: 'setFilter'; filter: GraphFilter }
   | { type: 'setDepth'; depth: HistoryDepth }
+  | { type: 'setRevset'; revset: string }
+  | { type: 'listRevsets' }
   | { type: 'loadFiles'; commitId: string }
   | { type: 'selectCommit'; commitId: string }
   | { type: 'command'; command: string; context: Record<string, unknown> }
