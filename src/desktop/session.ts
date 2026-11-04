@@ -164,6 +164,8 @@ export class DesktopSession implements Disposable {
       this.forge,
       this.autoFetch,
       this.askpass,
+      // After the services above, so none of them starts jj again once its processes are ended.
+      { dispose: () => this.runner.dispose() },
       this.registry.onDidChange(() => {
         this.scheduleState()
         const root = this.registry.activeModel?.root

@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { spawn, type ChildProcess } from 'node:child_process'
 import { basename } from 'node:path'
 import { hostSpawn } from '../util/hostProcess'
 import { killTree, OWN_GROUP } from '../util/processTree'
@@ -161,6 +161,9 @@ export class JjRunner {
   private readonly countdowns = new Set<Countdown>()
   private openPrompts = 0
   private warningHandler: ((warning: JjWarning) => void) | null = null
+  // jj processes still running, so closing the window that owns this runner can end them.
+  private readonly running = new Set<ChildProcess>()
+  private isDisposed = false
 
   constructor(
     private binaryPath: string,
@@ -205,6 +208,35 @@ export class JjRunner {
     }
   }
 
+  // Ends every jj process this runner started, with git and ssh below them, and refuses new runs.
+  // Their callers get an error, as after a timeout.
+  dispose(): void {
+    if (this.isDisposed) {
+      return
+    }
+    this.isDisposed = true
+    const grace = this.options.killGraceMs ?? KILL_GRACE_MS
+    for (const child of this.running) {
+      killTree(child, 'SIGTERM')
+      setTimeout(() => {
+        if (child.exitCode === null && child.signalCode === null) {
+          killTree(child, 'SIGKILL')
+        }
+      }, grace).unref()
+    }
+    this.running.clear()
+  }
+
+  private track(child: ChildProcess): void {
+    this.running.add(child)
+    child.once('exit', () => this.running.delete(child))
+    child.once('error', () => this.running.delete(child))
+  }
+
+  private stopped(args: readonly string[]): JjError {
+    return new JjError('jj was stopped because its window closed', args, '', null)
+  }
+
   async run(options: RunOptions): Promise<RunResult> {
     for (let attempt = 0; ; attempt++) {
       try {
@@ -233,6 +265,9 @@ export class JjRunner {
     ]
     const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
     const started = Date.now()
+    if (this.isDisposed) {
+      return Promise.reject(this.stopped(args))
+    }
 
     return new Promise((resolve, reject) => {
       const host = hostSpawn(this.binaryPath, args, {
@@ -247,6 +282,7 @@ export class JjRunner {
         stdio: ['pipe', 'pipe', 'pipe'],
         detached: OWN_GROUP,
       })
+      this.track(child)
       const stdout: Buffer[] = []
       const stderr: Buffer[] = []
       let hasTimedOut = false
@@ -299,6 +335,10 @@ export class JjRunner {
           reject(new JjError(timeoutMessage(timeoutMs, err), args, err, code))
           return
         }
+        if (this.isDisposed && code !== 0) {
+          reject(this.stopped(args))
+          return
+        }
         if (code !== 0) {
           if (err.trim()) {
             this.logger.error(`${repoTag(options.cwd)} ${redactUrlCredentials(err.trim())}`)
@@ -331,9 +371,17 @@ export class JjRunner {
 
   async runBytes(options: RunOptions): Promise<Buffer> {
     const args = [...GLOBAL_ARGS, '--ignore-working-copy', ...options.args]
+    if (this.isDisposed) {
+      throw this.stopped(args)
+    }
     return new Promise((resolve, reject) => {
       const host = hostSpawn(this.binaryPath, args, { cwd: options.cwd })
-      const child = spawn(host.command, host.args, { cwd: options.cwd, env: host.env })
+      const child = spawn(host.command, host.args, {
+        cwd: options.cwd,
+        env: host.env,
+        detached: OWN_GROUP,
+      })
+      this.track(child)
       const chunks: Buffer[] = []
       const errors: Buffer[] = []
       child.stdout.on('data', (chunk: Buffer) => chunks.push(chunk))
