@@ -232,3 +232,32 @@ describe.skipIf(process.platform === 'win32')('JjRunner prompts', () => {
     }
   })
 })
+
+describe.skipIf(process.platform === 'win32')('JjRunner dispose', () => {
+  test('ends running jj processes and their helpers', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ukemi-runner-'))
+    const fake = join(dir, 'jj')
+    // Like ssh started by git: a helper that holds jj's pipes.
+    writeFileSync(fake, '#!/bin/sh\nsleep 30 &\nwait\n', { mode: 0o700 })
+    const runner = new JjRunner(fake, NULL_LOGGER, { killGraceMs: 200 })
+    try {
+      const result = runner.run({ cwd: dir, args: ['git', 'fetch'], timeoutMs: 60_000 })
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      const started = Date.now()
+      runner.dispose()
+      await expect(result).rejects.toThrow('window closed')
+      expect(Date.now() - started).toBeLessThan(5000)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('refuses to start jj afterwards', async () => {
+    const runner = new JjRunner('jj', NULL_LOGGER)
+    runner.dispose()
+    await expect(runner.run({ cwd: tmpdir(), args: ['status'] })).rejects.toThrow('window closed')
+    await expect(runner.runBytes({ cwd: tmpdir(), args: ['file', 'show'] })).rejects.toThrow(
+      'window closed',
+    )
+  })
+})
