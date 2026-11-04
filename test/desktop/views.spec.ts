@@ -141,6 +141,53 @@ test('shows a diff side by side and without whitespace changes, and keeps the ch
   }
 })
 
+test('shows more unchanged lines from a hunk header, or the whole file', async () => {
+  const numbered = Array.from({ length: 80 }, (_, i) => `line ${i + 1}`)
+  const repo = fixtureRepo()
+  writeFileSync(join(repo, 'long.txt'), `${numbered.join('\n')}\n`)
+  execFileSync('jj', ['new'], { cwd: repo })
+  const changed = numbered.map((line, i) => (i === 4 || i === 74 ? `${line} changed` : line))
+  writeFileSync(join(repo, 'long.txt'), `${changed.join('\n')}\n`)
+  const { app, page } = await launch(repo)
+  try {
+    const openDiff = async () => {
+      await page.locator('.commit.is-wc').click({ position: { x: 60, y: 8 } })
+      await page.locator('.detail-file-list .file', { hasText: 'long.txt' }).click()
+    }
+    await openDiff()
+    const diff = page.locator('.detail-diff')
+    const rows = diff.locator('.diff-row')
+    const expanders = diff.locator('.diff-hunk-expand')
+    // Lines 2–8 and 72–78, with line 1, lines 9–71 and lines 79–80 hidden.
+    await expect(rows).toHaveCount(16)
+    await expect(expanders).toHaveText([/1 hidden line$/, /63 hidden lines$/, /2 hidden lines$/])
+
+    await expanders.nth(1).click()
+    await expect(rows).toHaveCount(56)
+    await expect(expanders.nth(1)).toHaveText(/23 hidden lines$/)
+    await expanders.nth(1).click()
+    await expect(rows).toHaveCount(79)
+    await expect(diff.locator('.diff-hunk')).toHaveCount(2)
+
+    await diff.locator('.detail-diff-bar button[title="Side by side"]').click()
+    await expanders.first().click()
+    await expect(diff.locator('.diff-split .diff-row')).toHaveCount(78)
+
+    await diff.locator('.detail-diff-bar button[title="Show the whole file"]').click()
+    await expect(diff.locator('.diff-split .diff-row')).toHaveCount(80)
+    await expect(diff.locator('.diff-hunk')).toHaveCount(0)
+
+    await diff.locator('.detail-diff-bar button[title^="Close"]').click()
+    await openDiff()
+    await expect(
+      diff.locator('.detail-diff-bar button[title="Show the whole file"][aria-pressed="true"]'),
+    ).toBeVisible()
+    await expect(diff.locator('.diff-split .diff-row')).toHaveCount(80)
+  } finally {
+    await app.close()
+  }
+})
+
 test('shows both versions of a changed image', async () => {
   const transparent =
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='

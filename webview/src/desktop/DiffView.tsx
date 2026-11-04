@@ -6,15 +6,20 @@ import { FileTypeIcon } from '../graph/FileIcon'
 import {
   dataUrlBytes,
   diffHunks,
+  EXPAND_STEP,
+  expandHunks,
   formatBytes,
   isLargeDiff,
   patchHunks,
+  revealMore,
   segments,
   splitRows,
   svgDataUrl,
   type DiffHunk,
   type DiffPart,
   type DiffRow,
+  type GapReveals,
+  type ShownHunk,
   type SplitRow,
 } from './diffModel'
 import { useDiffOptions, type DiffOptions } from './diffOptions'
@@ -38,6 +43,7 @@ type Side = 'old' | 'new'
 type Layout = DiffOptions['layout']
 
 const NO_TOKENS: SideTokens = { old: null, new: null }
+const NO_REVEALS: GapReveals = {}
 
 function sideTokens(path: string, text: string | undefined): Token[][] | null {
   return text === undefined ? null : highlightLines(text, parserFor(path, text))
@@ -150,14 +156,21 @@ function SplitLine({ row, tokens }: { row: SplitRow; tokens: SideTokens }) {
   )
 }
 
+// A hunk, and when its file's sides are known, the hidden gap its header opens.
+type HunkToShow = DiffHunk & Partial<Pick<ShownHunk, 'gap' | 'hiddenAbove'>>
+
 function Hunks({
   hunks,
   tokens = NO_TOKENS,
   layout = 'unified',
+  trailing,
+  onExpand,
 }: {
-  hunks: readonly DiffHunk[]
+  hunks: readonly HunkToShow[]
   tokens?: SideTokens
   layout?: Layout
+  trailing?: { gap: number; hidden: number }
+  onExpand?: (gap: number) => void
 }) {
   const isSplit = layout === 'split'
   return (
@@ -172,10 +185,44 @@ function Hunks({
       )}
       <tbody>
         {hunks.map((hunk, index) => (
-          <HunkRows key={index} hunk={hunk} tokens={tokens} isSplit={isSplit} />
+          <HunkRows key={index} hunk={hunk} tokens={tokens} isSplit={isSplit} onExpand={onExpand} />
         ))}
+        {onExpand && trailing && trailing.hidden > 0 && (
+          <ExpandRow hidden={trailing.hidden} onClick={() => onExpand(trailing.gap)} />
+        )}
       </tbody>
     </table>
+  )
+}
+
+function hiddenLabel(hidden: number): string {
+  return `${hidden} hidden ${hidden === 1 ? 'line' : 'lines'}`
+}
+
+// A hunk's header, or the end of a file, that shows more of the unchanged lines it hides.
+function ExpandRow({
+  header,
+  hidden,
+  onClick,
+}: {
+  header?: string
+  hidden: number
+  onClick: () => void
+}) {
+  return (
+    <tr className="diff-hunk">
+      <td colSpan={4}>
+        <button
+          className="diff-hunk-expand"
+          title={`Show ${Math.min(hidden, EXPAND_STEP)} more ${hidden === 1 ? 'line' : 'lines'}`}
+          onClick={onClick}
+        >
+          <span className="codicon codicon-unfold" aria-hidden />
+          {header && <span>{header}</span>}
+          <span className="diff-hunk-hidden">{hiddenLabel(hidden)}</span>
+        </button>
+      </td>
+    </tr>
   )
 }
 
@@ -183,17 +230,24 @@ function HunkRows({
   hunk,
   tokens,
   isSplit,
+  onExpand,
 }: {
-  hunk: DiffHunk
+  hunk: HunkToShow
   tokens: SideTokens
   isSplit: boolean
+  onExpand?: (gap: number) => void
 }) {
+  const { gap, hiddenAbove = 0 } = hunk
   return (
     <>
-      {hunk.header && (
-        <tr className="diff-hunk">
-          <td colSpan={4}>{hunk.header}</td>
-        </tr>
+      {onExpand && gap !== undefined && hiddenAbove > 0 ? (
+        <ExpandRow header={hunk.header} hidden={hiddenAbove} onClick={() => onExpand(gap)} />
+      ) : (
+        hunk.header && (
+          <tr className="diff-hunk">
+            <td colSpan={4}>{hunk.header}</td>
+          </tr>
+        )
       )}
       {isSplit
         ? splitRows(hunk.rows).map((row, index) => (
@@ -293,11 +347,28 @@ function FileDiff({
   const isLarge = useMemo(() => !isBinary && isLargeDiff(left, right), [isBinary, left, right])
   // A large file is diffed only once it is open and asked for.
   const isDiffed = !isBinary && (!isLarge || (isOpen && showLarge))
-  const { ignoreWhitespace } = options
+  const { ignoreWhitespace, fullFile } = options
   const hunks = useMemo(
-    () => (isDiffed ? diffHunks(left, right, { ignoreWhitespace }) : null),
-    [isDiffed, left, right, ignoreWhitespace],
+    () => (isDiffed ? diffHunks(left, right, { ignoreWhitespace, fullFile }) : null),
+    [isDiffed, left, right, ignoreWhitespace, fullFile],
   )
+  // What the headers have shown so far, for these hunks only: new hunks start folded again.
+  const [reveal, setReveal] = useState<{ hunks: DiffHunk[] | null; gaps: GapReveals }>({
+    hunks: null,
+    gaps: NO_REVEALS,
+  })
+  const gaps = reveal.hunks === hunks ? reveal.gaps : NO_REVEALS
+  const shown = useMemo(() => {
+    if (!hunks) {
+      return null
+    }
+    // The whole file hides nothing, so its one hunk needs no header.
+    return fullFile
+      ? { hunks: hunks.map((hunk) => ({ ...hunk, header: '' })), trailing: undefined }
+      : expandHunks(hunks, left, right, gaps, { ignoreWhitespace })
+  }, [hunks, fullFile, left, right, gaps, ignoreWhitespace])
+  const onExpand = (gap: number) =>
+    hunks && setReveal({ hunks, gaps: revealMore(gaps, gap, hunks.length) })
   // Only an open file pays for parsing its two sides, and a large one is not colored.
   const tokens = useMemo(
     (): SideTokens =>
@@ -338,7 +409,7 @@ function FileDiff({
           <ImageDiff left={images.left} right={images.right} />
         ) : isBinary ? (
           <p className="diff-placeholder">{file.right?.text || file.left?.text}</p>
-        ) : !hunks ? (
+        ) : !hunks || !shown ? (
           <p className="diff-placeholder">
             This file is too large to show at once.{' '}
             <button className="link-button" onClick={() => setShowLarge(true)}>
@@ -352,7 +423,13 @@ function FileDiff({
               : 'No changes in the content.'}
           </p>
         ) : (
-          <Hunks hunks={hunks} tokens={tokens} layout={options.layout} />
+          <Hunks
+            hunks={shown.hunks}
+            tokens={tokens}
+            layout={options.layout}
+            trailing={shown.trailing}
+            onExpand={fullFile ? undefined : onExpand}
+          />
         ))}
     </section>
   )
