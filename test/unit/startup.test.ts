@@ -4,6 +4,7 @@ import {
   foldersAfterClosing,
   startupWindows,
   themeSource,
+  windowShowing,
   windowsToRemember,
 } from '../../src/desktop/startup'
 
@@ -97,4 +98,25 @@ test('themeSource takes light or dark and follows the system otherwise', () => {
 test('desktopFileName matches the installed entry, also inside a Flatpak', () => {
   expect(desktopFileName({})).toBe('ukemi.desktop')
   expect(desktopFileName({ FLATPAK_ID: 'dev.samuelba.ukemi' })).toBe('dev.samuelba.ukemi.desktop')
+})
+
+describe('windowShowing', () => {
+  const windows = [
+    { folders: ['/a'], repos: ['/a'] },
+    { folders: ['/work'], repos: ['/work/x', '/work/y'] },
+  ]
+
+  test('finds the window that opened the folder', () => {
+    expect(windowShowing('/a', windows)).toBe(0)
+    expect(windowShowing('/a/', windows)).toBe(0)
+  })
+
+  test('finds a repository found inside an opened folder', () => {
+    expect(windowShowing('/work/y', windows)).toBe(1)
+  })
+
+  test('is -1 for a repository no window shows', () => {
+    expect(windowShowing('/b', windows)).toBe(-1)
+    expect(windowShowing('/work/z', windows)).toBe(-1)
+  })
 })

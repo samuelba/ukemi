@@ -1,4 +1,5 @@
 import { isAbsolute, relative } from 'node:path'
+import { sameFolder } from '../repo/workspaceItems'
 
 export const RESTORE_REPOSITORIES = 'desktop.restoreRepositories'
 
@@ -40,6 +41,23 @@ export function windowsToRemember(open: readonly (readonly string[])[]): string[
 function isInside(parent: string, child: string): boolean {
   const path = relative(parent, child)
   return path !== '' && !path.startsWith('..') && !isAbsolute(path)
+}
+
+export interface WindowContents {
+  // The folders the window opened.
+  folders: readonly string[]
+  // The repositories it shows, also those found inside an opened folder.
+  repos: readonly string[]
+}
+
+// The index of the window that already shows `root`, or -1. One repository in two windows would
+// double its watchers, auto-fetch and snapshots, so it opens where it already is.
+export function windowShowing(root: string, windows: readonly WindowContents[]): number {
+  return windows.findIndex(
+    (window) =>
+      window.folders.some((folder) => sameFolder(folder, root)) ||
+      window.repos.some((repo) => sameFolder(repo, root)),
+  )
 }
 
 // A window's folders after one repository tab closed, so the tab stays closed on the next start.
