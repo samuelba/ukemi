@@ -149,6 +149,17 @@ class DesktopApp implements DesktopContext {
   }
 
   async start(): Promise<void> {
+    // Finding jj and the login shell's PATH can take seconds. A `ukemi .` run meanwhile must not
+    // be lost, so it waits until the first windows are open.
+    const early: Array<{ argv: readonly string[]; cwd: string }> = []
+    let isStarted = false
+    app.on('second-instance', (_event, argv, cwd) => {
+      if (isStarted) {
+        void this.openFromSecondInstance(argv, cwd)
+      } else {
+        early.push({ argv, cwd })
+      }
+    })
     await adoptLoginShellPath(process.env)
     await this.findJj()
     this.systemFont = await detectSystemFont()
@@ -195,7 +206,10 @@ class DesktopApp implements DesktopContext {
     for (const folders of windows) {
       this.openWindow(folders)
     }
-    app.on('second-instance', (_event, argv, cwd) => void this.openFromSecondInstance(argv, cwd))
+    isStarted = true
+    for (const { argv, cwd } of early.splice(0)) {
+      void this.openFromSecondInstance(argv, cwd)
+    }
     void this.checkForUpdates()
     setInterval(() => void this.checkForUpdates(), UPDATE_CHECK_INTERVAL_MS).unref()
     app.on('activate', () => {
