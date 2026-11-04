@@ -142,6 +142,17 @@ export function editorFileCommands(env: CommandEnv): Record<string, Handler> {
         await vscode.commands.executeCommand('ukemi.file.openDiff', ctx)
       }
     },
+    'ukemi.showFileHistory': async (uri?: unknown) => {
+      const target = editorTarget(env, uri instanceof vscode.Uri ? uri : undefined)
+      if (!target) {
+        void vscode.window.showInformationMessage('Ukemi: open a file of a jj repository first.')
+        return
+      }
+      await vscode.commands.executeCommand('ukemi.file.history', {
+        repoId: target.model.root,
+        path: target.path,
+      })
+    },
     'ukemi.revertFile': async (uri?: unknown) => {
       const target = editorTarget(env, uri instanceof vscode.Uri ? uri : undefined)
       const ctx = target ? workingCopyContext(target.model, target.path) : null

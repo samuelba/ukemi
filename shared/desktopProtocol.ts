@@ -109,7 +109,7 @@ export interface ChangeDetail {
 // A Split or Clean up view, shown as a tab next to the change details.
 export interface PanelTab {
   id: string
-  kind: 'split' | 'cleanup' | 'editor'
+  kind: 'split' | 'cleanup' | 'editor' | 'history'
   title: string
 }
 

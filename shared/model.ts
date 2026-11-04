@@ -78,6 +78,13 @@ export interface Workspace {
   changedFiles: number
 }
 
+// The change that last touched a line of a file. Lines count from 1.
+export interface AnnotatedLine {
+  commitId: string
+  changeId: string
+  line: number
+}
+
 export interface Operation {
   id: string
   description: string

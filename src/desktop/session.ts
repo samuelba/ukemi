@@ -20,6 +20,7 @@ import { commitCommands } from '../app/commands/commitCommands'
 import type { CommandEnv, Handler } from '../app/commands/context'
 import { evolutionCommands } from '../app/commands/evolutionCommands'
 import { operationCommands } from '../app/commands/operationCommands'
+import { fileHistoryCommands } from '../app/commands/fileHistoryCommands'
 import { fileCommands } from '../app/commands/fileCommands'
 import { globalCommands } from '../app/commands/globalCommands'
 import { refCommands } from '../app/commands/refCommands'
@@ -533,6 +534,7 @@ export class DesktopSession implements Disposable {
       ...workspaceCommands(env),
       ...evolutionCommands(env),
       ...operationCommands(env),
+      ...fileHistoryCommands(env),
       'ukemi.showLog': () => this.shell('showLog'),
       'ukemi.repoTab.rename': (arg) =>
         this.withTab(arg, (repoId) => {

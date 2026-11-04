@@ -32,6 +32,8 @@ export interface Workbench {
     to: EvolutionEntry,
   ): Promise<void>
   openFileAtRevision(model: RepoModel, commit: CommitView, path: string): Promise<void>
+  // Lists the changes that touched the file.
+  showFileHistory(model: RepoModel, path: string): Promise<void>
   // Opens a file of the change for editing. In the desktop app that is the editor tab, which
   // also resolves conflicts; VS Code opens the working copy's file in its own editor.
   openEditor(model: RepoModel, commit: CommitView, path: string): Promise<void>

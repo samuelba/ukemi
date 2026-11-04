@@ -4,6 +4,7 @@ import { readdir, rm, stat } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 import type {
+  AnnotatedLine,
   BookmarkTracking,
   ChangedFile,
   Commit,
@@ -16,6 +17,7 @@ import { hostSpawn } from '../util/hostProcess'
 import { errorMessage } from '../util/logger'
 import { SerialQueue } from '../util/serialQueue'
 import {
+  parseAnnotation,
   parseBookmarks,
   parseCommitIds,
   parseDiffFiles,
@@ -31,6 +33,7 @@ import { bookmarkRevision, exactBookmark, rootFileset } from './revsets'
 import { JjError, JjRunner, NETWORK_TIMEOUT_MS, type RunOptions, type RunResult } from './runner'
 import { jjString } from './templates'
 import {
+  ANNOTATE_TEMPLATE,
   BOOKMARK_LIST_GRAPH_TEMPLATE,
   BOOKMARK_LIST_TEMPLATE,
   BOOKMARK_TRACKING_TEMPLATE,
@@ -48,6 +51,7 @@ import {
 
 export const MAX_LOG_ENTRIES = 2000
 export const MAX_EVOLUTION_ENTRIES = 200
+export const MAX_FILE_HISTORY_ENTRIES = 500
 
 export type SplitDirection = 'below' | 'above'
 export type RebaseMode = 'source' | 'revision' | 'branch'
@@ -283,6 +287,26 @@ export class JjRepo {
       published: local.filter((name) => pushed.has(name)),
       unpublished: local.filter((name) => !pushed.has(name)),
     }
+  }
+
+  // The change that last touched each line of the file, as of the revision.
+  async annotate(revision: string, path: string): Promise<AnnotatedLine[]> {
+    const { stdout } = await this.read([
+      'file',
+      'annotate',
+      '-r',
+      revision,
+      '-T',
+      ANNOTATE_TEMPLATE,
+      '--',
+      path,
+    ])
+    return parseAnnotation(stdout)
+  }
+
+  // The changes that touched the file, newest first. jj does not follow renames.
+  fileHistory(path: string, limit = MAX_FILE_HISTORY_ENTRIES): Promise<Commit[]> {
+    return this.log(`files(${rootFileset(path)})`, limit)
   }
 
   async operations(limit: number): Promise<Operation[]> {

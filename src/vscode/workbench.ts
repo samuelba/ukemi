@@ -3,6 +3,7 @@ import * as vscode from 'vscode'
 import type { CommandEnv, Workbench } from '../app/commands/context'
 import { openCleanupPanel } from './cleanupPanel'
 import { openCommitDiff, openFileAtRevision, openFileDiff, openVersionDiff } from './diff'
+import type { FileHistoryView } from './fileHistoryView'
 import { openSettings } from './openSettings'
 import { openSplitPanel } from './splitPanel'
 
@@ -17,6 +18,7 @@ export function vscodeWorkbench(
   paths: ExtensionPaths,
   env: () => CommandEnv,
   installJj: () => Promise<void>,
+  fileHistory: () => FileHistoryView,
 ): Workbench {
   return {
     openFileDiff,
@@ -34,6 +36,7 @@ export function vscodeWorkbench(
         'Ukemi: only working-copy files can be edited here. Run "jj new" on the change to edit it.',
       )
     },
+    showFileHistory: (model, path) => fileHistory().show(model, path),
     openFileExternally: async (fsPath) => {
       await vscode.window.showTextDocument(vscode.Uri.file(fsPath))
     },

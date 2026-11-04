@@ -136,5 +136,14 @@ export const BOOKMARK_TRACKING_TEMPLATE =
     behind: `if(${TRACKED}, json(self.tracking_ahead_count().lower()), "null")`,
   }) + LINE_END
 
+// One line per line of the file, naming the change that last touched it. The text is left out:
+// jj prints it as bytes, and the caller has the file already.
+export const ANNOTATE_TEMPLATE =
+  jsonObject({
+    commit_id: 'json(commit.commit_id())',
+    change_id: 'json(commit.change_id())',
+    line: 'json(line_number)',
+  }) + LINE_END
+
 export const OP_LOG_TEMPLATE =
   'json({"id" => id, "description" => description, "user" => user, "time" => time.end()}) ++ "\\n"'
