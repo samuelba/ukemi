@@ -3,6 +3,7 @@ import { join, sep } from 'node:path'
 import type { RepoWatchHandlers, WatchRepo } from '../../app/host'
 import type { Logger } from '../../util/logger'
 import { errorMessage } from '../../util/logger'
+import { repositoryStore } from '../../repo/workspaceFolder'
 
 const INTERNAL = ['.jj', '.git']
 
@@ -27,7 +28,8 @@ function tryWatch(
   }
 }
 
-// Watches the working copy and jj's operation heads. When the system runs out of watches for a
+// Watches the working copy and jj's operation heads, which a second workspace finds through the
+// pointer in its .jj/repo. When the system runs out of watches for a
 // big tree, the app still refreshes on new operations and when the window gets focus.
 export function fsWatchRepo(logger: Logger): WatchRepo {
   return (root: string, handlers: RepoWatchHandlers) => {
@@ -42,7 +44,7 @@ export function fsWatchRepo(logger: Logger): WatchRepo {
       logger,
     )
     const ops = tryWatch(
-      join(root, '.jj', 'repo', 'op_heads', 'heads'),
+      join(repositoryStore(root), 'op_heads', 'heads'),
       { recursive: false },
       () => handlers.onOperation(),
       logger,
