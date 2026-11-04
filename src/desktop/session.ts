@@ -55,6 +55,7 @@ import {
 import { aboutText } from './about'
 import { isValidSettingValue, runsProgram, settingFields } from './settingsSchema'
 import { foldersAfterClosing } from './startup'
+import { SAVE_DELAY_MS } from './windowBounds'
 import { watchRenderer } from './rendererRecovery'
 import { Terminals } from './terminals'
 import { zoomPercent } from './zoom'
@@ -402,6 +403,7 @@ export class DesktopSession implements Disposable {
     const window = new BrowserWindow({
       width: saved.width,
       height: saved.height,
+      ...(saved.x !== undefined && saved.y !== undefined ? { x: saved.x, y: saved.y } : {}),
       minWidth: 720,
       minHeight: 480,
       title: this.title(),
@@ -420,12 +422,17 @@ export class DesktopSession implements Disposable {
       window.once('show', () => resolve())
       window.once('closed', () => resolve())
     })
-    window.once('ready-to-show', () => window.show())
+    window.once('ready-to-show', () => {
+      if (saved.isMaximized) {
+        window.maximize()
+      }
+      window.show()
+    })
     window.webContents.on('did-finish-load', () =>
       window.webContents.setZoomFactor(this.context.zoomFactor()),
     )
     window.on('focus', () => this.focusEmitter.fire())
-    window.on('resize', () => this.context.saveWindowBounds(window.getBounds()))
+    this.rememberPlacement(window)
     window.on('closed', () => this.context.closeSession(this))
     this.context.guardNavigation(window)
     watchRenderer(window, this.context.logger, {
@@ -434,6 +441,34 @@ export class DesktopSession implements Disposable {
     })
     void window.loadURL(this.context.pageUrl('desktop'))
     return window
+  }
+
+  // Resizing fires many events, so the place is written once the window stays still, and on close.
+  // The normal bounds are kept while maximized, so restoring goes back to them.
+  private rememberPlacement(window: BrowserWindow): void {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const save = () => {
+      if (timer) {
+        clearTimeout(timer)
+        timer = null
+      }
+      if (window.isDestroyed() || window.isMinimized() || window.isFullScreen()) {
+        return
+      }
+      const bounds = window.getNormalBounds()
+      this.context.saveWindowBounds({ ...bounds, isMaximized: window.isMaximized() })
+    }
+    const later = () => {
+      if (timer) {
+        clearTimeout(timer)
+      }
+      timer = setTimeout(save, SAVE_DELAY_MS)
+    }
+    window.on('resize', later)
+    window.on('move', later)
+    window.on('maximize', later)
+    window.on('unmaximize', later)
+    window.on('close', save)
   }
 
   // The crashed page took its prompts and Split or Clean up tabs with it. Their state lived there,

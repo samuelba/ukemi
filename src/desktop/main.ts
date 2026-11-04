@@ -12,8 +12,8 @@ import {
   net,
   protocol,
   safeStorage,
+  screen,
   shell,
-  type Rectangle,
 } from 'electron'
 import { locateJj, versionText } from '../app/jjSetup'
 import { affectsJj } from '../app/settingsEffects'
@@ -46,6 +46,7 @@ import {
   windowsToRemember,
 } from './startup'
 import { readZoom, stepZoom, zoomPercent } from './zoom'
+import { readPlacement, type WindowPlacement } from './windowBounds'
 
 import {
   CHECK_FOR_UPDATES,
@@ -60,7 +61,6 @@ const OPEN_FOLDERS_KEY = 'openFolders'
 const BOUNDS_KEY = 'windowBounds'
 const ZOOM_KEY = 'zoomFactor'
 const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
-const DEFAULT_BOUNDS = { width: 1280, height: 860 }
 const isDevelopment = !app.isPackaged
 
 // Unpackaged, Electron would keep the data in a folder named after itself. Tests run the app
@@ -250,15 +250,13 @@ class DesktopApp implements DesktopContext {
     this.installMenu()
   }
 
-  windowBounds(): { width: number; height: number } {
-    const saved = this.state.get<{ width?: unknown; height?: unknown }>(BOUNDS_KEY)
-    return typeof saved?.width === 'number' && typeof saved.height === 'number'
-      ? { width: saved.width, height: saved.height }
-      : DEFAULT_BOUNDS
+  windowBounds(): WindowPlacement {
+    const screens = screen.getAllDisplays().map((display) => display.workArea)
+    return readPlacement(this.state.get<unknown>(BOUNDS_KEY), screens)
   }
 
-  saveWindowBounds(bounds: Rectangle): void {
-    void this.state.update(BOUNDS_KEY, { width: bounds.width, height: bounds.height })
+  saveWindowBounds(placement: WindowPlacement): void {
+    void this.state.update(BOUNDS_KEY, placement)
   }
 
   // Pages never navigate away or open windows. Links go to the browser.
