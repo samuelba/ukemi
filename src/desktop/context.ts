@@ -53,6 +53,8 @@ export interface DesktopContext {
   saveWindowBounds(placement: WindowPlacement): void
   guardNavigation(window: BrowserWindow): void
   openWindow(folders: string[]): void
+  // Another window that already shows the repository at `root`.
+  windowShowing(root: string, except?: DesktopSession): DesktopSession | undefined
   // The zoom factor of every window, and a change of it from the menu, a key or the status bar.
   zoomFactor(): number
   zoom(step: ZoomStep): void

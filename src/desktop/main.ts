@@ -41,6 +41,7 @@ import {
   desktopFileName,
   RESTORE_REPOSITORIES,
   startupWindows,
+  windowShowing,
   THEME,
   themeSource,
   windowsToRemember,
@@ -284,19 +285,31 @@ class DesktopApp implements DesktopContext {
     })
   }
 
+  // Repositories already open in a window are shown there instead, and a window opens only for
+  // the rest. When every folder is open already, no window opens.
   openWindow(folders: string[]): void {
-    const open = [...this.sessions].find(
-      (session) =>
-        folders.length > 0 &&
-        session.folders.length === folders.length &&
-        folders.every((folder) => session.folders.includes(folder)),
-    )
-    if (open) {
-      open.focus()
+    const fresh = folders.filter((folder) => {
+      const open = this.windowShowing(folder)
+      if (open) {
+        void open.reveal(folder)
+      }
+      return !open
+    })
+    if (folders.length > 0 && fresh.length === 0) {
       return
     }
-    this.sessions.add(new DesktopSession(this, folders))
+    this.sessions.add(new DesktopSession(this, fresh))
     this.rememberOpenFolders()
+  }
+
+  windowShowing(root: string, except?: DesktopSession): DesktopSession | undefined {
+    const others = [...this.sessions].filter((session) => session !== except)
+    return others[
+      windowShowing(
+        root,
+        others.map((session) => session.contents()),
+      )
+    ]
   }
 
   closeSession(session: DesktopSession): void {

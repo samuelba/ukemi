@@ -54,7 +54,7 @@ import {
 } from './menus'
 import { aboutText } from './about'
 import { isValidSettingValue, runsProgram, settingFields } from './settingsSchema'
-import { foldersAfterClosing } from './startup'
+import { foldersAfterClosing, windowShowing, type WindowContents } from './startup'
 import { SAVE_DELAY_MS } from './windowBounds'
 import { watchRenderer } from './rendererRecovery'
 import { Terminals } from './terminals'
@@ -256,15 +256,38 @@ export class DesktopSession implements Disposable {
     }
   }
 
-  // Opens a repository as a tab of this window and shows it.
+  // Opens a repository as a tab of this window and shows it. A repository open in another window
+  // is shown there instead.
   async addFolder(root: string): Promise<void> {
-    if (!this.folderList.includes(root)) {
+    if (windowShowing(root, [this.contents()]) < 0) {
+      const other = this.context.windowShowing(root, this)
+      if (other) {
+        await other.reveal(root)
+        return
+      }
       this.folderList.push(root)
       this.context.foldersChanged()
       this.window.setTitle(this.title())
       void this.askTrust()
       await this.registry.discover()
     }
+    await this.showRepo(root)
+  }
+
+  // Brings the window to the front with the repository at `root` as its active tab.
+  async reveal(root: string): Promise<void> {
+    this.focus()
+    await this.showRepo(root)
+  }
+
+  contents(): WindowContents {
+    return {
+      folders: this.folderList,
+      repos: this.registry.summaries().map((summary) => summary.id),
+    }
+  }
+
+  private async showRepo(root: string): Promise<void> {
     const repo = this.registry
       .summaries()
       .find((summary) => summary.id === root || summary.id.startsWith(`${root}/`))
