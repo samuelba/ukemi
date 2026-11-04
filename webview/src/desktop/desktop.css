@@ -811,6 +811,38 @@ button.detail-tag-conflict:hover {
   font-size: 11px;
 }
 
+.diff-hunk td:has(> .diff-hunk-expand) {
+  padding: 0;
+}
+
+.diff-hunk-expand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 14px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.diff-hunk-expand:hover {
+  background: color-mix(in srgb, var(--vscode-charts-blue) 16%, transparent);
+  color: var(--vscode-foreground);
+}
+
+.diff-hunk-expand:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.diff-hunk-hidden {
+  opacity: 0.75;
+}
+
 .diff-note .diff-text {
   color: var(--vscode-descriptionForeground);
   white-space: pre-wrap;

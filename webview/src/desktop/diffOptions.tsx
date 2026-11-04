@@ -3,10 +3,16 @@ import { useSyncExternalStore } from 'react'
 export interface DiffOptions {
   layout: 'unified' | 'split'
   ignoreWhitespace: boolean
+  // Every line of a file, not only its changes.
+  fullFile: boolean
 }
 
 const OPTIONS_KEY = 'ukemi.diff.options'
-const DEFAULT_OPTIONS: DiffOptions = { layout: 'unified', ignoreWhitespace: false }
+const DEFAULT_OPTIONS: DiffOptions = {
+  layout: 'unified',
+  ignoreWhitespace: false,
+  fullFile: false,
+}
 
 function readOptions(): DiffOptions {
   try {
@@ -15,6 +21,7 @@ function readOptions(): DiffOptions {
     return {
       layout: value.layout === 'split' ? 'split' : 'unified',
       ignoreWhitespace: value.ignoreWhitespace === true,
+      fullFile: value.fullFile === true,
     }
   } catch {
     return DEFAULT_OPTIONS
@@ -67,13 +74,9 @@ function Toggle({
   )
 }
 
-// The layout and whitespace toggles, for a diff's toolbar. A patch from jj is already diffed,
-// so it has no whitespace toggle.
-export function DiffOptionButtons({
-  canIgnoreWhitespace = true,
-}: {
-  canIgnoreWhitespace?: boolean
-}) {
+// The layout, whitespace and whole-file toggles, for a diff's toolbar. A patch from jj is
+// already diffed and has no sides to read, so it has only the layout toggle.
+export function DiffOptionButtons({ hasSides = true }: { hasSides?: boolean }) {
   const options = useDiffOptions()
   const isSplit = options.layout === 'split'
   return (
@@ -84,13 +87,21 @@ export function DiffOptionButtons({
         isOn={isSplit}
         onClick={() => setDiffOptions({ layout: isSplit ? 'unified' : 'split' })}
       />
-      {canIgnoreWhitespace && (
-        <Toggle
-          title="Ignore whitespace"
-          icon="whitespace"
-          isOn={options.ignoreWhitespace}
-          onClick={() => setDiffOptions({ ignoreWhitespace: !options.ignoreWhitespace })}
-        />
+      {hasSides && (
+        <>
+          <Toggle
+            title="Ignore whitespace"
+            icon="whitespace"
+            isOn={options.ignoreWhitespace}
+            onClick={() => setDiffOptions({ ignoreWhitespace: !options.ignoreWhitespace })}
+          />
+          <Toggle
+            title="Show the whole file"
+            icon="unfold"
+            isOn={options.fullFile}
+            onClick={() => setDiffOptions({ fullFile: !options.fullFile })}
+          />
+        </>
       )}
     </>
   )

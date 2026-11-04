@@ -177,7 +177,7 @@ function DiffPanel({
         <h2 className="detail-diff-title" title={diff.title}>
           {diff.title}
         </h2>
-        {diff.kind !== 'file' && <DiffOptionButtons canIgnoreWhitespace={diff.kind === 'files'} />}
+        {diff.kind !== 'file' && <DiffOptionButtons hasSides={diff.kind === 'files'} />}
         <button
           className="icon-button"
           title={isMaximized ? 'Restore' : 'Maximize'}
