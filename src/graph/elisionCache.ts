@@ -54,6 +54,18 @@ export class ElisionCache {
     })
   }
 
+  // Marks the entries resolved at `from` as resolved at `to`, for a caller that knows the
+  // operations in between cannot change any answer.
+  carryForward(from: string | null, to: string | null, now = new Date()): void {
+    const fromStamp = stampFor(from, now)
+    const toStamp = stampFor(to, now)
+    for (const [key, entry] of this.values) {
+      if (entry.stamp === fromStamp) {
+        this.values.set(key, { stamp: toStamp, ancestors: entry.ancestors })
+      }
+    }
+  }
+
   clear(): void {
     this.values.clear()
   }

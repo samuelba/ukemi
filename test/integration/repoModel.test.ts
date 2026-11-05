@@ -494,6 +494,33 @@ describe('RepoModel paging', () => {
     expect(model.graph?.isTruncated).toBe(false)
   })
 
+  test('a snapshot reuses the elision lookups, and another operation runs them again', async () => {
+    // mine: A, then two commits by someone else, then the working copy. The graph shows the
+    // working copy's parent as the root's parent, so the edge from there to A is elided.
+    jj(root, 'describe', '-m', 'mine A')
+    for (const message of ['other 1', 'other 2']) {
+      jj(root, '--config', 'user.email=other@ukemi.dev', 'new', '-m', message)
+    }
+    jj(root, 'new')
+    const { model: mine, commands } = countingModel({ filter: 'mine' })
+    const lookups = (): number => commands.filter((line) => ELISION_LOOKUP.test(line)).length
+
+    await mine.refresh()
+    expect(mine.graph?.commits.some((c) => c.row.outgoing.some((edge) => edge.isElided))).toBe(true)
+    const first = lookups()
+    expect(first).toBeGreaterThan(0)
+
+    writeFile(root, 'edit.txt', 'x\n')
+    mine.markDirty()
+    await mine.refresh()
+    expect(mine.graph?.workingCopyFiles.map((f) => f.path)).toEqual(['edit.txt'])
+    expect(lookups()).toBe(first)
+
+    jj(root, 'describe', '-r', '@-', '-m', 'other 2b')
+    await mine.refresh()
+    expect(lookups()).toBeGreaterThan(first)
+  })
+
   test('a failed elision lookup keeps the edge from the last refresh', async () => {
     jj(root, 'describe', '-m', 'base')
     jj(root, 'new', '-m', 'hidden')
