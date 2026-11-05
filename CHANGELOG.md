@@ -1,5 +1,55 @@
 # Changelog
 
+## [0.11.0](https://github.com/samuelba/ukemi/compare/v0.10.0...v0.11.0) (2026-11-05)
+
+
+### Features
+
+* custom revset filter and graph search (M7) ([74e7817](https://github.com/samuelba/ukemi/commit/74e7817863c85f23345601d92f247a501b50d70d))
+* custom revset filter and graph search (M7) ([13bd7a4](https://github.com/samuelba/ukemi/commit/13bd7a4fea4ab63dca8ef60cabd4ea9cbc284433))
+* drop a change between two changes to reorder the stack ([8d5bf5c](https://github.com/samuelba/ukemi/commit/8d5bf5ce19fcc93bde1a1d4b5490d761ffd14912))
+* drop a change between two changes to reorder the stack ([25a5dda](https://github.com/samuelba/ukemi/commit/25a5dda35613e9819810a19658de7814c662ca39))
+* expand hidden lines and show the whole file ([51e6c9b](https://github.com/samuelba/ukemi/commit/51e6c9b48a72ecde5168e917c44f0f445e47a441))
+* expand hidden lines and show the whole file ([5e84305](https://github.com/samuelba/ukemi/commit/5e84305739544b4d0fafcc2567a7d1101c2bd41c))
+* file history and blame (M8) ([9509aec](https://github.com/samuelba/ukemi/commit/9509aec40a73be1fe7e139561ea50bb5a57588e5))
+* file history and blame (M8) ([16c72dd](https://github.com/samuelba/ukemi/commit/16c72dd0e80d744393ae9dfd5102f6d5d140cba5))
+* load the commit graph in pages (F32) ([5a8b70b](https://github.com/samuelba/ukemi/commit/5a8b70b167d663c482bc97860d69aaa2f2ce2d28))
+* load the commit graph in pages (F32) ([ca7b393](https://github.com/samuelba/ukemi/commit/ca7b393394c66c192d4e8e41279ef2f84679fec2))
+* side-by-side, ignore-whitespace and image diffs ([ea668ff](https://github.com/samuelba/ukemi/commit/ea668ff679a56a3b08ad5f8b5492d2079ff3436f))
+* side-by-side, ignore-whitespace and image diffs ([67619e3](https://github.com/samuelba/ukemi/commit/67619e369eed8a10d2026c7866d93f983997431b))
+
+
+### Bug Fixes
+
+* debounce window bounds and restore position and maximized state (F39) ([b6d596d](https://github.com/samuelba/ukemi/commit/b6d596dce61fb05372da2761e448793eeb5d5b42))
+* debounce window bounds and restore position and maximized state (F39) ([88fc407](https://github.com/samuelba/ukemi/commit/88fc4078759c180274087023181b7975c0b7d602))
+* end a window's jj processes when it closes (F43) ([bd32180](https://github.com/samuelba/ukemi/commit/bd321802fddfb08b045d1150d599c56f15fb60d4))
+* end a window's jj processes when it closes (F43) ([981baf7](https://github.com/samuelba/ukemi/commit/981baf7b7974bbcc125badb7d92fcec89f604536))
+* keep elided-parent edges across operations (F27) ([44de851](https://github.com/samuelba/ukemi/commit/44de8512a09897067d0f03b7d921e2dc4b9dff99))
+* keep elided-parent edges across operations (F27) ([807ce3a](https://github.com/samuelba/ukemi/commit/807ce3a94338b247acdc11598b90a42361373238))
+* keep launches made while the app starts (F40) ([f040c7c](https://github.com/samuelba/ukemi/commit/f040c7c53426042ece370562b38cd702a5c8ebbd))
+* keep launches made while the app starts (F40) ([0a2b5bc](https://github.com/samuelba/ukemi/commit/0a2b5bce3645b5569f9d6164d1e7f85e170d5095))
+* open a repository in the window that already shows it (F41) ([49ffec5](https://github.com/samuelba/ukemi/commit/49ffec548cc6f2c27a66816c64cfb69e8fd54faa))
+* open a repository in the window that already shows it (F41) ([a8ba89b](https://github.com/samuelba/ukemi/commit/a8ba89bca7c449c4d95ccb662765d626e737f907))
+* skip ignored folders when watching the working copy ([80d2c7b](https://github.com/samuelba/ukemi/commit/80d2c7b885f2a65f1ac24ed9041a95ae85abcad7))
+* skip ignored folders when watching the working copy ([a98e717](https://github.com/samuelba/ukemi/commit/a98e7178f55dfe6cdcbc06c9fa6969351d8b2c8f))
+* watch operations in secondary workspaces (F34) ([cdc8337](https://github.com/samuelba/ukemi/commit/cdc8337b3655ab7904f7d5a07c195ceeae4c0440))
+* watch operations in secondary workspaces (F34) ([d22c7d4](https://github.com/samuelba/ukemi/commit/d22c7d4f588b74ac8c25dc6fc18a52a097398d50))
+
+
+### Performance Improvements
+
+* batch elision lookups in one jj process on jj 0.47+ ([4b18d36](https://github.com/samuelba/ukemi/commit/4b18d36c2a5732e9a475ed9e3119ebd1531ccdd8))
+* batch elision lookups in one jj process on jj 0.47+ ([5ce5a21](https://github.com/samuelba/ukemi/commit/5ce5a217d1b4a8d060ff34c08b8f5fc54f67c4cb))
+* keep elision lookups after a snapshot in any view ([9009aaf](https://github.com/samuelba/ukemi/commit/9009aafd5460dacd89a0942eb98f985291170150))
+* keep elision lookups after a snapshot in any view ([4dcb0ce](https://github.com/samuelba/ukemi/commit/4dcb0ce2e8d830c1cb11319f8ef4540a7cc1db36))
+* look up elided edges against the shown commits ([bd90aa3](https://github.com/samuelba/ukemi/commit/bd90aa34da9b07225bbdd367127f3936c46f370f))
+* look up elided edges against the shown commits ([70c6bdb](https://github.com/samuelba/ukemi/commit/70c6bdb9189f9ec037e82201ab1b163e29902784))
+* rebuild the graph page from ids after a snapshot ([0a2aa96](https://github.com/samuelba/ukemi/commit/0a2aa96a5844b05ebf093f4146053c3f89de8d4b))
+* rebuild the graph page from ids after a snapshot ([369c0f8](https://github.com/samuelba/ukemi/commit/369c0f8c7b403fa87effbe9ec0a38a3bd3f3193e))
+* reuse elision lookups across working-copy snapshots ([dc0133c](https://github.com/samuelba/ukemi/commit/dc0133c23d2c4acda645f9fa8b711496924c66f8))
+* reuse elision lookups across working-copy snapshots ([878fdac](https://github.com/samuelba/ukemi/commit/878fdacdfe54a47183d8fbfa2a738320ce5dfb05))
+
 ## [0.10.0](https://github.com/samuelba/ukemi/compare/v0.9.0...v0.10.0) (2026-11-03)
 
 
