@@ -19,8 +19,10 @@ import type { ParsedBookmark } from '../jj/parse'
 import { GRAPH_PAGE_SIZE, JjRepo, type TrunkRef } from '../jj/repo'
 import {
   changeRevision,
+  commitSetRevset,
   CURRENT_BOOKMARKS_REVSET,
   customGraphRevset,
+  elisionLookupRevset,
   graphRevset,
   type ChangeRef,
 } from '../jj/revsets'
@@ -406,14 +408,10 @@ export class RepoModel {
     if (unresolved.length === 0) {
       return
     }
-    const nodes = await this.resolveMissingParents(
-      reader,
-      commits,
-      revset,
-      head,
-      unresolved,
+    const nodes = await this.resolveMissingParents(reader, commits, revset, head, unresolved, {
       cutOff,
-    )
+      target: lookupTarget(revset, commits, loaded.isTruncated),
+    })
     this.showGraph(generation, this.assemble(commits, nodes, trunkId, shared), bookmarks)
   }
 
@@ -504,14 +502,14 @@ export class RepoModel {
     revset: string,
     head: string | null,
     missing: readonly string[],
-    cutOff: ReadonlySet<string>,
+    { cutOff, target }: { cutOff: ReadonlySet<string>; target: string },
   ): Promise<GraphNodeInput[]> {
     const found = new Map<string, readonly string[]>()
     // Each lookup is a jj process that loads the repository, so a cold graph with many elided
     // parents would otherwise start dozens at once.
     await mapLimited(missing, ELISION_LOOKUPS_AT_ONCE, async (parent) => {
       try {
-        const ancestors = await reader.commitIds(`heads(::${parent} & (${revset}))`)
+        const ancestors = await reader.commitIds(elisionLookupRevset(parent, target))
         this.elisionCache.remember(revset, parent, head, ancestors)
         found.set(parent, ancestors)
       } catch (error: unknown) {
@@ -705,6 +703,21 @@ function onlySnapshotsSince(operations: readonly Operation[], since: string | nu
   return operations
     .slice(0, index)
     .every((operation) => operation.description.trim() === SNAPSHOT_OPERATION)
+}
+
+// A revset of ids makes jj read only the commits it names, so a list stays well under the 32 KB
+// command line of Windows up to this many commits.
+const MAX_LISTED_COMMITS = GRAPH_PAGE_SIZE
+
+// What the elision lookups search. A graph that is not truncated shows all of the revset, so
+// `heads(::P & <shown ids>)` gives the same commits in the same order as `heads(::P & <revset>)`.
+// jj then checks only the shown commits, where the revset can make it read every commit in the
+// repository, as `mine()` and date filters do.
+function lookupTarget(revset: string, commits: readonly Commit[], isTruncated: boolean): string {
+  if (isTruncated || commits.length > MAX_LISTED_COMMITS) {
+    return revset
+  }
+  return commitSetRevset(commits.map((commit) => commit.commitId))
 }
 
 function sharedGraph(loaded: LoadedRepo, workingCopyFiles: ChangedFile[]): SharedGraph {

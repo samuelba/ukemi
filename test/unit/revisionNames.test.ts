@@ -1,5 +1,12 @@
 import { describe, expect, test } from 'vitest'
-import { bookmarkRevision, changeRevision, exactBookmark, revsetSymbol } from '../../src/jj/revsets'
+import {
+  bookmarkRevision,
+  changeRevision,
+  commitSetRevset,
+  elisionLookupRevset,
+  exactBookmark,
+  revsetSymbol,
+} from '../../src/jj/revsets'
 
 describe('revsetSymbol', () => {
   test.each(['main', 'feature/one', 'v1.2', 'fix-bug', 'a+b', 'snake_case', 'größe'])(
@@ -45,5 +52,18 @@ describe('changeRevision', () => {
   test('names the commit of a divergent or hidden change', () => {
     expect(changeRevision({ ...commit, isDivergent: true })).toBe('c0ffee')
     expect(changeRevision({ ...commit, isHidden: true })).toBe('c0ffee')
+  })
+})
+
+describe('commitSetRevset', () => {
+  test('joins the ids, and names no commit for an empty list', () => {
+    expect(commitSetRevset(['a1', 'b2'])).toBe('a1 | b2')
+    expect(commitSetRevset([])).toBe('none()')
+  })
+})
+
+describe('elisionLookupRevset', () => {
+  test('finds the newest ancestors of the parent in the target', () => {
+    expect(elisionLookupRevset('p0', 'a1 | b2')).toBe('heads(::p0 & (a1 | b2))')
   })
 })
