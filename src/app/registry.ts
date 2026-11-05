@@ -6,6 +6,7 @@ import { discoverRepos, findRepoRootUpwards, type RepoKind } from '../repo/disco
 import { repoLabel } from '../repo/labels'
 import { RepoModel } from '../repo/repoModel'
 import type { Logger } from '../util/logger'
+import { Debouncer } from './debouncer'
 import { Emitter, type Disposable } from './events'
 import type { Host } from './host'
 import {
@@ -19,6 +20,9 @@ import type { SettingsChange } from './settings'
 
 const ACTIVE_REFRESH_DELAY_MS = 400
 const BACKGROUND_REFRESH_DELAY_MS = 3_000
+// While files keep changing (a build, a checkout), refresh at least this often anyway.
+const ACTIVE_REFRESH_MAX_WAIT_MS = 2_000
+const BACKGROUND_REFRESH_MAX_WAIT_MS = 15_000
 const ACTIVE_REPO_KEY = 'ukemi.activeRepo'
 
 interface RepoEntry {
@@ -26,7 +30,6 @@ interface RepoEntry {
   kind: RepoKind
   model: RepoModel | null
   disposables: Disposable[]
-  timer: NodeJS.Timeout | null
 }
 
 export class RepoRegistry implements Disposable {
@@ -217,7 +220,7 @@ export class RepoRegistry implements Disposable {
   }
 
   private createEntry(root: string, kind: RepoKind): RepoEntry {
-    const entry: RepoEntry = { root, kind, model: null, disposables: [], timer: null }
+    const entry: RepoEntry = { root, kind, model: null, disposables: [] }
     if (kind !== 'jj') {
       return entry
     }
@@ -244,33 +247,28 @@ export class RepoRegistry implements Disposable {
   }
 
   private createWatchers(entry: RepoEntry, model: RepoModel): Disposable[] {
+    const refresh = new Debouncer(() => void model.refreshWorkingCopy())
     return [
+      refresh,
       this.host.watchRepo(entry.root, {
         onFile: () => {
           model.markDirty()
-          this.scheduleRefresh(entry, model)
+          this.scheduleRefresh(entry, refresh)
         },
         onOperation: () => void model.refreshIfOperationChanged(),
       }),
     ]
   }
 
-  private scheduleRefresh(entry: RepoEntry, model: RepoModel): void {
-    if (entry.timer) {
-      clearTimeout(entry.timer)
+  private scheduleRefresh(entry: RepoEntry, refresh: Debouncer): void {
+    if (entry.root === this.activeRoot) {
+      refresh.schedule(ACTIVE_REFRESH_DELAY_MS, ACTIVE_REFRESH_MAX_WAIT_MS)
+    } else {
+      refresh.schedule(BACKGROUND_REFRESH_DELAY_MS, BACKGROUND_REFRESH_MAX_WAIT_MS)
     }
-    const delay =
-      entry.root === this.activeRoot ? ACTIVE_REFRESH_DELAY_MS : BACKGROUND_REFRESH_DELAY_MS
-    entry.timer = setTimeout(() => {
-      entry.timer = null
-      void model.refreshWorkingCopy()
-    }, delay)
   }
 
   private disposeEntry(entry: RepoEntry): void {
-    if (entry.timer) {
-      clearTimeout(entry.timer)
-    }
     entry.disposables.forEach((d) => d.dispose())
   }
 
