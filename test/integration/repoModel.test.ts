@@ -521,6 +521,54 @@ describe('RepoModel paging', () => {
     expect(lookups()).toBeGreaterThan(first)
   })
 
+  test('an untruncated graph looks up elided parents among the shown commits', async () => {
+    jj(root, 'describe', '-m', 'mine A')
+    jj(root, '--config', 'user.email=other@ukemi.dev', 'new', '-m', 'other')
+    jj(root, 'new')
+    const lookups: string[] = []
+    class RecordingRunner extends JjRunner {
+      override run(options: RunOptions): Promise<RunResult> {
+        lookups.push(...options.args.filter((arg) => ELISION_LOOKUP.test(arg)))
+        return super.run(options)
+      }
+    }
+    const mine = new RepoModel(
+      new JjRepo(root, new RecordingRunner(JJ_BINARY, NULL_LOGGER)),
+      NULL_LOGGER,
+      { filter: 'mine' },
+    )
+
+    await mine.refresh()
+
+    const shown = mine.graph?.commits.map((c) => c.commitId) ?? []
+    expect(lookups).toHaveLength(1)
+    expect(lookups[0]).toBe(
+      `heads(::${mine.graph?.commits[0]?.parents[0]} & (${shown.join(' | ')}))`,
+    )
+    // The working copy's elided parent leads to A.
+    const workingCopy = mine.graph?.commits.find((c) => c.isWorkingCopy)
+    expect(workingCopy?.row.outgoing).toEqual([{ toColumn: 0, isElided: true }])
+    expect(mine.graph?.commits.map((c) => c.description)).toEqual(['', 'mine A\n'])
+  })
+
+  test('a truncated graph looks up elided parents in its revset', async () => {
+    // mine: A, then a commit by someone else, then B, C and the working copy. A page of three
+    // shows the working copy, C and B, whose parent is elided, and leaves A past the end.
+    jj(root, 'describe', '-m', 'mine A')
+    jj(root, '--config', 'user.email=other@ukemi.dev', 'new', '-m', 'other')
+    jj(root, 'new', '-m', 'mine B')
+    jj(root, 'new', '-m', 'mine C')
+    jj(root, 'new')
+    const { model: paged, commands } = countingModel({ filter: 'mine', pageSize: 3 })
+
+    await paged.refresh()
+
+    expect(paged.graph?.isTruncated).toBe(true)
+    const lookups = commands.filter((line) => ELISION_LOOKUP.test(line))
+    expect(lookups).toHaveLength(1)
+    expect(lookups[0]).toContain('mine()')
+  })
+
   test('a failed elision lookup keeps the edge from the last refresh', async () => {
     jj(root, 'describe', '-m', 'base')
     jj(root, 'new', '-m', 'hidden')

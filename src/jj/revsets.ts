@@ -92,6 +92,16 @@ export function requestCleanupRevset(headBranch: string): string {
   return `(::${head} ~ ::trunk() ~ ::(${others}) ~ (working_copies() ~ empty())) & mutable()`
 }
 
+// The commits with these ids, as a revset.
+export function commitSetRevset(commitIds: readonly string[]): string {
+  return commitIds.length === 0 ? 'none()' : commitIds.join(' | ')
+}
+
+// The commits of `target` that an elided parent leads to: the newest ones among its ancestors.
+export function elisionLookupRevset(parentId: string, target: string): string {
+  return `heads(::${parentId} & (${target}))`
+}
+
 // Commits that are still in a revset and were among the ids the user agreed to, so a command
 // that ran in between cannot widen what a confirmed command rewrites.
 export function confirmedRevset(revset: string, commitIds: readonly string[]): string {
