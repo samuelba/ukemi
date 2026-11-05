@@ -13,6 +13,7 @@ import { useHostMessages } from '../shared/hooks'
 import { postMessage } from '../shared/hostApi'
 import { canSquashIntoParent } from './canSquashIntoParent'
 import { CommitRow } from './CommitRow'
+import { insertGaps } from './dropCommit'
 import { DescribeDialog, type SuggestionReply } from './DescribeDialog'
 import { EmptyState } from './EmptyState'
 import { FileIconFonts, FileIconThemeContext } from './FileIcon'
@@ -140,6 +141,8 @@ export function App() {
     () => new Map((graph?.commits ?? []).map((commit) => [commit.commitId, commit])),
     [graph],
   )
+
+  const gaps = useMemo(() => insertGaps(graph?.commits ?? []), [graph])
 
   const isExpanded = useCallback(
     (commit: CommitView) =>
@@ -324,10 +327,12 @@ export function App() {
         )}
         {state.status === 'ready' && graph ? (
           <div className="graph" role="list">
-            {graph.commits.map((commit) => (
+            {graph.commits.map((commit, index) => (
               <CommitRow
                 key={commit.commitId}
                 commit={commit}
+                gapAbove={gaps[index]?.above ?? null}
+                gapBelow={gaps[index]?.below ?? null}
                 canSquash={canSquashIntoParent(commit, commitsById)}
                 repoId={repoId}
                 lanes={lanes}

@@ -234,6 +234,15 @@
   background: var(--vscode-list-dropBackground);
 }
 
+/* Dropping on the edge of a row inserts the change between it and the neighbouring row. */
+.commit.drop-insert-above {
+  box-shadow: inset 0 2px 0 var(--vscode-focusBorder);
+}
+
+.commit.drop-insert-below {
+  box-shadow: inset 0 -2px 0 var(--vscode-focusBorder);
+}
+
 .graph-cell {
   position: relative;
   flex: none;

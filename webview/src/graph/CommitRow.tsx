@@ -1,12 +1,20 @@
-import { memo, useEffect, useState, useSyncExternalStore, type DragEvent } from 'react'
+import { memo, useEffect, useSyncExternalStore, type DragEvent } from 'react'
 import { parseFileDrag } from '../../../shared/fileUri'
 import type { ChangedFile } from '../../../shared/model'
 import type { CommitView, ViewSettings } from '../../../shared/protocol'
 import { splitId, title } from '../shared/format'
-import { postMessage, vscodeContext } from '../shared/hostApi'
+import { isDesktop, postMessage, vscodeContext } from '../shared/hostApi'
 import { BOOKMARK_MIME, Badges, RequestRow } from './Badges'
-import { dropCommitAction, fileDropAction } from './dropCommit'
+import {
+  dropCommitAction,
+  fileDropAction,
+  insertCommitAction,
+  insertEdge,
+  type InsertEdge,
+} from './dropCommit'
 import { dragModifiers, installDragModifiers } from './dragModifiers'
+import { setTranslucentDragImage } from './dragImage'
+import { createDropMarker } from './dropMarker'
 import { FileList, FILE_LOCKED_MIME, FILE_MIME } from './FileList'
 import { LineStats, lineTotals } from './LineStats'
 import { GraphCell } from './GraphCell'
@@ -16,6 +24,9 @@ export const COMMIT_MIME = 'application/x-ukemi-commit'
 
 interface CommitRowProps {
   commit: CommitView
+  // The neighbouring rows a change can be dropped between this row and (see insertGaps).
+  gapAbove: string | null
+  gapBelow: string | null
   canSquash: boolean
   repoId: string
   lanes: number
@@ -32,7 +43,27 @@ interface CommitRowProps {
   onDescribe: (commit: CommitView) => void
 }
 
-type DropKind = 'commit' | 'duplicate' | 'file' | 'bookmark'
+type DropKind = 'commit' | 'duplicate' | 'file' | 'bookmark' | `insert-${InsertEdge}`
+
+// The drag data cannot be read before the drop, so the row being dragged is kept here.
+let draggedCommitId: string | null = null
+
+// Shared by all rows, so a row that misses its dragleave cannot keep a stale marker.
+const dropMarker = createDropMarker<DropKind>()
+
+// File and bookmark drags start outside a commit row, so clear on any drag that ends.
+if (typeof window !== 'undefined') {
+  window.addEventListener('dragend', () => dropMarker.clear(), true)
+  window.addEventListener('drop', () => dropMarker.clear(), true)
+}
+
+function useDropTarget(commitId: string): DropKind | null {
+  return useSyncExternalStore(
+    dropMarker.subscribe,
+    () => dropMarker.kindFor(commitId),
+    () => null,
+  )
+}
 
 function useCopyModifier() {
   useEffect(() => installDragModifiers(), [])
@@ -55,6 +86,11 @@ function dropKind(event: DragEvent, copy: boolean): DropKind | null {
     return 'file'
   }
   return types.includes(BOOKMARK_MIME) ? 'bookmark' : null
+}
+
+function pointInside(element: Element, x: number, y: number): boolean {
+  const rect = element.getBoundingClientRect()
+  return x >= rect.left && x < rect.right && y >= rect.top && y < rect.bottom
 }
 
 function runCommand(command: string, repoId: string, commitId: string) {
@@ -81,7 +117,9 @@ function RowAction({ title, icon, onClick }: { title: string; icon: string; onCl
 // rows that changed render again.
 export const CommitRow = memo(function CommitRow(props: CommitRowProps) {
   const { commit, repoId, settings, isExpanded } = props
-  const [dropTarget, setDropTarget] = useState<DropKind | null>(null)
+  const dropTarget = useDropTarget(commit.commitId)
+  const setDropTarget = (kind: DropKind | null) =>
+    kind ? dropMarker.show(commit.commitId, kind) : dropMarker.hide(commit.commitId)
   const copyModifier = useCopyModifier()
   const change = splitId(commit.changeId, commit.changePrefix, settings.changeIdLength)
   const summary = title(commit.description)
@@ -98,10 +136,37 @@ export const CommitRow = memo(function CommitRow(props: CommitRowProps) {
     return !commit.isImmutable || kind === 'commit'
   }
 
+  // The pair of changes a drop on the edge of this row goes between, if any.
+  const insertPair = (
+    event: DragEvent,
+  ): { edge: InsertEdge; after: string; before: string } | null => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const edge = insertEdge(event.clientY - rect.top, rect.height)
+    const pair =
+      edge === 'above' && props.gapAbove
+        ? { edge, after: commit.commitId, before: props.gapAbove }
+        : edge === 'below' && props.gapBelow
+          ? { edge, after: props.gapBelow, before: commit.commitId }
+          : null
+    if (!pair || draggedCommitId === pair.after || draggedCommitId === pair.before) {
+      return null
+    }
+    return pair
+  }
+
+  // Also bound to dragenter: Chromium takes the drop effect from dragenter alone for the first
+  // position over a new element, so an unhandled dragenter shows "no drop" until the next move.
   const onDragOver = (event: DragEvent) => {
     dragModifiers.onDragOver(event)
     const copy = dragModifiers.snapshot().copy
     const kind = dropKind(event, copy)
+    const pair = kind === 'commit' ? insertPair(event) : null
+    if (pair) {
+      event.preventDefault()
+      event.dataTransfer.dropEffect = copy ? 'copy' : 'move'
+      setDropTarget(`insert-${pair.edge}`)
+      return
+    }
     if (kind && accepts(kind)) {
       event.preventDefault()
       const copyDrop = (kind === 'commit' || kind === 'file') && copy
@@ -116,7 +181,18 @@ export const CommitRow = memo(function CommitRow(props: CommitRowProps) {
     dragModifiers.onDragOver(event)
     const modifiers = dragModifiers.snapshot()
     const kind = dropKind(event, modifiers.copy)
-    if (kind === 'commit') {
+    const pair = kind === 'commit' ? insertPair(event) : null
+    if (pair) {
+      const { action, mode } = insertCommitAction(modifiers.copy, modifiers.alt)
+      postMessage({
+        type: 'insertCommit',
+        sourceId: event.dataTransfer.getData(COMMIT_MIME),
+        afterId: pair.after,
+        beforeId: pair.before,
+        action,
+        mode,
+      })
+    } else if (kind === 'commit') {
       const { action, mode } = dropCommitAction(modifiers.copy, modifiers.alt)
       postMessage({
         type: 'dropCommit',
@@ -174,12 +250,26 @@ export const CommitRow = memo(function CommitRow(props: CommitRowProps) {
           return
         }
         dragModifiers.onDragStart(event, commit.isImmutable)
+        draggedCommitId = commit.commitId
         event.dataTransfer.setData(COMMIT_MIME, commit.commitId)
         event.dataTransfer.effectAllowed = 'copyMove'
+        if (isDesktop) {
+          setTranslucentDragImage(event)
+        }
       }}
-      onDragEnd={() => dragModifiers.onDragEnd()}
+      onDragEnd={() => {
+        draggedCommitId = null
+        dragModifiers.onDragEnd()
+      }}
+      onDragEnter={onDragOver}
       onDragOver={onDragOver}
-      onDragLeave={() => setDropTarget(null)}
+      onDragLeave={(event) => {
+        // Moving between elements of this row also fires dragleave. Keep the marker then. A move
+        // to another row needs no check: that row's dragenter has already taken the marker.
+        if (!pointInside(event.currentTarget, event.clientX, event.clientY)) {
+          setDropTarget(null)
+        }
+      }}
       onDrop={onDrop}
       onClick={() => {
         props.onSelect(commit.commitId)
