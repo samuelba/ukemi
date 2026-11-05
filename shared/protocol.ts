@@ -60,6 +60,8 @@ export interface GraphState {
   depth: HistoryDepth
   // A revset the user typed. It replaces the filter while set.
   revset: string | null
+  // The revset matches more commits than the graph loaded. Scrolling to the end loads more.
+  isTruncated: boolean
   hasRemotes: boolean
   hasUnpushed: boolean
   canUndo: boolean
@@ -141,6 +143,7 @@ export type WebviewMessage =
   | { type: 'setFilter'; filter: GraphFilter }
   | { type: 'setDepth'; depth: HistoryDepth }
   | { type: 'setRevset'; revset: string }
+  | { type: 'loadMore' }
   | { type: 'listRevsets' }
   | { type: 'loadFiles'; commitId: string }
   | { type: 'selectCommit'; commitId: string }

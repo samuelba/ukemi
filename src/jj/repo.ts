@@ -50,7 +50,14 @@ import {
 } from './templates'
 
 export const MAX_LOG_ENTRIES = 2000
+// The graph loads this many commits at first, and this many more each time it reaches the end.
+export const GRAPH_PAGE_SIZE = 500
 export const MAX_EVOLUTION_ENTRIES = 200
+
+export interface LogPage {
+  commits: Commit[]
+  isTruncated: boolean
+}
 export const MAX_FILE_HISTORY_ENTRIES = 500
 
 export type SplitDirection = 'below' | 'above'
@@ -139,6 +146,13 @@ export class JjRepo {
       LOG_TEMPLATE,
     ])
     return parseLog(stdout)
+  }
+
+  // The first `limit` commits of the revset. One more is asked for, so a revset that holds more
+  // says so instead of ending silently at the limit.
+  async logPage(revset: string, limit: number): Promise<LogPage> {
+    const commits = await this.log(revset, limit + 1)
+    return { commits: commits.slice(0, limit), isTruncated: commits.length > limit }
   }
 
   async commitIds(revset: string): Promise<string[]> {

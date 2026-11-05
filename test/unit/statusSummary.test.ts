@@ -47,6 +47,7 @@ function graph(overrides: Partial<GraphState> = {}): GraphState {
     filter: 'recent',
     depth: '7d',
     revset: null,
+    isTruncated: false,
     hasRemotes: true,
     hasUnpushed: false,
     canUndo: true,
