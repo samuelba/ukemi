@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { GRAPH_PAGE_SIZE, JjRepo } from '../../src/jj/repo'
+import { isVersionAtLeast, parseVersion } from '../../src/jj/parse'
+import { GRAPH_PAGE_SIZE, JjRepo, TEMPLATE_REVSET_VERSION } from '../../src/jj/repo'
 import { JjRunner, type RunOptions, type RunResult } from '../../src/jj/runner'
 import { RepoModel } from '../../src/repo/repoModel'
 import { NULL_LOGGER, type Logger } from '../../src/util/logger'
@@ -17,6 +18,11 @@ import {
 
 // The graph asks for one commit more than a page, to tell whether more exist.
 const GRAPH_LOAD = `--limit=${GRAPH_PAGE_SIZE + 1}`
+
+// Batched elision lookups need a jj whose templates evaluate revsets. CI also runs an older jj.
+const installedJj = parseVersion(execFileSync(JJ_BINARY, ['--version'], { encoding: 'utf8' }))
+const canBatchWithInstalledJj =
+  installedJj !== null && isVersionAtLeast(installedJj, TEMPLATE_REVSET_VERSION)
 
 let fixture: Fixture
 let root: string
@@ -567,6 +573,98 @@ describe('RepoModel paging', () => {
     const lookups = commands.filter((line) => ELISION_LOOKUP.test(line))
     expect(lookups).toHaveLength(1)
     expect(lookups[0]).toContain('mine()')
+  })
+
+  describe('batched elision lookups', () => {
+    // mine: A and B side by side, joined by someone else's merge with D on top, and C, someone
+    // else's commit and E on another branch. D's elided parent leads to both A and B, and E's to
+    // C, so one graph has two lookups, one of them with two edges.
+    function twoElidedParents(): void {
+      const other = ['--config', 'user.email=other@ukemi.dev']
+      jj(root, 'describe', '-m', 'mine A')
+      jj(root, 'new', 'root()', '-m', 'mine B')
+      jj(root, ...other, 'new', 'description(substring:"mine A")', '@', '-m', 'other merge')
+      jj(root, 'new', '-m', 'mine D')
+      jj(root, 'new', 'root()', '-m', 'mine C')
+      jj(root, ...other, 'new', '-m', 'other')
+      jj(root, 'new', '-m', 'mine E')
+    }
+
+    interface Recorded {
+      model: RepoModel
+      args: string[][]
+      warnings: string[]
+    }
+
+    function recordingModel(options: { version?: string; failBatch?: boolean } = {}): Recorded {
+      const args: string[][] = []
+      class TestRunner extends JjRunner {
+        override version(): ReturnType<JjRunner['version']> {
+          if (options.version === undefined) {
+            return super.version()
+          }
+          const [major = 0, minor = 0, patch = 0] = options.version.split('.').map(Number)
+          return Promise.resolve({ major, minor, patch })
+        }
+        override async run(run: RunOptions): Promise<RunResult> {
+          args.push([...run.args])
+          if (options.failBatch && run.args.some((arg) => arg.includes('revset('))) {
+            throw new Error('batch failed')
+          }
+          return super.run(run)
+        }
+      }
+      const warnings: string[] = []
+      const logger: Logger = { ...NULL_LOGGER, warn: (line) => warnings.push(line) }
+      const model = new RepoModel(
+        new JjRepo(root, new TestRunner(JJ_BINARY, NULL_LOGGER)),
+        logger,
+        {
+          filter: 'mine',
+        },
+      )
+      return { model, args, warnings }
+    }
+
+    const batches = (args: string[][]): number =>
+      args.filter((run) => run.some((arg) => arg.includes('revset('))).length
+    const separateLookups = (args: string[][]): number =>
+      args.filter((run) => run.some((arg) => ELISION_LOOKUP.test(arg))).length
+
+    test.skipIf(!canBatchWithInstalledJj)(
+      'one jj process draws the same graph as one lookup per parent',
+      async () => {
+        twoElidedParents()
+        const batched = recordingModel()
+        const separate = recordingModel({ version: '0.46.0' })
+
+        await batched.model.refresh()
+        await separate.model.refresh()
+
+        expect(batches(batched.args)).toBe(1)
+        expect(separateLookups(batched.args)).toBe(0)
+        expect(batches(separate.args)).toBe(0)
+        expect(separateLookups(separate.args)).toBe(2)
+        expect(batched.model.graph).toEqual(separate.model.graph)
+        const mineD = batched.model.graph?.commits.find((c) => c.description === 'mine D\n')
+        expect(mineD?.row.outgoing.filter((edge) => edge.isElided)).toHaveLength(2)
+      },
+    )
+
+    test('a failed batch falls back to one lookup per parent', async () => {
+      twoElidedParents()
+      // The batch fails before jj runs it, so any installed jj will do.
+      const failing = recordingModel({ version: '0.47.0', failBatch: true })
+      const separate = recordingModel({ version: '0.46.0' })
+
+      await failing.model.refresh()
+      await separate.model.refresh()
+
+      expect(batches(failing.args)).toBe(1)
+      expect(separateLookups(failing.args)).toBe(2)
+      expect(failing.warnings.some((line) => line.includes('batched elision lookup'))).toBe(true)
+      expect(failing.model.graph).toEqual(separate.model.graph)
+    })
   })
 
   test('a failed elision lookup keeps the edge from the last refresh', async () => {

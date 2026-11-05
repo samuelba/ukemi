@@ -4,6 +4,8 @@ import { hostSpawn } from '../util/hostProcess'
 import { killTree, OWN_GROUP } from '../util/processTree'
 import type { Logger } from '../util/logger'
 import { redactUrlCredentials } from '../util/text'
+import { askVersion } from './binary'
+import type { JjVersion } from './parse'
 
 export const DEFAULT_TIMEOUT_MS = 60_000
 export const NETWORK_TIMEOUT_MS = 120_000
@@ -164,6 +166,7 @@ export class JjRunner {
   // jj processes still running, so closing the window that owns this runner can end them.
   private readonly running = new Set<ChildProcess>()
   private isDisposed = false
+  private versionProbe: { path: string; version: Promise<JjVersion | null> } | null = null
 
   constructor(
     private binaryPath: string,
@@ -177,6 +180,15 @@ export class JjRunner {
 
   useBinary(path: string): void {
     this.binaryPath = path
+  }
+
+  // The version of the jj this runner starts, asked once for each binary. Null when jj does not
+  // answer, which callers treat as a version without the newer features.
+  version(): Promise<JjVersion | null> {
+    if (this.versionProbe?.path !== this.binaryPath) {
+      this.versionProbe = { path: this.binaryPath, version: askVersion(this.binaryPath) }
+    }
+    return this.versionProbe.version
   }
 
   setEnvironment(env: Readonly<Record<string, string>>): void {

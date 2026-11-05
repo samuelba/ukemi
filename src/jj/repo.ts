@@ -19,8 +19,10 @@ import { SerialQueue } from '../util/serialQueue'
 import {
   parseAnnotation,
   parseBookmarks,
+  isVersionAtLeast,
   parseCommitIds,
   parseDiffFiles,
+  parseElidedHeads,
   parseEvolution,
   parseFiles,
   parseLog,
@@ -28,8 +30,9 @@ import {
   parseRemotes,
   parseTracking,
   parseWorkspaces,
+  type JjVersion,
 } from './parse'
-import { bookmarkRevision, exactBookmark, rootFileset } from './revsets'
+import { bookmarkRevision, commitSetRevset, exactBookmark, rootFileset } from './revsets'
 import { JjError, JjRunner, NETWORK_TIMEOUT_MS, type RunOptions, type RunResult } from './runner'
 import { jjString } from './templates'
 import {
@@ -39,6 +42,7 @@ import {
   BOOKMARK_TRACKING_TEMPLATE,
   COMMIT_ID_TEMPLATE,
   DIFF_FILES_TEMPLATE,
+  elidedHeadsTemplate,
   EVOLOG_TEMPLATE,
   FILES_STATS_TEMPLATE,
   FILES_TEMPLATE,
@@ -53,6 +57,8 @@ export const MAX_LOG_ENTRIES = 2000
 // The graph loads this many commits at first, and this many more each time it reaches the end.
 export const GRAPH_PAGE_SIZE = 500
 export const MAX_EVOLUTION_ENTRIES = 200
+// The first jj whose templates can evaluate a revset, which elidedHeads needs.
+export const TEMPLATE_REVSET_VERSION: JjVersion = { major: 0, minor: 47, patch: 0 }
 
 export interface LogPage {
   commits: Commit[]
@@ -165,6 +171,26 @@ export class JjRepo {
       COMMIT_ID_TEMPLATE,
     ])
     return parseCommitIds(stdout)
+  }
+
+  // Whether elidedHeads works with this jj.
+  async canBatchElisionLookups(): Promise<boolean> {
+    const version = await this.runner.version()
+    return version !== null && isVersionAtLeast(version, TEMPLATE_REVSET_VERSION)
+  }
+
+  // heads(::parent & (target)) for each parent, from one jj process instead of one each. A
+  // parent missing from the result was not answered. Needs TEMPLATE_REVSET_VERSION.
+  async elidedHeads(parentIds: readonly string[], target: string): Promise<Map<string, string[]>> {
+    const { stdout } = await this.read([
+      'log',
+      '--no-graph',
+      '-r',
+      commitSetRevset(parentIds),
+      '-T',
+      elidedHeadsTemplate(target),
+    ])
+    return parseElidedHeads(stdout)
   }
 
   async files(commitId: string, withStats = false): Promise<ChangedFile[]> {

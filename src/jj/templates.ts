@@ -86,6 +86,14 @@ export const DIFF_FILES_TEMPLATE =
 
 export const COMMIT_ID_TEMPLATE = 'commit_id ++ "\\n"'
 
+// For each elided parent it renders, the parent's id and then the ids of
+// heads(::parent & (target)), in the order `jj log` prints that revset. revset() in templates
+// needs jj 0.47.
+export function elidedHeadsTemplate(target: string): string {
+  const lookup = `revset(${jjString('heads(::')} ++ commit_id ++ ${jjString(` & (${target}))`)})`
+  return `commit_id ++ " " ++ ${lookup}.map(|c| c.commit_id()).join(" ") ++ "\\n"`
+}
+
 export const WORKSPACE_TEMPLATE =
   'json({"name" => name, "root" => root, "commit_id" => target.commit_id(), "change_id" => target.change_id().short(8), "description" => target.description().first_line(), "is_empty" => target.empty(), "changed_files" => target.diff().files().len()}) ++ "\\n"'
 
