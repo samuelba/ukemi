@@ -33,6 +33,16 @@ describe('ElisionCache', () => {
     expect(cache.lookup('r', 'p', 'op1', day)?.fresh).toBe(false)
   })
 
+  it('carries entries from one operation forward to the next', () => {
+    const cache = new ElisionCache()
+    cache.remember('r', 'p', 'op1', ['a'], day)
+    cache.remember('r', 'q', 'op0', ['b'], day)
+    cache.carryForward('op1', 'op2', day)
+    expect(cache.get('r', 'p', 'op2', day)).toEqual(['a'])
+    // Only entries resolved at the earlier operation move.
+    expect(cache.lookup('r', 'q', 'op2', day)?.fresh).toBe(false)
+  })
+
   it('caches an empty result and resolves once per operation', async () => {
     const cache = new ElisionCache()
     let calls = 0

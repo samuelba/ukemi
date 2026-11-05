@@ -365,6 +365,9 @@ export class RepoModel {
     const reader = head === null ? this.repo : this.repo.atOperation(head)
     const revset =
       this.revset === null ? graphRevset(this.filter, this.depth) : customGraphRevset(this.revset)
+    if (this.snapshotsKeepElisions() && onlySnapshotsSince(operations, this.lastOperationId)) {
+      this.elisionCache.carryForward(this.lastOperationId, head)
+    }
     const loaded = await this.loadRevisionData(reader, revset, operations)
     if (generation !== this.viewGeneration) {
       return
@@ -432,6 +435,18 @@ export class RepoModel {
       this.logger.warn(`graph: finding the parents past the end failed: ${errorMessage(error)}`)
       return new Set()
     }
+  }
+
+  // A snapshot rewrites the working copy and rebases its descendants, so every other commit,
+  // and with it the ancestry of each unchanged elided parent, stays as it was. The rewritten
+  // commits are mutable and keep their author, so they stay in or out of the preset revsets,
+  // except under a date window, which a rewrite can move an old commit into. A typed revset
+  // can match anything, so it gets no shortcut.
+  private snapshotsKeepElisions(): boolean {
+    if (this.revset !== null) {
+      return false
+    }
+    return this.filter !== 'recent' || this.depth === 'all'
   }
 
   // Logged when the count changes, so a refresh of the same graph does not repeat it.
@@ -672,6 +687,24 @@ interface SharedGraph {
   currentBookmarks: string[]
   tracking: BookmarkTracking[]
   trunkName: string | null
+}
+
+const SNAPSHOT_OPERATION = 'snapshot working copy'
+
+// True when the newest operations are snapshots that lead straight back to `since`. The log
+// lists each operation before its parents, and a snapshot has one parent, so `since` coming
+// right after the snapshots means it is their ancestor and nothing else landed in between.
+function onlySnapshotsSince(operations: readonly Operation[], since: string | null): boolean {
+  if (since === null) {
+    return false
+  }
+  const index = operations.findIndex((operation) => operation.id === since)
+  if (index <= 0) {
+    return false
+  }
+  return operations
+    .slice(0, index)
+    .every((operation) => operation.description.trim() === SNAPSHOT_OPERATION)
 }
 
 function sharedGraph(loaded: LoadedRepo, workingCopyFiles: ChangedFile[]): SharedGraph {
