@@ -96,7 +96,16 @@ export async function probeVersion(path: string): Promise<JjVersion | null> {
     if (!flatpakAppId()) {
       await access(path, constants.X_OK)
     }
-    const host = hostSpawn(path, ['--version'])
+  } catch {
+    return null
+  }
+  return askVersion(path)
+}
+
+// The version that `jj --version` reports, for a path or a command name that PATH resolves.
+export async function askVersion(command: string): Promise<JjVersion | null> {
+  try {
+    const host = hostSpawn(command, ['--version'])
     const { stdout } = await execFileAsync(host.command, host.args, {
       env: host.env,
       timeout: VERSION_PROBE_TIMEOUT_MS,

@@ -13,6 +13,8 @@ concurrency:
 env:
   JJ_VERSION: '0.46.0'
   JJ_SHA256: fce0271158e665ceb82dc66c5eb95b1728649094e9133074f3b5baece345fc08
+  JJ_LATEST_VERSION: '0.47.1'
+  JJ_LATEST_SHA256: d4b657f622ee50929c8916466dfa3d6a6c17a0a32b50e7b2c793707ec9ebcad7
 
 jobs:
   build:
@@ -73,6 +75,22 @@ jobs:
           name: coverage
           path: coverage/
 
+  # The newest jj, for features older releases lack, such as revsets in templates.
+  tests-latest-jj:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - uses: ./.github/actions/setup-jj
+        with:
+          version: ${{ env.JJ_LATEST_VERSION }}
+          sha256: ${{ env.JJ_LATEST_SHA256 }}
+      - run: npm ci
+      - run: npx vitest run test/integration
+
   e2e:
     needs: build
     runs-on: ubuntu-latest
@@ -122,6 +140,7 @@ jobs:
       - format
       - lint
       - tests
+      - tests-latest-jj
       - e2e
       - desktop
     runs-on: ubuntu-latest

@@ -410,7 +410,7 @@ export class RepoModel {
     }
     const nodes = await this.resolveMissingParents(reader, commits, revset, head, unresolved, {
       cutOff,
-      target: lookupTarget(revset, commits, loaded.isTruncated),
+      lookup: lookupTarget(revset, commits, loaded.isTruncated),
     })
     this.showGraph(generation, this.assemble(commits, nodes, trunkId, shared), bookmarks)
   }
@@ -502,16 +502,21 @@ export class RepoModel {
     revset: string,
     head: string | null,
     missing: readonly string[],
-    { cutOff, target }: { cutOff: ReadonlySet<string>; target: string },
+    { cutOff, lookup }: { cutOff: ReadonlySet<string>; lookup: LookupTarget },
   ): Promise<GraphNodeInput[]> {
     const found = new Map<string, readonly string[]>()
+    const answer = (parent: string, ancestors: readonly string[]): void => {
+      this.elisionCache.remember(revset, parent, head, ancestors)
+      found.set(parent, ancestors)
+    }
+    const batched = await this.batchLookups(reader, missing, lookup)
+    batched.forEach((ancestors, parent) => answer(parent, ancestors))
+    const remaining = missing.filter((parent) => !batched.has(parent))
     // Each lookup is a jj process that loads the repository, so a cold graph with many elided
     // parents would otherwise start dozens at once.
-    await mapLimited(missing, ELISION_LOOKUPS_AT_ONCE, async (parent) => {
+    await mapLimited(remaining, ELISION_LOOKUPS_AT_ONCE, async (parent) => {
       try {
-        const ancestors = await reader.commitIds(elisionLookupRevset(parent, target))
-        this.elisionCache.remember(revset, parent, head, ancestors)
-        found.set(parent, ancestors)
+        answer(parent, await reader.commitIds(elisionLookupRevset(parent, lookup.revset)))
       } catch (error: unknown) {
         // Nothing is stored, so a provisional edge from the cache stays and the next refresh
         // tries again.
@@ -525,6 +530,26 @@ export class RepoModel {
       (parent) => found.get(parent) ?? this.elisionCache.lookup(revset, parent, head)?.ancestors,
       cutOff,
     ).nodes
+  }
+
+  // One jj process answers every lookup, when jj can evaluate revsets in templates. That only
+  // pays when the lookups search the shown commits: with the graph's revset, jj would evaluate
+  // it once for each parent in a row. A failed batch answers nothing, so each parent falls back
+  // to a lookup of its own.
+  private async batchLookups(
+    reader: JjRepo,
+    missing: readonly string[],
+    lookup: LookupTarget,
+  ): Promise<ReadonlyMap<string, readonly string[]>> {
+    if (!lookup.listsShown || missing.length < 2 || !(await reader.canBatchElisionLookups())) {
+      return new Map()
+    }
+    try {
+      return await reader.elidedHeads(missing, lookup.revset)
+    } catch (error: unknown) {
+      this.logger.warn(`graph: the batched elision lookup failed: ${errorMessage(error)}`)
+      return new Map()
+    }
   }
 
   private assemble(
@@ -709,15 +734,25 @@ function onlySnapshotsSince(operations: readonly Operation[], since: string | nu
 // command line of Windows up to this many commits.
 const MAX_LISTED_COMMITS = GRAPH_PAGE_SIZE
 
+interface LookupTarget {
+  readonly revset: string
+  // True when `revset` lists the shown commits rather than being the graph's revset.
+  readonly listsShown: boolean
+}
+
 // What the elision lookups search. A graph that is not truncated shows all of the revset, so
 // `heads(::P & <shown ids>)` gives the same commits in the same order as `heads(::P & <revset>)`.
 // jj then checks only the shown commits, where the revset can make it read every commit in the
 // repository, as `mine()` and date filters do.
-function lookupTarget(revset: string, commits: readonly Commit[], isTruncated: boolean): string {
+function lookupTarget(
+  revset: string,
+  commits: readonly Commit[],
+  isTruncated: boolean,
+): LookupTarget {
   if (isTruncated || commits.length > MAX_LISTED_COMMITS) {
-    return revset
+    return { revset, listsShown: false }
   }
-  return commitSetRevset(commits.map((commit) => commit.commitId))
+  return { revset: commitSetRevset(commits.map((commit) => commit.commitId)), listsShown: true }
 }
 
 function sharedGraph(loaded: LoadedRepo, workingCopyFiles: ChangedFile[]): SharedGraph {

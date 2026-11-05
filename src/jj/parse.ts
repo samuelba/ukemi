@@ -285,11 +285,28 @@ export function parseRemotes(output: string): Remote[] {
     .filter((remote) => remote.name.length > 0 && remote.url.length > 0)
 }
 
+const COMMIT_ID = /^[0-9a-f]{40}$/
+
 export function parseCommitIds(output: string): string[] {
   return output
     .split('\n')
     .map((line) => line.trim())
-    .filter((line) => /^[0-9a-f]{40}$/.test(line))
+    .filter((line) => COMMIT_ID.test(line))
+}
+
+// One line per elided parent: the parent's id, then the ids its lookup found.
+export function parseElidedHeads(output: string): Map<string, string[]> {
+  const heads = new Map<string, string[]>()
+  for (const line of output.split('\n')) {
+    const [parent, ...ids] = line.trim().split(' ')
+    if (parent && COMMIT_ID.test(parent)) {
+      heads.set(
+        parent,
+        ids.filter((id) => COMMIT_ID.test(id)),
+      )
+    }
+  }
+  return heads
 }
 
 export interface JjVersion {
