@@ -372,6 +372,62 @@ describe('mutations', () => {
     expect(stillKeeper?.parents).toEqual([parent])
   })
 
+  // A linear stack s1-s2-s3-s4, each with its own file, with @ empty on top.
+  async function stack() {
+    const changes: Record<string, string> = {}
+    for (const name of ['s1', 's2', 's3', 's4']) {
+      jj(root, 'describe', '-m', name)
+      writeFile(root, `${name}.txt`, `${name}\n`)
+      changes[name] = (await current()).changeId
+      jj(root, 'new')
+    }
+    return changes
+  }
+
+  // The descriptions from the parent of @ down to the root's child.
+  async function order() {
+    const commits = await repo.log('::@- ~ root()')
+    return commits.map((commit) => commit.description.trim())
+  }
+
+  test('rebase between moves one change up the stack', async () => {
+    const c = await stack()
+
+    await repo.rebaseBetween(c.s2 ?? '', 'revision', c.s3 ?? '', c.s4 ?? '')
+
+    expect(await order()).toEqual(['s4', 's2', 's3', 's1'])
+  })
+
+  test('rebase between moves one change down the stack', async () => {
+    const c = await stack()
+
+    await repo.rebaseBetween(c.s4 ?? '', 'revision', c.s1 ?? '', c.s2 ?? '')
+
+    expect(await order()).toEqual(['s3', 's2', 's4', 's1'])
+  })
+
+  test('rebase between with descendants moves the change and those above it', async () => {
+    const c = await stack()
+
+    await repo.rebaseBetween(c.s3 ?? '', 'source', c.s1 ?? '', c.s2 ?? '')
+
+    // @ is a descendant of s3, so it comes along and s2 lands on the new head.
+    const [wc] = await repo.log('@')
+    const [s1] = await repo.log(c.s1 ?? '')
+    const [s2] = await repo.log(c.s2 ?? '')
+    const [s3] = await repo.log(c.s3 ?? '')
+    expect(s3?.parents).toEqual([s1?.commitId])
+    expect(s2?.parents).toEqual([wc?.commitId])
+  })
+
+  test('duplicate between inserts a copy and leaves the original', async () => {
+    const c = await stack()
+
+    await repo.duplicateBetween(c.s1 ?? '', c.s3 ?? '', c.s4 ?? '')
+
+    expect(await order()).toEqual(['s4', 's1', 's3', 's2', 's1'])
+  })
+
   test('rebase branch mode moves the whole stack onto trunk from its tip', async () => {
     const remote = join(fixture.dir, 'remote.git')
     execFileSync('git', ['init', '--bare', '-q', remote])

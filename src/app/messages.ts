@@ -149,6 +149,29 @@ export function createMessageHandler(env: CommandEnv, dispatch: CommandDispatche
         )
         return
       }
+      case 'insertCommit': {
+        const { sourceId, afterId, beforeId } = message
+        if (sourceId === afterId || sourceId === beforeId) {
+          return
+        }
+        const after = model.revisionFor(afterId)
+        const before = model.revisionFor(beforeId)
+        if (message.action === 'duplicate') {
+          const source = model.revisionFor(sourceId)
+          const revset = message.mode === 'source' ? `${source}::` : source
+          await env.operations.run('Duplicate', model, () =>
+            model.repo.duplicateBetween(revset, after, before),
+          )
+          return
+        }
+        if (model.findCommit(sourceId)?.isImmutable) {
+          return
+        }
+        await env.operations.run('Rebase', model, () =>
+          model.repo.rebaseBetween(model.revisionFor(sourceId), message.mode, after, before),
+        )
+        return
+      }
       case 'dropFile': {
         if (!model) {
           return

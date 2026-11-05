@@ -541,6 +541,11 @@ export class JjRepo {
     ])
   }
 
+  // Inserts copies between two changes, which rebases `before` and its descendants onto them.
+  duplicateBetween(revset: string, after: string, before: string) {
+    return this.mutate(['duplicate', revset, '--insert-after', after, '--insert-before', before])
+  }
+
   revert(commitId: string) {
     return this.mutate(['revert', '-r', commitId, '--onto', '@'])
   }
@@ -552,6 +557,19 @@ export class JjRepo {
       source,
       PLACEMENT_FLAGS[placement],
       destination,
+    ])
+  }
+
+  // Inserts the source between two changes, which rebases `before` onto it.
+  rebaseBetween(source: string, mode: RebaseMode, after: string, before: string) {
+    return this.mutate([
+      'rebase',
+      REBASE_MODE_FLAGS[mode],
+      source,
+      '--insert-after',
+      after,
+      '--insert-before',
+      before,
     ])
   }
 

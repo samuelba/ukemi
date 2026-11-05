@@ -160,6 +160,15 @@ export type WebviewMessage =
       mode: DropMode
       action: DropAction
     }
+  // Insert a change between two changes: after the lower one, before the upper one.
+  | {
+      type: 'insertCommit'
+      sourceId: string
+      afterId: string
+      beforeId: string
+      mode: DropMode
+      action: DropAction
+    }
   | {
       type: 'dropFile'
       fromCommitId: string
