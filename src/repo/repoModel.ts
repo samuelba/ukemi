@@ -1,5 +1,5 @@
 import { resolve } from 'node:path'
-import { layoutGraph, type GraphNodeInput, type GraphRow } from '../../shared/graphLayout'
+import { layoutGraph, type GraphNodeInput } from '../../shared/graphLayout'
 import type {
   BookmarkTracking,
   ChangedFile,
@@ -19,7 +19,6 @@ import type { ParsedBookmark } from '../jj/parse'
 import { GRAPH_PAGE_SIZE, JjRepo, type TrunkRef } from '../jj/repo'
 import {
   changeRevision,
-  commitSetRevset,
   CURRENT_BOOKMARKS_REVSET,
   customGraphRevset,
   elisionLookupRevset,
@@ -29,7 +28,22 @@ import {
 import type { Logger } from '../util/logger'
 import { mapLimited } from '../util/mapLimited'
 import { errorMessage } from '../util/logger'
+import {
+  changesOf,
+  hasUnsyncedBookmarks,
+  markNeverPushed,
+  remoteBookmarkNames,
+  toCommitView,
+} from './commitViews'
 import { placeBookmark as moveLocalBookmark } from './placeBookmark'
+import {
+  lookupTarget,
+  onlySnapshotsSince,
+  snapshotPageRevset,
+  snapshotsKeepMembership,
+  type GraphView,
+  type LookupTarget,
+} from './refreshRevsets'
 import { resolveSelectedCommit } from './selection'
 import { canRedo, UNDO_HISTORY_LIMIT } from './undoState'
 
@@ -39,6 +53,9 @@ const NETWORK_OPERATION = /^(fetch from git remote|push .*to git remote)/
 export type ChangeListener = () => void
 
 const ELISION_LOOKUPS_AT_ONCE = 4
+// Reading the page from the shown commits after a snapshot pays off only where the revset is
+// slow, as when it makes jj read every commit of a large repository.
+const SNAPSHOT_PAGE_AFTER_MS = 300
 
 export class RepoModel {
   private filter: GraphFilter = 'recent'
@@ -49,6 +66,9 @@ export class RepoModel {
   // starts over when the view changes.
   private limit: number
   private droppedParents = 0
+  private readonly snapshotPageAfterMs: number
+  // How long the last load of the page from the graph's revset took.
+  private fullPageMs: number | null = null
   private current: GraphState | null = null
   // The commits of the graph before the current one, so ids that a view sent just before a
   // refresh still find their change.
@@ -86,8 +106,10 @@ export class RepoModel {
       snapshotOtherWorkspaces?: boolean
       showLineStats?: boolean
       pageSize?: number
+      snapshotPageAfterMs?: number
     } = {},
   ) {
+    this.snapshotPageAfterMs = options.snapshotPageAfterMs ?? SNAPSHOT_PAGE_AFTER_MS
     this.pageSize = options.pageSize ?? GRAPH_PAGE_SIZE
     this.limit = this.pageSize
     this.depth = options.depth ?? this.depth
@@ -367,10 +389,16 @@ export class RepoModel {
     const reader = head === null ? this.repo : this.repo.atOperation(head)
     const revset =
       this.revset === null ? graphRevset(this.filter, this.depth) : customGraphRevset(this.revset)
-    if (this.snapshotsKeepElisions() && onlySnapshotsSince(operations, this.lastOperationId)) {
+    if (
+      snapshotsKeepMembership(this.view) &&
+      onlySnapshotsSince(operations, this.lastOperationId)
+    ) {
       this.elisionCache.carryForward(this.lastOperationId, head)
     }
-    const loaded = await this.loadRevisionData(reader, revset, operations)
+    const snapshotPage = this.snapshotPage(operations, revset)
+    const loaded = await this.loadRevisionData(reader, snapshotPage ?? revset, operations, {
+      timesPage: snapshotPage === null,
+    })
     if (generation !== this.viewGeneration) {
       return
     }
@@ -435,16 +463,23 @@ export class RepoModel {
     }
   }
 
-  // A snapshot rewrites the working copy and rebases its descendants, so every other commit,
-  // and with it the ancestry of each unchanged elided parent, stays as it was. The rewritten
-  // commits are mutable and keep their author, so they stay in or out of the preset revsets,
-  // except under a date window, which a rewrite can move an old commit into. A typed revset
-  // can match anything, so it gets no shortcut.
-  private snapshotsKeepElisions(): boolean {
-    if (this.revset !== null) {
-      return false
+  private get view(): GraphView {
+    return { filter: this.filter, depth: this.depth, revset: this.revset }
+  }
+
+  // The revset to read the page with after snapshots only, or null to read it from `revset`.
+  // See snapshotPageRevset.
+  private snapshotPage(operations: readonly Operation[], revset: string): string | null {
+    if (this.fullPageMs === null || this.fullPageMs < this.snapshotPageAfterMs) {
+      return null
     }
-    return this.filter !== 'recent' || this.depth === 'all'
+    const input = {
+      view: this.view,
+      shown: this.current,
+      shownOperation: this.lastOperationId,
+      operations,
+    }
+    return snapshotPageRevset(input, revset)
   }
 
   // Logged when the count changes, so a refresh of the same graph does not repeat it.
@@ -459,14 +494,22 @@ export class RepoModel {
 
   private async loadRevisionData(
     reader: JjRepo,
-    revset: string,
+    pageRevset: string,
     operations: readonly Operation[],
+    { timesPage }: { timesPage: boolean },
   ): Promise<LoadedRepo> {
     this.lastOperationId = operations[0]?.id ?? null
     this.loadedOperations = operations
+    const started = Date.now()
+    const pageLoad = reader.logPage(pageRevset, this.limit).then((page) => {
+      if (timesPage) {
+        this.fullPageMs = Date.now() - started
+      }
+      return page
+    })
     const [page, trunk, workspaces, remotes, listed, currentBookmarks, tracking] =
       await Promise.all([
-        reader.logPage(revset, this.limit),
+        pageLoad,
         reader.trunk(),
         reader.workspaces(),
         reader.remotes(),
@@ -712,49 +755,6 @@ interface SharedGraph {
   trunkName: string | null
 }
 
-const SNAPSHOT_OPERATION = 'snapshot working copy'
-
-// True when the newest operations are snapshots that lead straight back to `since`. The log
-// lists each operation before its parents, and a snapshot has one parent, so `since` coming
-// right after the snapshots means it is their ancestor and nothing else landed in between.
-function onlySnapshotsSince(operations: readonly Operation[], since: string | null): boolean {
-  if (since === null) {
-    return false
-  }
-  const index = operations.findIndex((operation) => operation.id === since)
-  if (index <= 0) {
-    return false
-  }
-  return operations
-    .slice(0, index)
-    .every((operation) => operation.description.trim() === SNAPSHOT_OPERATION)
-}
-
-// A revset of ids makes jj read only the commits it names, so a list stays well under the 32 KB
-// command line of Windows up to this many commits.
-const MAX_LISTED_COMMITS = GRAPH_PAGE_SIZE
-
-interface LookupTarget {
-  readonly revset: string
-  // True when `revset` lists the shown commits rather than being the graph's revset.
-  readonly listsShown: boolean
-}
-
-// What the elision lookups search. A graph that is not truncated shows all of the revset, so
-// `heads(::P & <shown ids>)` gives the same commits in the same order as `heads(::P & <revset>)`.
-// jj then checks only the shown commits, where the revset can make it read every commit in the
-// repository, as `mine()` and date filters do.
-function lookupTarget(
-  revset: string,
-  commits: readonly Commit[],
-  isTruncated: boolean,
-): LookupTarget {
-  if (isTruncated || commits.length > MAX_LISTED_COMMITS) {
-    return { revset, listsShown: false }
-  }
-  return { revset: commitSetRevset(commits.map((commit) => commit.commitId)), listsShown: true }
-}
-
 function sharedGraph(loaded: LoadedRepo, workingCopyFiles: ChangedFile[]): SharedGraph {
   return {
     isTruncated: loaded.isTruncated,
@@ -767,58 +767,4 @@ function sharedGraph(loaded: LoadedRepo, workingCopyFiles: ChangedFile[]): Share
     tracking: loaded.tracking,
     trunkName: loaded.trunk.bookmark,
   }
-}
-
-function toCommitView(
-  commit: Commit,
-  row: GraphRow | undefined,
-  trunkId: string | undefined,
-): CommitView {
-  return {
-    ...commit,
-    row: row ?? {
-      id: commit.commitId,
-      column: 0,
-      width: 1,
-      incoming: [],
-      outgoing: [],
-      passThrough: [],
-    },
-    isTrunk: commit.commitId === trunkId,
-    requests: [],
-  }
-}
-
-function remoteBookmarkNames(rows: readonly ParsedBookmark[]): Set<string> {
-  return new Set(rows.filter((row) => row.remote !== null).map((row) => row.name))
-}
-
-function markNeverPushed(commits: readonly Commit[], pushed: ReadonlySet<string>): Commit[] {
-  return commits.map((commit) =>
-    commit.localBookmarks.every((b) => pushed.has(b.name))
-      ? commit
-      : {
-          ...commit,
-          localBookmarks: commit.localBookmarks.map((b) =>
-            pushed.has(b.name) ? b : { ...b, synced: false },
-          ),
-        },
-  )
-}
-
-function hasUnsyncedBookmarks(commits: readonly Commit[]): boolean {
-  return commits.some((c) => c.localBookmarks.some((b) => !b.synced))
-}
-
-function changesOf(state: GraphState | null): Map<string, ChangeRef> {
-  const changes = new Map<string, ChangeRef>()
-  for (const commit of state?.commits ?? []) {
-    changes.set(commit.commitId, {
-      commitId: commit.commitId,
-      changeId: commit.changeId,
-      isDivergent: commit.isDivergent,
-      isHidden: commit.isHidden,
-    })
-  }
-  return changes
 }
