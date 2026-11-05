@@ -99,13 +99,8 @@ export function snapshotPageRevset(input: SnapshotPageInput, revset: string): st
   ) {
     return null
   }
-  const isSameGraph =
-    shown.operationId === input.shownOperation &&
-    shown.filter === view.filter &&
-    shown.depth === view.depth &&
-    shown.revset === view.revset
   if (
-    !isSameGraph ||
+    !isSameGraph(shown, input) ||
     shown.isTruncated ||
     shown.commits.length > MAX_LISTED_COMMITS ||
     shown.commits.some((commit) => commit.isDivergent)
@@ -117,4 +112,52 @@ export function snapshotPageRevset(input: SnapshotPageInput, revset: string): st
     commit.isHidden ? commit.commitId : `change_id(${commit.changeId})`,
   )
   return `(${[...named, 'working_copies()::'].join(' | ')}) & (${revset})`
+}
+
+// True when the page loaded after snapshots only differs from the shown one by rewritten
+// commits: each commit that left has a change that came back under a new commit id. The
+// lookups of both pages search the shown commits (see lookupTarget). A commit the snapshots
+// created is no ancestor of an older one, and one they hid is no ancestor of a visible one, so
+// the lookup of every unchanged parent keeps its answer. That holds for any revset, a date
+// window or a typed one too, as long as nothing else joined or left the page.
+export function pageChangedOnlyByRewrites(
+  input: SnapshotPageInput,
+  commits: readonly Commit[],
+  isTruncated: boolean,
+): boolean {
+  const { shown } = input
+  if (
+    shown === null ||
+    !onlySnapshotsSince(input.operations, input.shownOperation) ||
+    !isSameGraph(shown, input)
+  ) {
+    return false
+  }
+  const listed = (page: readonly Commit[]): boolean => page.length <= MAX_LISTED_COMMITS
+  if (shown.isTruncated || isTruncated || !listed(shown.commits) || !listed(commits)) {
+    return false
+  }
+  if ([...shown.commits, ...commits].some((commit) => commit.isDivergent)) {
+    return false
+  }
+  const before = new Set(shown.commits.map((commit) => commit.commitId))
+  const after = new Set(commits.map((commit) => commit.commitId))
+  const left = shown.commits.filter((commit) => !after.has(commit.commitId))
+  const joined = commits.filter((commit) => !before.has(commit.commitId))
+  const leftChanges = new Set(left.map((commit) => commit.changeId))
+  return (
+    left.length === joined.length &&
+    leftChanges.size === left.length &&
+    joined.every((commit) => leftChanges.has(commit.changeId))
+  )
+}
+
+// The shown graph is the one of the last load, and of the view the coming load reads.
+function isSameGraph(shown: GraphState, input: SnapshotPageInput): boolean {
+  return (
+    shown.operationId === input.shownOperation &&
+    shown.filter === input.view.filter &&
+    shown.depth === input.view.depth &&
+    shown.revset === input.view.revset
+  )
 }

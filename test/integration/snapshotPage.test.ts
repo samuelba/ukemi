@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import type { GraphFilter, HistoryDepth } from '../../shared/model'
+import type { CommitView } from '../../shared/protocol'
 import { JjRepo } from '../../src/jj/repo'
 import { JjRunner, type RunOptions, type RunResult } from '../../src/jj/runner'
 import { RepoModel } from '../../src/repo/repoModel'
@@ -254,6 +255,75 @@ describe('snapshot page', () => {
 
       expect(watched.snapshotPages()).toBe(0)
       await expectSameAsFullLoad(watched.model, { filter: 'stack' })
+    })
+  })
+
+  describe('elision lookups after a snapshot', () => {
+    const OLD = ['--config', 'debug.commit-timestamp=2020-01-01T00:00:00Z']
+
+    function lookupModel(options: Options): { model: RepoModel; lookups: () => number } {
+      let count = 0
+      class LookupCounter extends JjRunner {
+        override run(run: RunOptions): Promise<RunResult> {
+          if (run.args.some((arg) => /^heads\(::[0-9a-f]{40} & |revset\(/.test(arg))) {
+            count += 1
+          }
+          return super.run(run)
+        }
+      }
+      const repo = new JjRepo(root, new LookupCounter(JJ_BINARY, NULL_LOGGER))
+      return { model: new RepoModel(repo, NULL_LOGGER, options), lookups: () => count }
+    }
+
+    test.each<[string, Options]>([
+      ['Recent with a date window', { filter: 'recent', depth: '7d' }],
+      ['a typed revset', { revset: 'mine()' }],
+    ])('%s keeps them when only the working copy was rewritten', async (_name, options) => {
+      // Two old commits below the working copy: the date window shows the newer one, as the
+      // parent of the window's first commit, and elides the older one.
+      jj(root, ...OLD, 'describe', '-m', 'mine old 1')
+      jj(root, ...OLD, ...OTHER, 'new', '-m', 'other old 2')
+      jj(root, 'new', '-m', 'mine new')
+      jj(root, 'new')
+      const { model, lookups } = lookupModel(options)
+      await model.refresh()
+      const first = lookups()
+      expect(first).toBeGreaterThan(0)
+
+      await editAndRefresh(model)
+
+      expect(lookups()).toBe(first)
+      await expectSameAsFullLoad(model, options)
+    })
+
+    test('a typed revset looks up again when the snapshot brought a commit into view', async () => {
+      // The revset leaves out the newest commit. That is C until the working copy W, rewritten
+      // by the snapshot, becomes the newest, so C joins the graph. Q's elided parent P then
+      // leads to C, where before it led nowhere.
+      const at = (date: string): string[] => [
+        '--config',
+        `debug.commit-timestamp=${date}T00:00:00Z`,
+      ]
+      jj(root, ...at('2021-01-01'), 'describe', '-m', 'mine W')
+      jj(root, ...at('2025-01-01'), 'new', 'root()', '-m', 'mine C')
+      jj(root, ...at('2020-01-01'), ...OTHER, 'new', '-m', 'other P')
+      jj(root, ...at('2024-01-01'), 'new', '-m', 'mine Q')
+      jj(root, 'edit', commitOf('mine W'))
+      const options = { revset: '(mine() & mutable()) ~ latest(mutable(), 1)' }
+      const { model, lookups } = lookupModel(options)
+      const mineQ = (): CommitView | undefined =>
+        model.graph?.commits.find((c) => c.description === 'mine Q\n')
+      await model.refresh()
+      expect(model.graph?.commits.some((c) => c.description === 'mine C\n')).toBe(false)
+      expect(mineQ()?.row.outgoing).toEqual([])
+      const first = lookups()
+
+      await editAndRefresh(model)
+
+      expect(model.graph?.commits.some((c) => c.description === 'mine C\n')).toBe(true)
+      expect(mineQ()?.row.outgoing.map((edge) => edge.isElided)).toEqual([true])
+      expect(lookups()).toBeGreaterThan(first)
+      await expectSameAsFullLoad(model, options)
     })
   })
 })

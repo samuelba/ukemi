@@ -3,6 +3,7 @@ import type { Operation } from '../../shared/model'
 import type { CommitView, GraphState } from '../../shared/protocol'
 import {
   onlySnapshotsSince,
+  pageChangedOnlyByRewrites,
   snapshotPageRevset,
   type SnapshotPageInput,
 } from '../../src/repo/refreshRevsets'
@@ -92,5 +93,58 @@ describe('onlySnapshotsSince', () => {
     expect(onlySnapshotsSince([operation('b', 'new empty commit'), ...ops.slice(1)], 'a')).toBe(
       false,
     )
+  })
+})
+
+describe('pageChangedOnlyByRewrites', () => {
+  const recent = { view: { filter: 'recent', depth: '7d', revset: null } } as const
+  const shownRecent = { filter: 'recent' } as const
+  const rewritten = commit('aaa', { commitId: 'aaa-new' })
+
+  test('holds when each commit that left came back under a new commit id', () => {
+    expect(
+      pageChangedOnlyByRewrites(input(recent, shownRecent), [rewritten, commit('bbb')], false),
+    ).toBe(true)
+    expect(
+      pageChangedOnlyByRewrites(input(recent, shownRecent), [commit('aaa'), commit('bbb')], false),
+    ).toBe(true)
+  })
+
+  test('does not hold when a commit joined, left or the page cannot be compared', () => {
+    const value = input(recent, shownRecent)
+    const cases: Array<[string, boolean]> = [
+      [
+        'a commit joined',
+        pageChangedOnlyByRewrites(value, [rewritten, commit('bbb'), commit('ccc')], false),
+      ],
+      ['a commit left', pageChangedOnlyByRewrites(value, [commit('aaa')], false)],
+      [
+        'another change took its place',
+        pageChangedOnlyByRewrites(value, [commit('ccc'), commit('bbb')], false),
+      ],
+      [
+        'the new page is truncated',
+        pageChangedOnlyByRewrites(value, [rewritten, commit('bbb')], true),
+      ],
+      [
+        'a divergent change',
+        pageChangedOnlyByRewrites(
+          value,
+          [commit('aaa', { isDivergent: true }), commit('bbb')],
+          false,
+        ),
+      ],
+      [
+        'another operation',
+        pageChangedOnlyByRewrites(
+          { ...value, operations: [operation('op2', 'describe commit'), operation('op1')] },
+          [rewritten, commit('bbb')],
+          false,
+        ),
+      ],
+    ]
+    for (const [name, holds] of cases) {
+      expect(holds, name).toBe(false)
+    }
   })
 })

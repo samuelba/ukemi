@@ -39,6 +39,7 @@ import { placeBookmark as moveLocalBookmark } from './placeBookmark'
 import {
   lookupTarget,
   onlySnapshotsSince,
+  pageChangedOnlyByRewrites,
   snapshotPageRevset,
   snapshotsKeepMembership,
   type GraphView,
@@ -389,11 +390,15 @@ export class RepoModel {
     const reader = head === null ? this.repo : this.repo.atOperation(head)
     const revset =
       this.revset === null ? graphRevset(this.filter, this.depth) : customGraphRevset(this.revset)
-    if (
-      snapshotsKeepMembership(this.view) &&
-      onlySnapshotsSince(operations, this.lastOperationId)
-    ) {
-      this.elisionCache.carryForward(this.lastOperationId, head)
+    const before = {
+      view: this.view,
+      shown: this.current,
+      shownOperation: this.lastOperationId,
+      operations,
+    }
+    const keepsMembership = snapshotsKeepMembership(this.view)
+    if (keepsMembership && onlySnapshotsSince(operations, before.shownOperation)) {
+      this.elisionCache.carryForward(before.shownOperation, head)
     }
     const snapshotPage = this.snapshotPage(operations, revset)
     const loaded = await this.loadRevisionData(reader, snapshotPage ?? revset, operations, {
@@ -401,6 +406,10 @@ export class RepoModel {
     })
     if (generation !== this.viewGeneration) {
       return
+    }
+    // Other views can still keep the lookups when the page shows it did not change otherwise.
+    if (!keepsMembership && pageChangedOnlyByRewrites(before, loaded.logged, loaded.isTruncated)) {
+      this.elisionCache.carryForward(before.shownOperation, head)
     }
     const bookmarks = loaded.bookmarks.filter((row) => row.remote !== 'git')
     const commits =
