@@ -41,6 +41,13 @@ jobs:
       - run: npm run desktop:package
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      # node-pty starts every shell through spawn-helper. Without the execute bit the terminal fails
+      # with "posix_spawnp failed". scripts/stage-node-pty.mjs sets it.
+      - if: runner.os == 'macOS'
+        run: |
+          for helper in out/desktop-release/mac*/Ukemi.app/Contents/Resources/app.asar.unpacked/node_modules/node-pty/prebuilds/*/spawn-helper; do
+            test -x "$helper" || { echo "::error::$helper is not executable"; exit 1; }
+          done
       - uses: actions/upload-artifact@v7
         with:
           name: desktop-${{ runner.os }}

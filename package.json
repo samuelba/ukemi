@@ -26,9 +26,10 @@
     "install:cursor": "npm run package && cursor --install-extension ukemi-jj-$npm_package_version.vsix --force",
     "vscode:prepublish": "npm run package:build",
     "test:e2e": "npm run build && node test/e2e/runE2e.mjs",
-    "desktop": "node esbuild.mjs && electron dist/desktop/main.js",
+    "desktop": "node esbuild.mjs && node scripts/stage-node-pty.mjs && electron dist/desktop/main.js",
     "desktop:watch": "node esbuild.mjs --watch",
     "desktop:bundle": "node esbuild.mjs --production && node scripts/stage-node-pty.mjs",
+    "desktop:install": "node scripts/install-desktop.mjs",
     "desktop:package": "npm run desktop:bundle && electron-builder --publish never",
     "desktop:package:dir": "npm run desktop:bundle && electron-builder --dir --publish never",
     "desktop:package:appimage": "npm run desktop:bundle && electron-builder --linux AppImage --publish never",
@@ -36,7 +37,7 @@
     "desktop:package:snap": "npm run desktop:bundle && electron-builder --linux snap --publish never",
     "desktop:package:deb": "npm run desktop:bundle && electron-builder --linux deb --publish never",
     "desktop:package:rpm": "npm run desktop:bundle && electron-builder --linux rpm --publish never",
-    "test:desktop": "node esbuild.mjs && playwright test --config test/desktop/playwright.config.ts"
+    "test:desktop": "node esbuild.mjs && node scripts/stage-node-pty.mjs && playwright test --config test/desktop/playwright.config.ts"
   },
   "dependencies": {
     "@vscode/codicons": "^0.0.46-24",
