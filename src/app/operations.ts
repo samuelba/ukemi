@@ -23,13 +23,16 @@ export class Operations implements Disposable {
     this.emitter.fire()
   }
 
+  // The label stays up through the graph reload, so the stale graph never shows without it.
   async run<T>(label: string, model: RepoModel, task: () => Promise<T>): Promise<T | undefined> {
-    try {
-      return await this.track(label, task)
-    } finally {
-      model.markDirty()
-      void model.refresh()
-    }
+    return this.track(label, async () => {
+      try {
+        return await task()
+      } finally {
+        model.markDirty()
+        await model.refresh()
+      }
+    })
   }
 
   async track<T>(label: string, task: () => Promise<T>): Promise<T | undefined> {
