@@ -15,12 +15,12 @@ import {
   screen,
   shell,
 } from 'electron'
-import { locateJj, versionText } from '../app/jjSetup'
+import { locateJj, upgradeManagedJj, versionText } from '../app/jjSetup'
 import { affectsJj } from '../app/settingsEffects'
 import type { Ui } from '../app/ui'
 import type { AboutInfo, Fonts, LogLine, ZoomStep } from '../../shared/desktopProtocol'
 import { aboutInfo } from './about'
-import { downloadJj, MIN_JJ_VERSION, PINNED_RELEASE } from '../jj/binary'
+import { downloadJj, MIN_JJ_VERSION, PINNED_RELEASE, type ResolvedJj } from '../jj/binary'
 import { findRepoRootUpwards } from '../repo/discovery'
 import { errorMessage } from '../util/logger'
 import { KeyValueFile } from './adapters/keyValueFile'
@@ -162,7 +162,12 @@ class DesktopApp implements DesktopContext {
       }
     })
     await adoptLoginShellPath(process.env)
-    await this.findJj()
+    const found = await this.findJj()
+    if (found) {
+      void upgradeManagedJj(found, this.paths.userData, this.logger).then((upgraded) =>
+        upgraded ? this.reloadJj() : undefined,
+      )
+    }
     this.systemFont = await detectSystemFont()
     this.applyTheme()
     // The native About panel of the macOS app menu. Help > About shows Ukemi's own dialog.
@@ -373,7 +378,7 @@ class DesktopApp implements DesktopContext {
     }
   }
 
-  private async findJj(): Promise<void> {
+  private async findJj(): Promise<ResolvedJj | null> {
     const found = await locateJj(this.settings.read().jjPath, this.paths.userData, this.logger)
     this.jj.path = found?.path ?? null
     this.jj.version = found ? versionText(found.version) : null
@@ -381,6 +386,7 @@ class DesktopApp implements DesktopContext {
       const { major, minor } = MIN_JJ_VERSION
       this.logger.warn(`no jj ${major}.${minor} or newer found`)
     }
+    return found
   }
 
   private serveFiles(): void {

@@ -35,6 +35,7 @@ import {
 import { EvolutionView } from './vscode/evolutionView'
 import { vscodeForgeAccounts } from './vscode/forgeAccounts'
 import { GRAPH_VIEW_ID, GraphView } from './vscode/graphView'
+import { upgradeManagedJj } from './app/jjSetup'
 import { installJj, locateJj, offerInstall, updateTerminalPath } from './vscode/jjSetup'
 import { createOutputLogger } from './vscode/outputLogger'
 import { ScmController } from './vscode/scm'
@@ -221,6 +222,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
 
   if (!located) {
     void offerInstall(storageDir, logger).then((installed) => (installed ? reloadJj() : undefined))
+  } else {
+    void upgradeManagedJj(located, storageDir, logger).then((upgraded) =>
+      upgraded ? reloadJj() : undefined,
+    )
   }
   await registry.discover()
   return { registry }
