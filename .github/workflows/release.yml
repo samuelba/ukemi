@@ -133,3 +133,48 @@ jobs:
             exit 1
           fi
           gh release upload "${{ needs.release-please.outputs.tag_name }}" "${files[@]}"
+
+  # Points the download buttons on samuelba.dev/ukemi at the new installers. Runs only when every
+  # desktop build uploaded its files, so the site never links to a missing one. Needs a write
+  # deploy key of samuelba/samuelba-website in the WEBSITE_DEPLOY_KEY secret, and the
+  # WEBSITE_UPDATE variable set to true. Sevalla rebuilds the site on the push.
+  website:
+    needs: [release-please, desktop]
+    if: needs.release-please.outputs.release_created == 'true' && vars.WEBSITE_UPDATE == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: ukemi
+      - uses: actions/checkout@v7
+        with:
+          repository: samuelba/samuelba-website
+          ref: main
+          ssh-key: ${{ secrets.WEBSITE_DEPLOY_KEY }}
+          path: site
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Write the release's download links
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node ukemi/scripts/updateWebsiteRelease.mjs \
+            --repo "${{ github.repository }}" \
+            --tag "${{ needs.release-please.outputs.tag_name }}" \
+            --out site/src/data/ukemi-release.json
+      - name: Push to the website
+        working-directory: site
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo 'the website already has these links'
+            exit 0
+          fi
+          git add src/data/ukemi-release.json
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "chore: update Ukemi downloads to ${{ needs.release-please.outputs.tag_name }}"
+          git push origin HEAD:main
