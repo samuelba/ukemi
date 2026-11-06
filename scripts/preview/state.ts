@@ -36,6 +36,7 @@ async function main(root: string, output: string): Promise<void> {
       showFullPaths: false,
       showLineStats: false,
       showGitTags: true,
+      previewDrops: true,
       changedFilesView: 'list',
       ciOnlyMine: true,
     },

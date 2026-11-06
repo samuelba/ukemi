@@ -1,4 +1,5 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { previewDrop, type PreviewDrop } from '../../../shared/dropPreview'
 import type { FileIconTheme } from '../../../shared/fileIconTheme'
 import type { ChangedFile } from '../../../shared/model'
 import type {
@@ -15,12 +16,25 @@ import { canSquashIntoParent } from './canSquashIntoParent'
 import { CommitRow } from './CommitRow'
 import { insertGaps } from './dropCommit'
 import { DescribeDialog, type SuggestionReply } from './DescribeDialog'
+import { DropPreviewBar } from './DropPreviewBar'
 import { EmptyState } from './EmptyState'
 import { FileIconFonts, FileIconThemeContext } from './FileIcon'
+import { LANE_WIDTH } from './GraphCell'
 import { GraphSearch } from './GraphSearch'
 import { withUnchangedObjects } from './keepUnchanged'
 import { LoadMoreRow } from './LoadMoreRow'
 import { searchCommits, stepMatch } from './matchCommit'
+import {
+  applyPending,
+  dropMessage,
+  errorText,
+  nextPending,
+  previewText,
+  resolvePending,
+  startPending,
+  type PendingDrop,
+} from './pendingDrop'
+import { PreviewRow } from './PreviewRow'
 import { RevsetBar, type RevsetReply } from './RevsetBar'
 import { selectedRow, type Selection } from './selection'
 import { Toolbar } from './Toolbar'
@@ -33,6 +47,9 @@ interface Describing {
 }
 
 const fileKey = (repoId: string, commitId: string) => `${repoId}\n${commitId}`
+
+// An applied drop that the host never answers must not keep the preview up.
+const APPLY_TIMEOUT_MS = 15_000
 
 export function App() {
   const [state, setState] = useState<ViewState | null>(null)
@@ -55,12 +72,14 @@ export function App() {
   const replyCount = useRef(0)
   const [isSearching, setIsSearching] = useState(false)
   const [searchText, setSearchText] = useState('')
+  const [pending, setPending] = useState<PendingDrop | null>(null)
 
   useHostMessages<HostMessage>(
     (message) => {
       switch (message.type) {
         case 'state':
           setState((previous) => withUnchangedObjects(previous, message.state))
+          setPending((previous) => previous && nextPending(previous, message.state))
           return
         case 'reveal': {
           const commit = state?.graph?.commits.find((c) => c.commitId === message.commitId)
@@ -132,10 +151,23 @@ export function App() {
     setRevealId(null)
   }, [revealId, graph])
 
-  const lanes = useMemo(
-    () => (graph?.commits ?? []).reduce((widest, c) => Math.max(widest, c.row.width), 1),
-    [graph],
-  )
+  const preview = useMemo(() => {
+    const drop = pending && graph ? resolvePending(pending, graph.commits) : null
+    if (!pending || !graph || !drop) {
+      return null
+    }
+    return {
+      drop,
+      result: previewDrop(graph.commits, drop, { ghosts: pending.phase === 'preview' }),
+    }
+  }, [pending, graph])
+
+  const lanes = useMemo(() => {
+    const rows = preview?.result.ok
+      ? preview.result.rows
+      : (graph?.commits ?? []).map((commit) => commit.row)
+    return rows.reduce((widest, row) => Math.max(widest, row.width), 1)
+  }, [graph, preview])
 
   const commitsById = useMemo(
     () => new Map((graph?.commits ?? []).map((commit) => [commit.commitId, commit])),
@@ -194,6 +226,19 @@ export function App() {
   // across refreshes.
   const graphRef = useRef(graph)
   graphRef.current = graph
+  const previewDropsRef = useRef(true)
+  previewDropsRef.current = state?.settings.previewDrops ?? true
+  const dropCommit = useCallback((drop: PreviewDrop) => {
+    const current = graphRef.current
+    const started = previewDropsRef.current && current ? startPending(drop, current) : null
+    if (started) {
+      setPending(started)
+    } else {
+      postMessage(dropMessage(drop))
+    }
+  }, [])
+  const cancelDrop = useCallback(() => setPending(null), [])
+
   const selectCommit = useCallback((commitId: string) => {
     const commit = graphRef.current?.commits.find((c) => c.commitId === commitId)
     setSelection({ commitId, changeId: commit?.changeId ?? '' })
@@ -256,6 +301,25 @@ export function App() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [openSearch])
 
+  const isApplying = pending?.phase === 'applying'
+  useEffect(() => {
+    if (!isApplying) {
+      return
+    }
+    const timer = setTimeout(() => setPending(null), APPLY_TIMEOUT_MS)
+    return () => clearTimeout(timer)
+  }, [isApplying])
+
+  // Another drag starts over. The preview rows themselves cannot be dragged.
+  const isPreviewing = pending?.phase === 'preview'
+  useEffect(() => {
+    if (!isPreviewing) {
+      return
+    }
+    window.addEventListener('dragstart', cancelDrop, true)
+    return () => window.removeEventListener('dragstart', cancelDrop, true)
+  }, [isPreviewing, cancelDrop])
+
   // The host learns about the working copy chosen by default, so its views show the same change.
   useEffect(() => {
     if (selection === null && selected && announced.current !== repoId) {
@@ -270,6 +334,60 @@ export function App() {
 
   const filesFor = (commit: CommitView) =>
     commit.isWorkingCopy ? graph?.workingCopyFiles : files.get(fileKey(repoId, commit.commitId))
+
+  const labelOf = (commitId: string) => {
+    const commit = commitsById.get(commitId)
+    return commit ? title(commit.description) || commit.changeId.slice(0, 8) : commitId.slice(0, 8)
+  }
+
+  const applyDrop = () => {
+    if (preview?.result.ok && pending) {
+      postMessage(dropMessage(preview.drop))
+      setPending(applyPending(pending))
+    }
+  }
+
+  const previewBar = preview && (
+    <DropPreviewBar
+      key="drop-preview"
+      text={
+        preview.result.ok
+          ? previewText(preview.result.summary, labelOf)
+          : errorText(preview.result.error, `“${labelOf(preview.drop.sourceId)}”`)
+      }
+      canApply={preview.result.ok}
+      isApplying={isApplying}
+      indent={lanes * LANE_WIDTH + 8}
+      onApply={applyDrop}
+      onCancel={cancelDrop}
+    />
+  )
+
+  // The previewed graph, with the bar under the row the dropped change lands on.
+  const previewRows = () => {
+    const result = preview?.result
+    if (!result?.ok) {
+      return null
+    }
+    return result.nodes.flatMap((node, index) => {
+      const commit = commitsById.get(node.commitId)
+      const row = result.rows[index]
+      if (!commit || !row) {
+        return []
+      }
+      const shown = (
+        <PreviewRow
+          key={node.id}
+          node={node}
+          commit={commit}
+          row={row}
+          lanes={lanes}
+          changeIdLength={state.settings.changeIdLength}
+        />
+      )
+      return node.id === result.anchorId ? [shown, previewBar] : [shown]
+    })
+  }
 
   return (
     <FileIconThemeContext.Provider value={fileIcons ?? bundledIcons}>
@@ -326,29 +444,32 @@ export function App() {
           </div>
         )}
         {state.status === 'ready' && graph ? (
-          <div className="graph" role="list">
-            {graph.commits.map((commit, index) => (
-              <CommitRow
-                key={commit.commitId}
-                commit={commit}
-                gapAbove={gaps[index]?.above ?? null}
-                gapBelow={gaps[index]?.below ?? null}
-                canSquash={canSquashIntoParent(commit, commitsById)}
-                repoId={repoId}
-                lanes={lanes}
-                files={filesFor(commit)}
-                isExpanded={isExpanded(commit)}
-                isSelected={selected === commit.commitId}
-                isDimmed={matchSet !== null && !matchSet.has(commit.commitId)}
-                hasRemotes={graph.hasRemotes}
-                hasForge={graph.forge !== null}
-                settings={state.settings}
-                onToggle={toggle}
-                onSelect={selectCommit}
-                onDescribe={startDescribe}
-              />
-            ))}
-            {graph.isTruncated && (
+          <div className={`graph${preview?.result.ok ? ' is-previewing' : ''}`} role="list">
+            {previewRows() ??
+              graph.commits.flatMap((commit, index) => [
+                <CommitRow
+                  key={commit.commitId}
+                  commit={commit}
+                  gapAbove={gaps[index]?.above ?? null}
+                  gapBelow={gaps[index]?.below ?? null}
+                  canSquash={canSquashIntoParent(commit, commitsById)}
+                  repoId={repoId}
+                  lanes={lanes}
+                  files={filesFor(commit)}
+                  isExpanded={isExpanded(commit)}
+                  isSelected={selected === commit.commitId}
+                  isDimmed={matchSet !== null && !matchSet.has(commit.commitId)}
+                  hasRemotes={graph.hasRemotes}
+                  hasForge={graph.forge !== null}
+                  settings={state.settings}
+                  onToggle={toggle}
+                  onSelect={selectCommit}
+                  onDescribe={startDescribe}
+                  onDropCommit={dropCommit}
+                />,
+                ...(preview && commit.commitId === preview.drop.sourceId ? [previewBar] : []),
+              ])}
+            {graph.isTruncated && !preview?.result.ok && (
               // A new view starts with a fresh row, which may ask again at the same count.
               <LoadMoreRow
                 key={`${repoId}\0${graph.filter}\0${graph.depth}\0${graph.revset ?? ''}`}

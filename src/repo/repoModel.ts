@@ -611,7 +611,9 @@ export class RepoModel {
     shared: SharedGraph,
   ): GraphState {
     const rows = layoutGraph(nodes)
-    const views = commits.map((commit, index) => toCommitView(commit, rows[index], trunkId))
+    const views = commits.map((commit, index) =>
+      toCommitView(commit, rows[index], trunkId, nodes[index]?.parents),
+    )
     return {
       repoId: this.root,
       commits: this.attachRequests(views),

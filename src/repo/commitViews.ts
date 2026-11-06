@@ -1,4 +1,4 @@
-import type { GraphRow } from '../../shared/graphLayout'
+import type { GraphEdgeInput, GraphRow } from '../../shared/graphLayout'
 import type { Commit } from '../../shared/model'
 import type { CommitView, GraphState } from '../../shared/protocol'
 import type { ParsedBookmark } from '../jj/parse'
@@ -10,9 +10,11 @@ export function toCommitView(
   commit: Commit,
   row: GraphRow | undefined,
   trunkId: string | undefined,
+  edges: readonly GraphEdgeInput[] = [],
 ): CommitView {
   return {
     ...commit,
+    edges: [...edges],
     row: row ?? {
       id: commit.commitId,
       column: 0,

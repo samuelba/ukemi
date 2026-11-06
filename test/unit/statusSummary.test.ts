@@ -74,6 +74,7 @@ function state(overrides: Partial<ViewState> = {}): ViewState {
       showFullPaths: false,
       showLineStats: false,
       showGitTags: true,
+      previewDrops: true,
       changedFilesView: 'list',
       ciOnlyMine: false,
     },

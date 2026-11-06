@@ -47,6 +47,7 @@ export function buildViewState(inputs: ViewStateInputs): ViewState {
       showFullPaths: config.showFullPaths,
       showLineStats: config.showLineStats,
       showGitTags: config.showGitTags,
+      previewDrops: config.previewDrops,
       changedFilesView: config.changedFilesView,
       ciOnlyMine: config.ciOnlyMine,
     },

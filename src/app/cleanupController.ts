@@ -76,6 +76,7 @@ function commitView(commit: Commit): CommitView {
       outgoing: [],
       passThrough: [],
     },
+    edges: [],
     isTrunk: false,
     requests: [],
   }

@@ -61,6 +61,7 @@ const DEFAULT_SETTINGS: ViewSettings = {
   showFullPaths: false,
   showLineStats: false,
   showGitTags: true,
+  previewDrops: true,
   changedFilesView: 'list',
   ciOnlyMine: true,
 }

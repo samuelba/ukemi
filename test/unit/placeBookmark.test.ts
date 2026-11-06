@@ -26,6 +26,7 @@ function commit(commitId: string, bookmarks: readonly string[]): CommitView {
     isHidden: false,
     isMine: true,
     row: { id: commitId, column: 0, width: 1, incoming: [], outgoing: [], passThrough: [] },
+    edges: [],
     isTrunk: false,
     requests: [],
   }
