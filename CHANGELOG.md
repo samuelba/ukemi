@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.11.0](https://github.com/samuelba/ukemi/compare/v0.10.0...v0.11.0) (2026-11-05)
+
+
+### Features
+
+* custom revset filter and graph search (M7) ([13bd7a4](https://github.com/samuelba/ukemi/commit/13bd7a4fea4ab63dca8ef60cabd4ea9cbc284433))
+* drop a change between two changes to reorder the stack ([25a5dda](https://github.com/samuelba/ukemi/commit/25a5dda35613e9819810a19658de7814c662ca39))
+* expand hidden lines and show the whole file ([5e84305](https://github.com/samuelba/ukemi/commit/5e84305739544b4d0fafcc2567a7d1101c2bd41c))
+* file history and blame (M8) ([16c72dd](https://github.com/samuelba/ukemi/commit/16c72dd0e80d744393ae9dfd5102f6d5d140cba5))
+* load the commit graph in pages (F32) ([ca7b393](https://github.com/samuelba/ukemi/commit/ca7b393394c66c192d4e8e41279ef2f84679fec2))
+* side-by-side, ignore-whitespace and image diffs ([67619e3](https://github.com/samuelba/ukemi/commit/67619e369eed8a10d2026c7866d93f983997431b))
+
+
+### Bug Fixes
+
+* debounce window bounds and restore position and maximized state (F39) ([88fc407](https://github.com/samuelba/ukemi/commit/88fc4078759c180274087023181b7975c0b7d602))
+* end a window's jj processes when it closes (F43) ([981baf7](https://github.com/samuelba/ukemi/commit/981baf7b7974bbcc125badb7d92fcec89f604536))
+* keep elided-parent edges across operations (F27) ([807ce3a](https://github.com/samuelba/ukemi/commit/807ce3a94338b247acdc11598b90a42361373238))
+* keep launches made while the app starts (F40) ([0a2b5bc](https://github.com/samuelba/ukemi/commit/0a2b5bce3645b5569f9d6164d1e7f85e170d5095))
+* open a repository in the window that already shows it (F41) ([a8ba89b](https://github.com/samuelba/ukemi/commit/a8ba89bca7c449c4d95ccb662765d626e737f907))
+* skip ignored folders when watching the working copy ([a98e717](https://github.com/samuelba/ukemi/commit/a98e7178f55dfe6cdcbc06c9fa6969351d8b2c8f))
+* watch operations in secondary workspaces (F34) ([d22c7d4](https://github.com/samuelba/ukemi/commit/d22c7d4f588b74ac8c25dc6fc18a52a097398d50))
+
+
+### Performance Improvements
+
+* batch elision lookups in one jj process on jj 0.47+ ([5ce5a21](https://github.com/samuelba/ukemi/commit/5ce5a217d1b4a8d060ff34c08b8f5fc54f67c4cb))
+* keep elision lookups after a snapshot in any view ([4dcb0ce](https://github.com/samuelba/ukemi/commit/4dcb0ce2e8d830c1cb11319f8ef4540a7cc1db36))
+* look up elided edges against the shown commits ([70c6bdb](https://github.com/samuelba/ukemi/commit/70c6bdb9189f9ec037e82201ab1b163e29902784))
+* rebuild the graph page from ids after a snapshot ([369c0f8](https://github.com/samuelba/ukemi/commit/369c0f8c7b403fa87effbe9ec0a38a3bd3f3193e))
+* reuse elision lookups across working-copy snapshots ([878fdac](https://github.com/samuelba/ukemi/commit/878fdacdfe54a47183d8fbfa2a738320ce5dfb05))
+
 ## [0.10.0](https://github.com/samuelba/ukemi/compare/v0.9.0...v0.10.0) (2026-11-03)
 
 
