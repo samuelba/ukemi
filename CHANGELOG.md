@@ -5,17 +5,13 @@
 
 ### Features
 
-* download jj 0.47.1 and upgrade earlier downloads on startup ([b0f5408](https://github.com/samuelba/ukemi/commit/b0f5408a87bc310bf4dfb0d4bdf7c612be31c48a))
 * download jj 0.47.1 and upgrade earlier downloads on startup ([d1270c5](https://github.com/samuelba/ukemi/commit/d1270c517b23050043a43f7387cc812050cc5467))
-* preview the graph a drop produces before applying it ([ccda7e5](https://github.com/samuelba/ukemi/commit/ccda7e5440ff2cea4707e5a142a50d055bbd3cd0))
 * preview the graph a drop produces before applying it ([d57c427](https://github.com/samuelba/ukemi/commit/d57c427cec194c34b5dcbc07ab24a55dcac1f365))
 
 
 ### Bug Fixes
 
-* install the desktop app from a checkout and fix the macOS terminal ([74b25ad](https://github.com/samuelba/ukemi/commit/74b25ad6377af0e40f0c53a80dd07c5491d90a2c))
 * install the desktop app from a checkout and fix the macOS terminal ([448db70](https://github.com/samuelba/ukemi/commit/448db704faa58f4cebb30b9b86963168675c2023))
-* keep the operation label up until the graph reload finishes ([e2f9f85](https://github.com/samuelba/ukemi/commit/e2f9f85d47ce5f9aee009c7bd5c9bcd16f647ddf))
 * keep the operation label up until the graph reload finishes ([fb85f99](https://github.com/samuelba/ukemi/commit/fb85f99276bbcdcd698d755fed4bdc48b38c50f6))
 
 ## [0.11.0](https://github.com/samuelba/ukemi/compare/v0.10.0...v0.11.0) (2026-11-05)
