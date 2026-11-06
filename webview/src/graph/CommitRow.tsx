@@ -1,4 +1,5 @@
 import { memo, useEffect, useSyncExternalStore, type DragEvent } from 'react'
+import type { PreviewDrop } from '../../../shared/dropPreview'
 import { parseFileDrag } from '../../../shared/fileUri'
 import type { ChangedFile } from '../../../shared/model'
 import type { CommitView, ViewSettings } from '../../../shared/protocol'
@@ -41,6 +42,8 @@ interface CommitRowProps {
   onToggle: (commit: CommitView) => void
   onSelect: (commitId: string) => void
   onDescribe: (commit: CommitView) => void
+  // A change was dropped on this row or next to it. The graph previews or runs it.
+  onDropCommit: (drop: PreviewDrop) => void
 }
 
 type DropKind = 'commit' | 'duplicate' | 'file' | 'bookmark' | `insert-${InsertEdge}`
@@ -182,10 +185,14 @@ export const CommitRow = memo(function CommitRow(props: CommitRowProps) {
     const modifiers = dragModifiers.snapshot()
     const kind = dropKind(event, modifiers.copy)
     const pair = kind === 'commit' ? insertPair(event) : null
+    // A drop can swap the rows for its preview, which removes the dragged row before its
+    // dragend fires, so the drag ends here too.
+    draggedCommitId = null
+    dragModifiers.onDragEnd()
     if (pair) {
       const { action, mode } = insertCommitAction(modifiers.copy, modifiers.alt)
-      postMessage({
-        type: 'insertCommit',
+      props.onDropCommit({
+        kind: 'between',
         sourceId: event.dataTransfer.getData(COMMIT_MIME),
         afterId: pair.after,
         beforeId: pair.before,
@@ -194,8 +201,8 @@ export const CommitRow = memo(function CommitRow(props: CommitRowProps) {
       })
     } else if (kind === 'commit') {
       const { action, mode } = dropCommitAction(modifiers.copy, modifiers.alt)
-      postMessage({
-        type: 'dropCommit',
+      props.onDropCommit({
+        kind: 'onto',
         sourceId: event.dataTransfer.getData(COMMIT_MIME),
         targetId: commit.commitId,
         action,

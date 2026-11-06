@@ -243,6 +243,134 @@
   box-shadow: inset 0 -2px 0 var(--vscode-focusBorder);
 }
 
+/* A drop preview: the graph the drop would produce, shown until it is applied or cancelled. */
+.commit.preview-row:hover {
+  background: none;
+}
+
+.commit.preview-moved,
+.commit.preview-carried,
+.commit.preview-new {
+  border-left-color: var(--ukemi-preview-edge);
+  background: var(--ukemi-preview-bg);
+}
+
+.commit.preview-moved:hover,
+.commit.preview-carried:hover,
+.commit.preview-new:hover {
+  background: var(--ukemi-preview-bg);
+}
+
+.commit.preview-reparented {
+  border-left-color: color-mix(in srgb, var(--ukemi-preview-edge) 40%, transparent);
+}
+
+/* Where a moved change is now. It fades, so the eye goes to where it lands. */
+.commit.preview-old .commit-body,
+.commit.preview-old .graph-cell {
+  opacity: var(--ukemi-preview-old);
+}
+
+.commit.preview-old .summary {
+  font-style: italic;
+}
+
+.change-id.preview-new-id {
+  color: var(--ukemi-preview-edge);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.drop-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 3px 8px 6px;
+  padding: 5px 6px 5px 8px;
+  border: 1px solid var(--ukemi-preview-edge);
+  border-radius: var(--ukemi-radius);
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  box-shadow: 0 2px 8px var(--ukemi-preview-shadow);
+  animation: drop-preview-in 140ms ease-out;
+}
+
+/* Focused by code while jj runs, so a pointer user sees no ring. */
+.drop-preview:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.drop-preview > .codicon {
+  color: var(--ukemi-preview-edge);
+}
+
+.drop-preview.is-error {
+  border-color: var(--vscode-inputValidation-warningBorder);
+}
+
+.drop-preview.is-error > .codicon {
+  color: var(--vscode-editorWarning-foreground);
+}
+
+.drop-preview-text {
+  flex: 1 1 12em;
+  min-width: 0;
+}
+
+.drop-preview-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.drop-preview .button {
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--ukemi-radius);
+  transition:
+    background 120ms ease-out,
+    border-color 120ms ease-out;
+}
+
+.drop-preview .button.drop-preview-apply {
+  color: var(--ukemi-ink-button-fg);
+  background: var(--ukemi-ink-button-bg);
+}
+
+.drop-preview .button.drop-preview-apply:hover {
+  background: var(--ukemi-ink-button-hover);
+}
+
+.drop-preview .button.secondary {
+  border-color: var(--ukemi-quiet-button-border);
+  color: var(--vscode-foreground);
+  background: transparent;
+}
+
+.drop-preview .button.secondary:hover {
+  background: var(--ukemi-quiet-button-hover);
+}
+
+.drop-preview .button:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+@keyframes drop-preview-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drop-preview {
+    animation: none;
+  }
+}
+
 .graph-cell {
   position: relative;
   flex: none;

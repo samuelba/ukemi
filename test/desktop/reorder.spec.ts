@@ -53,15 +53,24 @@ const shownOrder = (page: Page) =>
     .allTextContents()
     .then((texts) => texts.map((t) => t.trim()).filter((t) => /^s\d$/.test(t)))
 
-// Waits until both jj and the graph show `order`, so the next drag hits the redrawn rows.
+// Waits until both jj and the graph show `order`, so the next drag hits the redrawn rows. The
+// preview of an applied drop shows the same order, so also wait for the real rows.
 async function expectOrder(page: Page, repo: string, order: string[]) {
   await expect.poll(() => stackOrder(repo)).toEqual(order)
+  await expect(page.locator('.drop-preview')).toHaveCount(0)
   await expect.poll(() => shownOrder(page)).toEqual(order)
 }
 
 // Drops `source` on the top edge of `target`, which is the gap between it and the row above.
-async function dropAbove(page: Page, source: string, target: string) {
+// The drop shows a preview first.
+async function previewAbove(page: Page, source: string, target: string) {
   await row(page, source).dragTo(row(page, target), { targetPosition: { x: 60, y: 1 } })
+  await expect(page.locator('.drop-preview')).toBeVisible()
+}
+
+async function dropAbove(page: Page, source: string, target: string) {
+  await previewAbove(page, source, target)
+  await page.locator('.drop-preview-apply').click()
 }
 
 test('reorders a stack by dropping changes between changes, again and again', async () => {
@@ -78,6 +87,33 @@ test('reorders a stack by dropping changes between changes, again and again', as
 
     await dropAbove(page, 's1', 's3')
     await expectOrder(page, repo, ['s2', 's1', 's3', 's4'])
+  } finally {
+    await app.close()
+  }
+})
+
+test('previews a drop and leaves the stack alone when cancelled', async () => {
+  const repo = stackRepo()
+  const { app, page } = await launch(repo)
+  try {
+    await expect(row(page, 's4')).toBeVisible()
+
+    await previewAbove(page, 's2', 's3')
+    await expect(page.locator('.drop-preview-text')).toHaveText(
+      'Rebase only “s2” between “s3” and “s4”',
+    )
+    // The moved change shows where it lands, and faded where it is now.
+    await expect(page.locator('.commit.preview-moved .summary')).toHaveText('s2')
+    await expect(page.locator('.commit.preview-old .summary')).toHaveText('s2')
+    await expect(page.locator('.drop-preview-apply')).toBeFocused()
+
+    await page.keyboard.press('Escape')
+    await expect(page.locator('.drop-preview')).toHaveCount(0)
+    await expectOrder(page, repo, ['s4', 's3', 's2', 's1'])
+
+    await previewAbove(page, 's2', 's3')
+    await page.keyboard.press('Enter')
+    await expectOrder(page, repo, ['s4', 's2', 's3', 's1'])
   } finally {
     await app.close()
   }

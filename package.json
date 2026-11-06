@@ -2176,6 +2176,11 @@
           "default": true,
           "description": "Show git tags on changes in the graph."
         },
+        "ukemi.previewDrops": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the graph a dragged change would produce, with Apply and Cancel buttons, before running the rebase or duplicate."
+        },
         "ukemi.workspaces.snapshotOnRefresh": {
           "scope": "resource",
           "type": "boolean",

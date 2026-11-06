@@ -1,5 +1,5 @@
 import type { FileIconTheme } from './fileIconTheme'
-import type { GraphRow } from './graphLayout'
+import type { GraphEdgeInput, GraphRow } from './graphLayout'
 import type {
   BookmarkTracking,
   ChangedFile,
@@ -41,6 +41,8 @@ export interface RequestBadge {
 
 export interface CommitView extends Commit {
   row: GraphRow
+  // The edges the row draws, elided ones included. A drop preview moves them around.
+  edges: GraphEdgeInput[]
   isTrunk: boolean
   requests: RequestBadge[]
 }
@@ -93,6 +95,8 @@ export interface ViewSettings {
   showFullPaths: boolean
   showLineStats: boolean
   showGitTags: boolean
+  // A dropped change shows the resulting graph first, with a button that applies it.
+  previewDrops: boolean
   changedFilesView: ChangedFilesView
   ciOnlyMine: boolean
 }

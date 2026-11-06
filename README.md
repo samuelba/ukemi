@@ -139,6 +139,7 @@ Select the gear in the title bar of the Ukemi view to open the Ukemi settings.
 | `ukemi.showFullPaths`                | Show full file paths in the graph. Default: off.                                                   |
 | `ukemi.showLineStats`                | Show added and removed line counts. This reads those file contents on each refresh. Default: off.  |
 | `ukemi.showGitTags`                  | Show git tags on changes. Default: on.                                                             |
+| `ukemi.previewDrops`                 | Preview the graph a dragged change produces, with **Apply** and **Cancel**. Default: on.           |
 | `ukemi.changedFilesView`             | Show changed files as a `list` or a `tree`.                                                        |
 | `ukemi.workspaces.snapshotOnRefresh` | Snapshot every other workspace on each refresh. Default: off. Each snapshot is a jj operation.     |
 | `ukemi.autoFetch.enabled`            | Fetch the active repository on a timer. Default: off.                                              |

@@ -21,6 +21,17 @@
   --ukemi-selected: var(--vscode-list-inactiveSelectionBackground);
   --ukemi-radius: 3px;
   --ukemi-mark-ink: var(--sumi);
+  /* Rows a drop preview moves or adds, and the bar that applies it. */
+  --ukemi-preview-bg: color-mix(in srgb, var(--shu) 9%, transparent);
+  --ukemi-preview-edge: var(--shu);
+  --ukemi-preview-old: 0.42;
+  --ukemi-preview-shadow: var(--vscode-widget-shadow, rgb(0 0 0 / 25%));
+  /* The bar's buttons follow the app's ink-on-paper buttons instead of the theme's button blue. */
+  --ukemi-ink-button-bg: var(--vscode-foreground);
+  --ukemi-ink-button-fg: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  --ukemi-ink-button-hover: color-mix(in srgb, var(--vscode-foreground) 82%, transparent);
+  --ukemi-quiet-button-border: var(--vscode-widget-border, var(--ukemi-edge));
+  --ukemi-quiet-button-hover: var(--vscode-toolbar-hoverBackground, var(--ukemi-hover));
 }
 
 body.vscode-dark,
@@ -28,6 +39,8 @@ body.vscode-high-contrast {
   --ukemi-bookmark-bg: color-mix(in srgb, #7f88d8 22%, transparent);
   --ukemi-here-fg: #ff8a65;
   --ukemi-mark-ink: var(--washi);
+  --ukemi-preview-bg: color-mix(in srgb, #ff8a65 13%, transparent);
+  --ukemi-preview-edge: #ff8a65;
 }
 
 body.vscode-light {
