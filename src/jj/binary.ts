@@ -21,31 +21,31 @@ export interface ReleaseAsset {
 // The official builds, by Node's `${process.platform}-${process.arch}`. The digests are the ones
 // GitHub lists for the release assets.
 export const PINNED_RELEASE = {
-  version: '0.46.0',
+  version: '0.47.1',
   assets: {
     'linux-x64': {
-      name: 'jj-v0.46.0-x86_64-unknown-linux-musl.tar.gz',
-      sha256: 'fce0271158e665ceb82dc66c5eb95b1728649094e9133074f3b5baece345fc08',
+      name: 'jj-v0.47.1-x86_64-unknown-linux-musl.tar.gz',
+      sha256: 'd4b657f622ee50929c8916466dfa3d6a6c17a0a32b50e7b2c793707ec9ebcad7',
     },
     'linux-arm64': {
-      name: 'jj-v0.46.0-aarch64-unknown-linux-musl.tar.gz',
-      sha256: '80e28f7501c11e50e0ca06cd6a1fa1d982cff9cc59bfe4411a9d36aa501d867e',
+      name: 'jj-v0.47.1-aarch64-unknown-linux-musl.tar.gz',
+      sha256: '0f300e1576de8dabe0a9dedf0b87ae44f8accea5cf54d9a342a51061c1fb1bcd',
     },
     'darwin-x64': {
-      name: 'jj-v0.46.0-x86_64-apple-darwin.tar.gz',
-      sha256: '10d941de276c7c5074ef5d395312813b4575f4ce92cb9c0b05738efb90bd3b60',
+      name: 'jj-v0.47.1-x86_64-apple-darwin.tar.gz',
+      sha256: 'ce7ac70c3b7cf90f2273b4fa62d24576727c5fd55c60dc3820221c05320c7589',
     },
     'darwin-arm64': {
-      name: 'jj-v0.46.0-aarch64-apple-darwin.tar.gz',
-      sha256: '43daa37ce0f9716cdf6fb65a29cbcae74a3160aef048cf3cb3d166d41cb4ab58',
+      name: 'jj-v0.47.1-aarch64-apple-darwin.tar.gz',
+      sha256: '50129b527f7cd6aef82aebd4bb2b670bb56766adc509ef3279c4327aa3592255',
     },
     'win32-x64': {
-      name: 'jj-v0.46.0-x86_64-pc-windows-msvc.zip',
-      sha256: 'c42316b10df04611bc65029a18bcb2d92636edddb6871d511f7bb4233e999b83',
+      name: 'jj-v0.47.1-x86_64-pc-windows-msvc.zip',
+      sha256: '72f9f80bc99d07a7f48d5f219cf5bab91f7e906e4b53f6c827948e646cd1152f',
     },
     'win32-arm64': {
-      name: 'jj-v0.46.0-aarch64-pc-windows-msvc.zip',
-      sha256: 'f6f0552d0e292e3e62aa7fd21f4b15e9b6644d4939db908ed6d6b04b5b0a7907',
+      name: 'jj-v0.47.1-aarch64-pc-windows-msvc.zip',
+      sha256: '07f3cf6ed6db95f12be6c79c76aff948689375a9f201f521df4468d0a0c5de85',
     },
   } as Record<string, ReleaseAsset>,
 }
@@ -69,6 +69,37 @@ export type ResolveResult =
 
 export function managedBinaryPath(storageDir: string, platform: string = process.platform): string {
   return join(storageDir, `jj-${PINNED_RELEASE.version}`, binaryName(platform))
+}
+
+// Binaries an earlier Ukemi downloaded for another pinned release, newest first.
+export async function staleManagedBinaries(
+  storageDir: string,
+  platform: string = process.platform,
+): Promise<string[]> {
+  let names: string[]
+  try {
+    names = await readdir(storageDir)
+  } catch {
+    return []
+  }
+  return names
+    .map((name) => ({ name, version: /^jj-(\d+\.\d+\.\d+)$/.exec(name)?.[1] }))
+    .filter((entry) => entry.version !== undefined && entry.version !== PINNED_RELEASE.version)
+    .map((entry) => ({ ...entry, parsed: parseVersion(`jj ${entry.version}`) }))
+    .filter((entry) => entry.parsed !== null)
+    .sort((a, b) => (isVersionAtLeast(a.parsed!, b.parsed!) ? -1 : 1))
+    .map((entry) => join(storageDir, entry.name, binaryName(platform)))
+}
+
+// Keeps the newest stale binary, which a window still running the previous Ukemi may be using.
+export async function removeOldManagedBinaries(
+  storageDir: string,
+  platform: string = process.platform,
+): Promise<void> {
+  const stale = await staleManagedBinaries(storageDir, platform)
+  for (const binary of stale.slice(1)) {
+    await rm(join(binary, '..'), { recursive: true, force: true }).catch(() => undefined)
+  }
 }
 
 function binaryName(platform: string): string {
@@ -132,6 +163,11 @@ export async function resolveJj(options: {
     ...(configured ? [{ path: configured, source: 'setting' as const }] : []),
     ...searchPaths.map((path) => ({ path, source: 'path' as const })),
     { path: managedBinaryPath(options.storageDir), source: 'managed' },
+    // Until the pinned release is downloaded, an earlier download keeps Ukemi working.
+    ...(await staleManagedBinaries(options.storageDir)).map((path) => ({
+      path,
+      source: 'managed' as const,
+    })),
   ]
 
   let tooOld: { path: string; version: JjVersion } | null = null
