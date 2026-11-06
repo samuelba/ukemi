@@ -80,15 +80,51 @@ Every [GitHub release](https://github.com/samuelba/ukemi/releases) has these fil
 | Linux   | `Ukemi-<version>-x86_64.flatpak` | `flatpak install --user ./Ukemi-<version>-x86_64.flatpak`                 |
 | Linux   | `ukemi-jj_<version>_amd64.snap`  | `sudo snap install --dangerous --classic ./ukemi-jj_<version>_amd64.snap` |
 | Linux   | `Ukemi-<version>.AppImage`       | See [AppImage](#appimage) below                                           |
-| macOS   | `Ukemi-<version>-arm64.dmg`      | Apple silicon. Open it and drag Ukemi to Applications                     |
-| macOS   | `Ukemi-<version>-x64.dmg`        | Intel. Open it and drag Ukemi to Applications                             |
+| macOS   | `Ukemi-<version>-arm64.dmg`      | Apple silicon. See [macOS](#macos) below                                  |
+| macOS   | `Ukemi-<version>-x64.dmg`        | Intel. See [macOS](#macos) below                                          |
 | Windows | `Ukemi Setup <version>.exe`      | Run the installer                                                         |
 
-The macOS and Windows builds are not signed yet. On macOS, open Ukemi from the context menu the first time. On Windows, choose **More info** and **Run anyway**.
+The Windows build is not signed yet. Choose **More info** and **Run anyway**.
 
-Start it from the app menu, or with a repository: `ukemi ~/src/repo`. Settings, the window layout and the log are in `~/.config/Ukemi` on Linux.
+Start it from the app menu, or with a repository: `ukemi ~/src/repo`. Settings, the window layout and the log are in `~/.config/Ukemi` on Linux and in `~/Library/Application Support/Ukemi` on macOS.
 
 When a newer release is out, Ukemi says so and offers to open its page, where you download the installer as above. It asks GitHub when it starts and once a day. Turn this off with **Check for Updates** in the settings.
+
+To build and install the app from a checkout instead, see [Install from source](#install-from-source).
+
+### macOS
+
+The macOS build is not signed by a registered Apple developer yet, so macOS blocks it the first time. Since macOS 15, opening it from the context menu no longer gets past this. Either:
+
+- **System Settings.** Open the dmg, drag Ukemi to Applications and open it. macOS says it cannot verify the developer. Choose **Done**. Then open **System Settings → Privacy & Security**, scroll to "Ukemi was blocked", choose **Open Anyway** and confirm with your password.
+- **Terminal.** After you drag Ukemi to Applications, remove the quarantine flag that macOS put on the download:
+
+  ```sh
+  xattr -dr com.apple.quarantine /Applications/Ukemi.app
+  ```
+
+Do this again after each update, since every new download is flagged. An app built with [Install from source](#install-from-source) is not flagged and opens straight away.
+
+The dmg does not add a `ukemi` command. To open a repository from the terminal, run `open -n -a Ukemi --args ~/src/repo`, or install from source, which adds the command.
+
+### Install from source
+
+This builds the app from a checkout and installs it for this system. It needs [Node.js](https://nodejs.org) 24 and git. On Linux, `npm install` also compiles the terminal's native module, which needs `python3`, `make` and a C++ compiler.
+
+```sh
+git clone https://github.com/samuelba/ukemi.git
+cd ukemi
+npm install
+npm run desktop:install
+```
+
+- **macOS** copies `Ukemi.app` to `/Applications`, or to `~/Applications` if that is not writable, and adds the `ukemi` command in `~/.local/bin`.
+- **Debian and Ubuntu** build the deb and install it with `apt-get`.
+- **Fedora, RHEL and openSUSE** build the rpm and install it with `dnf` or `zypper`. Building the rpm needs `rpm-build` and `libxcrypt-compat`.
+
+On Linux the package manager asks for your password and adds the app menu entry and the `ukemi` command. For other distributions, build the AppImage with `npm run desktop:package:appimage` and set it up as [below](#appimage).
+
+To update, pull and run the same commands again. A build of the same version replaces the installed one.
 
 ### AppImage
 
@@ -256,6 +292,7 @@ npm run package     # builds ukemi-jj-0.2.0.vsix
 ```sh
 npm run desktop                   # builds and starts the app from source
 npm run test:desktop              # end-to-end tests of the app
+npm run desktop:install           # builds and installs the app for this system
 npm run desktop:package           # every installer for this system, in out/desktop-release
 npm run desktop:package:dir       # the unpacked app only, the quickest build to try
 npm run desktop:package:appimage  # one Linux format: appimage, flatpak, snap, deb or rpm
