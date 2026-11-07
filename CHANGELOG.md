@@ -5,33 +5,21 @@
 
 ### Features
 
-* **graph:** keyboard navigation and the context menu key (U2) ([f748c83](https://github.com/samuelba/ukemi/commit/f748c83dab20855f2a3f044c26265a65afc7f666))
 * **graph:** keyboard navigation and the context menu key (U2) ([932ba7e](https://github.com/samuelba/ukemi/commit/932ba7ef3ecd346cf2765dcc137a2ca36fa9ca84))
-* **graph:** make graph and file rows an accessible tree (U1) ([b8c5d2e](https://github.com/samuelba/ukemi/commit/b8c5d2eac3284fd793d29ccf2a1418faf80bea92))
 * **graph:** make graph and file rows an accessible tree (U1) ([10b20cb](https://github.com/samuelba/ukemi/commit/10b20cbfd59491308b6c683800f663b9dcd84572))
-* **graph:** squash a change into a picked destination ([8177f43](https://github.com/samuelba/ukemi/commit/8177f43d8c28587ed6f7078e4c981a00cf185286))
 * **graph:** squash a change into a picked destination ([1dfb54c](https://github.com/samuelba/ukemi/commit/1dfb54ce7f50029292e5520f111f49695cab212e))
-* rebase stacks that are behind the trunk onto it ([3e94e89](https://github.com/samuelba/ukemi/commit/3e94e89a2dc5635e68949e252c796bc9f587e9aa))
 * rebase stacks that are behind the trunk onto it ([9b36427](https://github.com/samuelba/ukemi/commit/9b3642714c672599701f62783cd7cb03d5eee9cd))
-* show CI job and pipeline durations in the request hover ([2e9e3ed](https://github.com/samuelba/ukemi/commit/2e9e3ed14f32a2f42753ca7e946388585e499779))
 * show CI job and pipeline durations in the request hover ([636eae9](https://github.com/samuelba/ukemi/commit/636eae945321568c72bad15adbd7cdb3ad8352db))
-* **webview:** trap and restore focus in dialogs (U3) ([0103023](https://github.com/samuelba/ukemi/commit/0103023213660f538e3c74d5a5d50f9a1ac48517))
 * **webview:** trap and restore focus in dialogs (U3) ([96d6c67](https://github.com/samuelba/ukemi/commit/96d6c67110a95a80b9e8716e4240b589ede67d41))
 
 
 ### Bug Fixes
 
-* attach only requests from this repository or your own fork (F49) ([c6d75f7](https://github.com/samuelba/ukemi/commit/c6d75f7ba6a4940eba570bd47ee336ac0db37095))
 * attach only requests from this repository or your own fork (F49) ([dd14d63](https://github.com/samuelba/ukemi/commit/dd14d633951fd17e7ff590b6ff4b1c02b9a3faa0))
-* detect gh and glab logins from token environment variables (F53) ([aeade7d](https://github.com/samuelba/ukemi/commit/aeade7dc86dcfb3c6b92e481fdb16800fb95ad52))
 * detect gh and glab logins from token environment variables (F53) ([1974e07](https://github.com/samuelba/ukemi/commit/1974e075e51b2e44c4ea865cb72834575dd30613))
-* keep GitLab requests when one detail call fails, load all approvals (F54) ([cef31a4](https://github.com/samuelba/ukemi/commit/cef31a48456ae579edd81997948ae9296db51a10))
 * keep GitLab requests when one detail call fails, load all approvals (F54) ([f07e15b](https://github.com/samuelba/ukemi/commit/f07e15ba116d7c59df1f92aff0f5023bf022126b))
-* look up requests by head branch instead of the newest 50 (F50) ([4925c61](https://github.com/samuelba/ukemi/commit/4925c6154f4b53c00934591a66664932bb3495b8))
 * look up requests by head branch instead of the newest 50 (F50) ([1422592](https://github.com/samuelba/ukemi/commit/14225927ffbb709accfc257f48a0a19a9ef6c8c9))
-* show request badges as stale when a refresh fails (F55) ([df54662](https://github.com/samuelba/ukemi/commit/df546627de6084bbfd300e0fb862561619c5b45e))
 * show request badges as stale when a refresh fails (F55) ([572eb41](https://github.com/samuelba/ukemi/commit/572eb41395d5e21a7978076c90065b4aa7ec4792))
-* treat hosts glab is signed in to as GitLab hosts ([31d3db4](https://github.com/samuelba/ukemi/commit/31d3db4a0854591bcc6c5b5248f2ef626f6517b9))
 * treat hosts glab is signed in to as GitLab hosts ([67f851c](https://github.com/samuelba/ukemi/commit/67f851c5331bb1ec8624b140f06158622da0b41b))
 
 ## [0.12.0](https://github.com/samuelba/ukemi/compare/v0.11.0...v0.12.0) (2026-11-06)
