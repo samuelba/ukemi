@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.13.0](https://github.com/samuelba/ukemi/compare/v0.12.0...v0.13.0) (2026-11-07)
+
+
+### Features
+
+* **graph:** keyboard navigation and the context menu key (U2) ([932ba7e](https://github.com/samuelba/ukemi/commit/932ba7ef3ecd346cf2765dcc137a2ca36fa9ca84))
+* **graph:** make graph and file rows an accessible tree (U1) ([10b20cb](https://github.com/samuelba/ukemi/commit/10b20cbfd59491308b6c683800f663b9dcd84572))
+* **graph:** squash a change into a picked destination ([1dfb54c](https://github.com/samuelba/ukemi/commit/1dfb54ce7f50029292e5520f111f49695cab212e))
+* rebase stacks that are behind the trunk onto it ([9b36427](https://github.com/samuelba/ukemi/commit/9b3642714c672599701f62783cd7cb03d5eee9cd))
+* show CI job and pipeline durations in the request hover ([636eae9](https://github.com/samuelba/ukemi/commit/636eae945321568c72bad15adbd7cdb3ad8352db))
+* **webview:** trap and restore focus in dialogs (U3) ([96d6c67](https://github.com/samuelba/ukemi/commit/96d6c67110a95a80b9e8716e4240b589ede67d41))
+
+
+### Bug Fixes
+
+* attach only requests from this repository or your own fork (F49) ([dd14d63](https://github.com/samuelba/ukemi/commit/dd14d633951fd17e7ff590b6ff4b1c02b9a3faa0))
+* detect gh and glab logins from token environment variables (F53) ([1974e07](https://github.com/samuelba/ukemi/commit/1974e075e51b2e44c4ea865cb72834575dd30613))
+* keep GitLab requests when one detail call fails, load all approvals (F54) ([f07e15b](https://github.com/samuelba/ukemi/commit/f07e15ba116d7c59df1f92aff0f5023bf022126b))
+* look up requests by head branch instead of the newest 50 (F50) ([1422592](https://github.com/samuelba/ukemi/commit/14225927ffbb709accfc257f48a0a19a9ef6c8c9))
+* show request badges as stale when a refresh fails (F55) ([572eb41](https://github.com/samuelba/ukemi/commit/572eb41395d5e21a7978076c90065b4aa7ec4792))
+* treat hosts glab is signed in to as GitLab hosts ([67f851c](https://github.com/samuelba/ukemi/commit/67f851c5331bb1ec8624b140f06158622da0b41b))
+
 ## [0.12.0](https://github.com/samuelba/ukemi/compare/v0.11.0...v0.12.0) (2026-11-06)
 
 
