@@ -1,6 +1,7 @@
 import { basename } from 'node:path'
 import type { ChangedFilesView } from '../../../shared/protocol'
 import { InitIncompleteError, JjRepo, readInitFolder, type NewRepoOptions } from '../../jj/repo'
+import { changeRevision } from '../../jj/revsets'
 import type { RepoModel } from '../../repo/repoModel'
 import {
   bookmarkGoToItems,
@@ -12,7 +13,7 @@ import { errorMessage } from '../../util/logger'
 import { validateBookmarkName, validateRemoteName, validateRemoteUrl } from '../../util/text'
 import { showForgeMissing } from '../forgeMissing'
 import { updateWhereItLives, type UkemiConfig } from '../settings'
-import type { PickItem } from '../ui'
+import { confirm, type PickItem } from '../ui'
 import { contextModel, parseContext, type CommandEnv, type Handler } from './context'
 
 function activeOrWarn(env: CommandEnv): RepoModel | null {
@@ -30,6 +31,31 @@ function withModel(env: CommandEnv, fn: (model: RepoModel) => Promise<unknown>):
       await fn(model)
     }
   }
+}
+
+// Rebases every stack of yours that the graph shows behind the trunk, each as a whole branch.
+async function rebaseStacksOntoTrunk(env: CommandEnv, model: RepoModel): Promise<void> {
+  await model.settled()
+  const trunk = model.graph?.trunkName
+  if (!trunk) {
+    void env.ui.warn('Ukemi: no trunk bookmark found on a remote.')
+    return
+  }
+  const heads = (model.graph?.commits ?? []).filter((c) => c.isBehindTrunk && c.isMine)
+  if (heads.length === 0) {
+    void env.ui.info(`Ukemi: all your stacks are already on ${trunk}.`)
+    return
+  }
+  if (
+    heads.length > 1 &&
+    !(await confirm(env.ui, `Rebase ${heads.length} stacks onto ${trunk}?`, 'Rebase'))
+  ) {
+    return
+  }
+  const sources = heads.map((c) => `(${changeRevision(c)})`).join(' | ')
+  await env.operations.run('Rebase stacks', model, () =>
+    model.repo.rebase(sources, 'trunk()', 'branch'),
+  )
 }
 
 async function selectRepository(env: CommandEnv): Promise<void> {
@@ -364,6 +390,7 @@ export function globalCommands(env: CommandEnv): Record<string, Handler> {
     'ukemi.newFromTrunk': withModel(env, (model) =>
       env.operations.run('New change from trunk', model, () => model.repo.newChange(['trunk()'])),
     ),
+    'ukemi.rebaseStacksTrunk': withModel(env, (model) => rebaseStacksOntoTrunk(env, model)),
     'ukemi.goTo': withModel(env, (model) => goTo(env, model)),
     'ukemi.cleanup': async (arg?: unknown) => {
       const model = contextModel(env, parseContext(arg))

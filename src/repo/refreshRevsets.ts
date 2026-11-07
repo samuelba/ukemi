@@ -14,6 +14,10 @@ export interface GraphView {
 
 const SNAPSHOT_OPERATION = 'snapshot working copy'
 
+// The newest change of each stack that is not based on the current trunk, so a rebase onto the
+// trunk would move it. Without a trunk bookmark trunk() is root(), and the set is empty.
+export const STALE_STACK_HEADS_REVSET = 'heads(mutable()) ~ trunk()::'
+
 // A revset of ids makes jj read only the commits it names, so a list stays well under the 32 KB
 // command line of Windows up to this many commits.
 const MAX_LISTED_COMMITS = GRAPH_PAGE_SIZE

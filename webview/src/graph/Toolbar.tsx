@@ -146,6 +146,17 @@ function pushCurrentLabel(graph: GraphState): string {
     : 'Push current bookmark (no bookmark on this stack)'
 }
 
+function staleStackCount(graph: GraphState): number {
+  return graph.commits.filter((c) => c.isBehindTrunk && c.isMine).length
+}
+
+function rebaseStacksLabel(trunk: string, count: number): string {
+  if (count === 0) {
+    return `All your stacks are on ${trunk}`
+  }
+  return count === 1 ? `Rebase 1 stack onto ${trunk}` : `Rebase ${count} stacks onto ${trunk}`
+}
+
 function hasUnsyncedCurrent(graph: GraphState): boolean {
   const current = new Set(graph.currentBookmarks)
   return graph.commits.some((c) => c.localBookmarks.some((b) => current.has(b.name) && !b.synced))
@@ -220,6 +231,15 @@ export function Toolbar({
             />
             {graph.hasRemotes && (
               <>
+                {graph.trunkName && (
+                  <ToolButton
+                    icon="git-pull-request"
+                    label={rebaseStacksLabel(graph.trunkName, staleStackCount(graph))}
+                    isAccent={staleStackCount(graph) > 0}
+                    isDisabled={staleStackCount(graph) === 0}
+                    onClick={() => command('ukemi.rebaseStacksTrunk', { repoId })}
+                  />
+                )}
                 <ToolButton
                   icon="cloud-download"
                   label={fetchLabel(autoFetch)}
