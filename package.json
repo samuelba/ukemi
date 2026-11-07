@@ -403,6 +403,11 @@
         "category": "Ukemi"
       },
       {
+        "command": "ukemi.commit.squashInto",
+        "title": "Squash into…",
+        "category": "Ukemi"
+      },
+      {
         "command": "ukemi.commit.split",
         "title": "Split…",
         "category": "Ukemi"
@@ -899,6 +904,10 @@
     ],
     "submenus": [
       {
+        "id": "ukemi.squash",
+        "label": "Squash"
+      },
+      {
         "id": "ukemi.duplicate",
         "label": "Duplicate"
       },
@@ -954,7 +963,7 @@
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit' && !isEmpty"
         },
         {
-          "command": "ukemi.commit.squash",
+          "submenu": "ukemi.squash",
           "group": "3_rewrite@1",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit' && !isImmutable && !(isWorkingCopy && isEmpty)"
         },
@@ -1452,6 +1461,16 @@
           "when": "view == ukemi.bookmarks && viewItem =~ /^bookmark\\+/"
         }
       ],
+      "ukemi.squash": [
+        {
+          "command": "ukemi.commit.squash",
+          "group": "1_place@1"
+        },
+        {
+          "command": "ukemi.commit.squashInto",
+          "group": "1_place@2"
+        }
+      ],
       "ukemi.duplicate": [
         {
           "command": "ukemi.commit.duplicate",
@@ -1595,6 +1614,10 @@
         },
         {
           "command": "ukemi.commit.squash",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.squashInto",
           "when": "false"
         },
         {
