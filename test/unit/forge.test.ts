@@ -537,43 +537,6 @@ describe('GitlabClient', () => {
     expect(calls.some((call) => call.includes('/projects/21/pipelines/99/jobs'))).toBe(true)
   })
 
-  test('loads a later page when the request limit is above 100', async () => {
-    const pages: string[] = []
-    const mergeRequest = (iid: number) => ({
-      iid,
-      title: `MR ${iid}`,
-      web_url: `https://gitlab.com/a/b/-/merge_requests/${iid}`,
-      state: 'opened',
-      source_branch: iid === 101 ? 'wanted' : 'other',
-      target_branch: 'main',
-      author: { id: 1 },
-    })
-    const client = new GitlabClient('gitlab.com', 'a/b', 't', async (url) => {
-      if (url.includes('/api/v4/user')) {
-        return new Response(JSON.stringify({ id: 1 }), { status: 200 })
-      }
-      if (url.includes('/approvals')) {
-        return new Response(JSON.stringify({ approved: false, approved_by: [] }), { status: 200 })
-      }
-      if (!url.includes('/merge_requests?')) {
-        return new Response(JSON.stringify({ head_pipeline: null }), { status: 200 })
-      }
-      const page = new URL(url).searchParams.get('page') ?? ''
-      pages.push(page)
-      const start = page === '2' ? 100 : 0
-      const count = page === '2' ? 20 : 100
-      return new Response(
-        JSON.stringify(Array.from({ length: count }, (_, index) => mergeRequest(start + index))),
-        { status: 200 },
-      )
-    })
-
-    const requests = await client.listRequests(['wanted'], 120)
-
-    expect(pages).toEqual(['1', '2'])
-    expect(requests.map((request) => request.number)).toEqual([101])
-  })
-
   test('sends the chosen target branch', async () => {
     let body: Record<string, unknown> = {}
     const client = new GitlabClient('gitlab.com', 'a/b', 't', async (_url, init) => {
@@ -697,7 +660,7 @@ describe('GitlabClient', () => {
       'oauth',
     )
 
-    await client.listRequests([]).catch(() => undefined)
+    await client.listRequests(['x']).catch(() => undefined)
 
     expect(headers.length).toBeGreaterThan(0)
     expect(headers.every((value) => value === 'Bearer oauth-token')).toBe(true)
@@ -711,7 +674,7 @@ describe('GitlabClient', () => {
       async () => new Response(JSON.stringify({ message: '401 Unauthorized' }), { status: 401 }),
     )
 
-    const error = await client.listRequests([]).catch((e: unknown) => e)
+    const error = await client.listRequests(['x']).catch((e: unknown) => e)
 
     expect(error).toBeInstanceOf(ForgeError)
     expect((error as ForgeError).isAuthError).toBe(true)

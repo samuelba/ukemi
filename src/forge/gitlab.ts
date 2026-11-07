@@ -1,7 +1,13 @@
 import { z } from 'zod'
 import type { CiCheck, CiState, RequestBadge, RequestState } from '../../shared/protocol'
 import { isSafeHttpsHost } from './hostName'
-import { clampRequestLimit, DEFAULT_REQUEST_LIMIT, REQUEST_PAGE_SIZE } from './requestLimit'
+import { mapLimited } from '../util/mapLimited'
+import {
+  clampRequestLimit,
+  DEFAULT_REQUEST_LIMIT,
+  GITLAB_BRANCH_CONCURRENCY,
+  REQUESTS_PER_BRANCH,
+} from './requestLimit'
 import {
   ForgeError,
   requestJson,
@@ -229,12 +235,15 @@ export class GitlabClient implements ForgeClient {
     branches: readonly string[],
     limit = DEFAULT_REQUEST_LIMIT,
   ): Promise<RequestBadge[]> {
+    const wanted = [...new Set(branches)].slice(0, clampRequestLimit(limit))
+    if (wanted.length === 0) {
+      return []
+    }
     const [userId, listed] = await Promise.all([
       this.currentUserId(),
-      this.listMergeRequests(clampRequestLimit(limit)),
+      this.listMergeRequests(wanted),
     ])
-    const wanted = new Set(branches)
-    const mrs = listed.filter((mr) => wanted.has(mr.source_branch) && isOwnSource(mr, userId))
+    const mrs = listed.filter((mr) => isOwnSource(mr, userId))
     const open = mrs.filter((mr) => mr.state === 'opened')
     const detailed = new Set(open.slice(0, DETAIL_LIMIT).map((mr) => mr.iid))
     const withJobs = new Set(
@@ -248,24 +257,26 @@ export class GitlabClient implements ForgeClient {
     )
   }
 
-  private async listMergeRequests(limit: number): Promise<GitlabMergeRequest[]> {
-    const collected: GitlabMergeRequest[] = []
-    let page = 1
-    while (collected.length < limit) {
-      const pageSize = Math.min(REQUEST_PAGE_SIZE, limit - collected.length)
+  // One lookup per head branch, so a busy project cannot push a bookmark's request out of a list
+  // of the newest ones.
+  private async listMergeRequests(branches: readonly string[]): Promise<GitlabMergeRequest[]> {
+    const lists = await mapLimited(branches, GITLAB_BRANCH_CONCURRENCY, async (branch) => {
       const body = await this.call(
         this.projectUrl(
-          `/merge_requests?state=all&order_by=updated_at&per_page=${pageSize}&page=${page}`,
+          `/merge_requests?state=all&order_by=updated_at&source_branch=${encodeURIComponent(branch)}` +
+            `&per_page=${REQUESTS_PER_BRANCH}`,
         ),
       )
-      const batch = z.array(mergeRequestSchema).parse(body)
-      collected.push(...batch)
-      if (batch.length < pageSize) {
-        break
-      }
-      page += 1
+      return z
+        .array(mergeRequestSchema)
+        .parse(body)
+        .filter((mr) => mr.source_branch === branch)
+    })
+    const byIid = new Map<number, GitlabMergeRequest>()
+    for (const mr of lists.flat()) {
+      byIid.set(mr.iid, mr)
     }
-    return collected
+    return [...byIid.values()]
   }
 
   private async currentUserId(): Promise<number | null> {

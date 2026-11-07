@@ -1,6 +1,11 @@
 import { z } from 'zod'
 import type { CiCheck, CiState, RequestBadge, RequestState } from '../../shared/protocol'
-import { clampRequestLimit, DEFAULT_REQUEST_LIMIT, REQUEST_PAGE_SIZE } from './requestLimit'
+import {
+  clampRequestLimit,
+  DEFAULT_REQUEST_LIMIT,
+  GITHUB_BRANCHES_PER_QUERY,
+  REQUESTS_PER_BRANCH,
+} from './requestLimit'
 import {
   ForgeError,
   requestJson,
@@ -69,16 +74,8 @@ const pullSchema = z.object({
 const listSchema = z.object({
   data: z.object({
     viewer: z.object({ login: z.string() }).nullish(),
-    repository: z
-      .object({
-        pullRequests: z.object({
-          pageInfo: z
-            .object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() })
-            .optional(),
-          nodes: z.array(pullSchema),
-        }),
-      })
-      .nullable(),
+    // One entry per head branch alias; a lookup GitHub could not answer is null.
+    repository: z.record(z.object({ nodes: z.array(pullSchema) }).nullable()).nullable(),
   }),
 })
 
@@ -197,29 +194,21 @@ export function githubCheckState(status: string, conclusion: string | null): CiS
   }
 }
 
-const LIST_QUERY = `query($owner: String!, $name: String!, $limit: Int!, $after: String) {
-  viewer { login }
-  repository(owner: $owner, name: $name) {
-    pullRequests(first: $limit, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {
-      pageInfo { hasNextPage endCursor }
-      nodes {
-        number title url state isDraft headRefName baseRefName reviewDecision isCrossRepository
-        headRepositoryOwner { login }
-        author { login }
-        latestReviews(first: 1) { totalCount }
-        commits(last: 1) {
-          nodes {
-            commit {
-              statusCheckRollup {
-                state
-                contexts(first: 50) {
-                  nodes {
-                    __typename
-                    ... on CheckRun { name status conclusion detailsUrl }
-                    ... on StatusContext { context state targetUrl }
-                  }
-                }
-              }
+const PULL_FIELDS = `fragment PullFields on PullRequest {
+  number title url state isDraft headRefName baseRefName reviewDecision isCrossRepository
+  headRepositoryOwner { login }
+  author { login }
+  latestReviews(first: 1) { totalCount }
+  commits(last: 1) {
+    nodes {
+      commit {
+        statusCheckRollup {
+          state
+          contexts(first: 50) {
+            nodes {
+              __typename
+              ... on CheckRun { name status conclusion detailsUrl }
+              ... on StatusContext { context state targetUrl }
             }
           }
         }
@@ -227,6 +216,26 @@ const LIST_QUERY = `query($owner: String!, $name: String!, $limit: Int!, $after:
     }
   }
 }`
+
+// One aliased lookup per head branch, so a busy repository cannot push a bookmark's request out of
+// a list of the newest ones.
+export function branchQuery(count: number): string {
+  const variables = Array.from({ length: count }, (_, index) => `, $b${index}: String!`).join('')
+  const lookups = Array.from(
+    { length: count },
+    (_, index) =>
+      `    b${index}: pullRequests(headRefName: $b${index}, first: ${REQUESTS_PER_BRANCH}, ` +
+      `orderBy: {field: UPDATED_AT, direction: DESC}) ` +
+      `{ nodes { ...PullFields } }`,
+  ).join('\n')
+  return `query($owner: String!, $name: String!${variables}) {
+  viewer { login }
+  repository(owner: $owner, name: $name) {
+${lookups}
+  }
+}
+${PULL_FIELDS}`
+}
 
 export class GithubClient implements ForgeClient {
   readonly kind = 'github' as const
@@ -263,34 +272,30 @@ export class GithubClient implements ForgeClient {
     branches: readonly string[],
     limit = DEFAULT_REQUEST_LIMIT,
   ): Promise<RequestBadge[]> {
-    const capped = clampRequestLimit(limit)
-    const pulls: GithubPull[] = []
+    const wanted = [...new Set(branches)].slice(0, clampRequestLimit(limit))
+    const pulls = new Map<number, GithubPull>()
     let viewer: string | null = null
-    let after: string | null = null
-    while (pulls.length < capped) {
-      const page = await this.pullPage(Math.min(REQUEST_PAGE_SIZE, capped - pulls.length), after)
+    for (let start = 0; start < wanted.length; start += GITHUB_BRANCHES_PER_QUERY) {
+      const page = await this.branchPage(wanted.slice(start, start + GITHUB_BRANCHES_PER_QUERY))
       viewer = page.viewer ?? viewer
-      pulls.push(...page.pulls)
-      if (!page.endCursor || page.endCursor === after || page.pulls.length === 0) {
-        break
+      for (const pull of page.pulls) {
+        pulls.set(pull.number, pull)
       }
-      after = page.endCursor
     }
-    const wanted = new Set(branches)
-    return pulls
-      .filter((pull) => wanted.has(pull.headRefName) && isOwnHead(pull, viewer))
+    return [...pulls.values()]
+      .filter((pull) => isOwnHead(pull, viewer))
       .map((pull) => this.toBadge(pull, viewer))
   }
 
-  private async pullPage(
-    limit: number,
-    after: string | null,
-  ): Promise<{ viewer: string | null; pulls: GithubPull[]; endCursor: string | null }> {
+  private async branchPage(
+    branches: readonly string[],
+  ): Promise<{ viewer: string | null; pulls: GithubPull[] }> {
+    const variables = Object.fromEntries(branches.map((branch, index) => [`b${index}`, branch]))
     const body = await this.call(this.graphqlUrl, {
       method: 'POST',
       body: JSON.stringify({
-        query: LIST_QUERY,
-        variables: { owner: this.owner, name: this.name, limit, after },
+        query: branchQuery(branches.length),
+        variables: { owner: this.owner, name: this.name, ...variables },
       }),
     })
     const parsed = listSchema.safeParse(body)
@@ -306,12 +311,13 @@ export class GithubClient implements ForgeClient {
       )
     }
     const data = parsed.data.data
-    const connection = data.repository?.pullRequests
-    const pageInfo = connection?.pageInfo
+    const lookups = Object.values(data.repository ?? {})
     return {
       viewer: data.viewer?.login ?? null,
-      pulls: connection?.nodes ?? [],
-      endCursor: pageInfo?.hasNextPage ? (pageInfo.endCursor ?? null) : null,
+      // Only the heads this query asked for count.
+      pulls: lookups
+        .flatMap((lookup) => lookup?.nodes ?? [])
+        .filter((pull) => branches.includes(pull.headRefName)),
     }
   }
 
