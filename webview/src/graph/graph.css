@@ -763,6 +763,22 @@
   flex: none;
 }
 
+.request-check-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.request-check-time {
+  flex: none;
+  margin-left: auto;
+  padding-left: 8px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.85em;
+  font-variant-numeric: tabular-nums;
+}
+
 .request-check:disabled {
   cursor: default;
   opacity: 0.8;

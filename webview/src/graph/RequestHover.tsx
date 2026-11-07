@@ -1,6 +1,8 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { checkElapsed, spanElapsed } from '../../../shared/ciTiming'
 import type { CiCheck, RequestBadge } from '../../../shared/protocol'
+import { formatDuration } from '../shared/format'
 import { staleRequestsNote } from '../../../shared/forgeStale'
 import { stackLabel } from '../../../shared/stack'
 import { postMessage } from '../shared/hostApi'
@@ -8,6 +10,7 @@ import { CiStatusIcon, REQUEST_LABEL } from './requestMeta'
 
 const CLOSE_DELAY_MS = 120
 const POPOVER_WIDTH = 280
+const TICK_MS = 1000
 
 function openExternal(url: string): void {
   postMessage({ type: 'openUrl', url })
@@ -29,6 +32,31 @@ function groupChecks(checks: readonly CiCheck[]): { stage: string; checks: CiChe
   return order.map((stage) => ({ stage, checks: groups.get(stage) ?? [] }))
 }
 
+// The current time, ticking each second while something still runs.
+function useNow(ticking: boolean): number {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!ticking) {
+      return undefined
+    }
+    setNow(Date.now())
+    const timer = setInterval(() => setNow(Date.now()), TICK_MS)
+    return () => clearInterval(timer)
+  }, [ticking])
+  return now
+}
+
+function isRunning(request: RequestBadge): boolean {
+  return (
+    (request.ci === 'pending' && !!request.pipelineStartedAt && !request.pipelineFinishedAt) ||
+    request.checks.some((check) => check.state === 'pending' && !!check.startedAt)
+  )
+}
+
+function Elapsed({ ms }: { ms: number | undefined }) {
+  return ms === undefined ? null : <span className="request-check-time">{formatDuration(ms)}</span>
+}
+
 function RequestPopoverBody({
   request,
   refreshError,
@@ -38,6 +66,12 @@ function RequestPopoverBody({
 }) {
   const groups = groupChecks(request.checks)
   const pipelineUrl = request.pipelineUrl
+  const now = useNow(isRunning(request))
+  const pipelineMs = spanElapsed(
+    { startedAt: request.pipelineStartedAt, finishedAt: request.pipelineFinishedAt },
+    request.ci === 'pending',
+    now,
+  )
   return (
     <>
       <button
@@ -50,6 +84,7 @@ function RequestPopoverBody({
       <div className="request-popover-meta">
         {REQUEST_LABEL[request.state]}
         {request.ci === 'none' ? '' : ` · CI ${request.ci}`}
+        {!pipelineUrl && pipelineMs !== undefined ? ` · ${formatDuration(pipelineMs)}` : ''}
         {request.stack ? ` · ${stackLabel(request.stack)} in stack` : ''}
       </div>
       {refreshError && (
@@ -57,7 +92,8 @@ function RequestPopoverBody({
       )}
       {pipelineUrl && (
         <button type="button" className="request-check" onClick={() => openExternal(pipelineUrl)}>
-          Pipeline
+          <span className="request-check-name">Pipeline</span>
+          <Elapsed ms={pipelineMs} />
         </button>
       )}
       {groups.length === 0 && <div className="request-popover-empty">No jobs</div>}
@@ -73,7 +109,8 @@ function RequestPopoverBody({
               onClick={() => openExternal(check.url)}
             >
               <CiStatusIcon state={check.state} />
-              <span>{check.name}</span>
+              <span className="request-check-name">{check.name}</span>
+              <Elapsed ms={checkElapsed(check, now)} />
             </button>
           ))}
         </div>

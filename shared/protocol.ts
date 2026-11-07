@@ -18,6 +18,9 @@ export interface CiCheck {
   stage?: string
   state: CiState
   url: string
+  // ISO 8601. Unset for a job that has not started or has not finished.
+  startedAt?: string
+  finishedAt?: string
 }
 
 export interface StackInfo {
@@ -33,6 +36,9 @@ export interface RequestBadge {
   ci: CiState
   isMine: boolean
   pipelineUrl?: string
+  // ISO 8601. The finish is unset while the pipeline still runs.
+  pipelineStartedAt?: string
+  pipelineFinishedAt?: string
   checks: CiCheck[]
   headBranch: string
   baseBranch: string

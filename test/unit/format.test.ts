@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'vitest'
-import { relativeTime, splitId, splitPath, title } from '../../webview/src/shared/format'
+import {
+  formatDuration,
+  relativeTime,
+  splitId,
+  splitPath,
+  title,
+} from '../../webview/src/shared/format'
 
 const now = Date.parse('2026-10-22T12:00:00Z')
 
@@ -40,5 +46,20 @@ describe('splitPath', () => {
 describe('title', () => {
   test('returns the first line', () => {
     expect(title('feat: x\n\nbody')).toBe('feat: x')
+  })
+})
+
+describe('formatDuration', () => {
+  test.each([
+    [0, '0s'],
+    [-5_000, '0s'],
+    [59_999, '59s'],
+    [60_000, '1m 00s'],
+    [192_000, '3m 12s'],
+    [3_599_000, '59m 59s'],
+    [3_600_000, '1h 00m'],
+    [3_840_000, '1h 04m'],
+  ])('formats %d ms as %s', (ms, expected) => {
+    expect(formatDuration(ms)).toBe(expected)
   })
 })

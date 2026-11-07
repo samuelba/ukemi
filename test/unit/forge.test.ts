@@ -167,6 +167,8 @@ describe('GithubClient', () => {
                       status: 'COMPLETED',
                       conclusion: 'SUCCESS',
                       detailsUrl: 'https://github.com/o/r/actions/runs/1',
+                      startedAt: '2026-11-07T12:00:00Z',
+                      completedAt: '2026-11-07T12:03:12Z',
                     },
                     {
                       __typename: 'StatusContext',
@@ -211,8 +213,15 @@ describe('GithubClient', () => {
         ci: 'success',
         isMine: true,
         pipelineUrl: 'https://github.com/o/r/pull/1/checks',
+        pipelineStartedAt: '2026-11-07T12:00:00Z',
         checks: [
-          { name: 'ci', state: 'success', url: 'https://github.com/o/r/actions/runs/1' },
+          {
+            name: 'ci',
+            state: 'success',
+            url: 'https://github.com/o/r/actions/runs/1',
+            startedAt: '2026-11-07T12:00:00Z',
+            finishedAt: '2026-11-07T12:03:12Z',
+          },
           { name: 'review', state: 'pending', url: 'https://github.com/o/r/status' },
         ],
         headBranch: 'mine',
@@ -371,6 +380,8 @@ describe('GitlabClient', () => {
               stage: 'test',
               status: 'failed',
               web_url: 'https://git.anybotics.com/team/sub/repo/-/jobs/1',
+              started_at: '2026-11-07T12:00:00Z',
+              finished_at: '2026-11-07T12:02:00Z',
             },
           ],
           '/merge_requests/7/approvals': { approved: true, approved_by: [{}] },
@@ -403,7 +414,7 @@ describe('GitlabClient', () => {
               source_branch: 'other',
               target_branch: 'main',
               author: { id: 9 },
-              head_pipeline: { id: 43, status: 'running' },
+              head_pipeline: { id: 43, status: 'running', started_at: '2026-11-07T12:05:00Z' },
             },
           ],
         },
@@ -425,10 +436,20 @@ describe('GitlabClient', () => {
           stage: 'test',
           state: 'failure',
           url: 'https://git.anybotics.com/team/sub/repo/-/jobs/1',
+          startedAt: '2026-11-07T12:00:00Z',
+          finishedAt: '2026-11-07T12:02:00Z',
         },
       ],
+      pipelineStartedAt: '2026-11-07T12:00:00Z',
+      pipelineFinishedAt: '2026-11-07T12:02:00Z',
     })
-    expect(requests[1]).toMatchObject({ number: 8, isMine: false, checks: [] })
+    expect(requests[1]).toMatchObject({
+      number: 8,
+      isMine: false,
+      checks: [],
+      pipelineStartedAt: '2026-11-07T12:05:00Z',
+    })
+    expect(requests[1]?.pipelineFinishedAt).toBeUndefined()
     expect(calls.some((call) => call.includes('/pipelines/43/jobs'))).toBe(false)
   })
 
