@@ -573,7 +573,10 @@ describe('GitlabClient', () => {
       'gitlab.com',
       'a/b',
       't',
-      async () => {
+      async (_url, init) => {
+        if (init.method !== 'POST') {
+          return new Response('{}', { status: 404 })
+        }
         posts += 1
         if (posts === 1) {
           return new Response(JSON.stringify({ message: { source_branch: ['does not exist'] } }), {
@@ -601,7 +604,10 @@ describe('GitlabClient', () => {
       'gitlab.com',
       'a/b',
       't',
-      async () => {
+      async (_url, init) => {
+        if (init.method !== 'POST') {
+          return new Response('{}', { status: 404 })
+        }
         posts += 1
         return new Response(JSON.stringify({ message: { title: ["can't be blank"] } }), {
           status: 400,
@@ -627,7 +633,10 @@ describe('GitlabClient', () => {
       'gitlab.com',
       'a/b',
       't',
-      async () => {
+      async (_url, init) => {
+        if (init.method !== 'POST') {
+          return new Response('{}', { status: 404 })
+        }
         posts += 1
         return new Response(JSON.stringify({ message: { source_branch: ['does not exist'] } }), {
           status: 400,
