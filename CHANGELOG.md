@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.13.0](https://github.com/samuelba/ukemi/compare/v0.12.0...v0.13.0) (2026-11-07)
+
+
+### Features
+
+* **graph:** keyboard navigation and the context menu key (U2) ([932ba7e](https://github.com/samuelba/ukemi/commit/932ba7ef3ecd346cf2765dcc137a2ca36fa9ca84))
+* **graph:** make graph and file rows an accessible tree (U1) ([10b20cb](https://github.com/samuelba/ukemi/commit/10b20cbfd59491308b6c683800f663b9dcd84572))
+* **webview:** trap and restore focus in dialogs (U3) ([96d6c67](https://github.com/samuelba/ukemi/commit/96d6c67110a95a80b9e8716e4240b589ede67d41))
+
 ## [0.12.0](https://github.com/samuelba/ukemi/compare/v0.11.0...v0.12.0) (2026-11-06)
 
 
