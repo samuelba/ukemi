@@ -39,6 +39,10 @@ test('runs a command from the palette and undoes it with the keyboard', async ()
     const before = changes()
     await page.keyboard.press('F1')
     await page.locator('.palette .prompt-input').fill('new change from trunk')
+    // Enter runs the option active at the last render, so wait until the filter has picked it.
+    await expect(
+      page.getByRole('option', { name: /^New change from trunk/i, selected: true }),
+    ).toBeVisible()
     await page.keyboard.press('Enter')
     await expect.poll(changes).toBe(before + 1)
     await page.locator('.graph-pane').click({ position: { x: 300, y: 400 } })
