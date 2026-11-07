@@ -1,6 +1,11 @@
 export const DEFAULT_REQUEST_LIMIT = 50
 export const MAX_REQUEST_LIMIT = 500
-export const REQUEST_PAGE_SIZE = 100
+// Requests read per head branch: a branch rarely has more than its current one and a few old ones.
+export const REQUESTS_PER_BRANCH = 10
+// Head branches per GitHub GraphQL query.
+export const GITHUB_BRANCHES_PER_QUERY = 20
+// GitLab lookups by head branch that run at once.
+export const GITLAB_BRANCH_CONCURRENCY = 4
 
 export function clampRequestLimit(value: number): number {
   if (!Number.isFinite(value)) {

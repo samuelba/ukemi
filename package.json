@@ -2277,7 +2277,7 @@
           "default": 50,
           "minimum": 1,
           "maximum": 500,
-          "description": "How many of the most recently updated merge and pull requests to load. Each request returns at most 100, so a higher value loads more pages."
+          "description": "How many bookmarks to look up merge and pull requests for, newest in the graph first. Each bookmark costs a lookup, so a lower value saves API calls."
         },
         "ukemi.forge.nativeStacks": {
           "scope": "resource",

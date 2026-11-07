@@ -184,7 +184,7 @@ Select the gear in the title bar of the Ukemi view to open the Ukemi settings.
 | `ukemi.gitlab.hosts`                 | Self-hosted GitLab hosts, for example `git.example.com`.                                           |
 | `ukemi.gitlab.oauthApplications`     | GitLab OAuth client IDs by host. The client ID is not a secret.                                    |
 | `ukemi.forge.ciOnlyMine`             | Show CI status only on open requests that you authored. Default: on.                               |
-| `ukemi.forge.requestLimit`           | How many recently updated merge and pull requests to load. Default: 50. Maximum: 500.              |
+| `ukemi.forge.requestLimit`           | How many bookmarks to look up requests for, newest in the graph first. Default: 50. Maximum: 500.  |
 | `ukemi.forge.nativeStacks`           | Group synced GitHub pull request stacks into GitHub's native stack view. Default: on.              |
 | `ukemi.forge.statusInterval`         | How often to reload CI status. Default: `60s`, or 15s while your pipeline runs.                    |
 | `ukemi.describeSuggest.tools`        | Tools that can suggest a description, in button order: `claude`, `copilot`, `cursor`, `vscode-lm`. |
