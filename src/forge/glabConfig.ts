@@ -34,40 +34,57 @@ export function glabEnvToken(host: string, env: NodeJS.ProcessEnv): boolean {
   return GLAB_TOKENS.some((name) => !!env[name]) && glabEnvHost(env) === host.toLowerCase()
 }
 
-export function glabKnowsHost(
-  host: string,
-  options: {
-    env?: NodeJS.ProcessEnv
-    // The variables the CLI runs with, for its token variables.
-    tokenEnv?: NodeJS.ProcessEnv
-    home?: string
-    readFile?: (file: string) => string
-  } = {},
-): boolean {
-  if (glabEnvToken(host, options.tokenEnv ?? cliTokenEnv())) {
-    return true
-  }
+interface ReadOptions {
+  env?: NodeJS.ProcessEnv
+  // The variables the CLI runs with, for its token variables.
+  tokenEnv?: NodeJS.ProcessEnv
+  home?: string
+  readFile?: (file: string) => string
+}
+
+function fileHosts(options: ReadOptions): string[] {
   const file = glabConfigFile(options.env ?? hostConfigEnv(), options.home ?? homedir())
   try {
     const text = (options.readFile ?? ((filePath: string) => readFileSync(filePath, 'utf8')))(file)
-    return configHasHost(text, host)
+    return configHosts(text)
   } catch {
-    return false
+    return []
+  }
+}
+
+// Hosts glab is signed in to, lowercased: those in its config file and the host of its token variables.
+export function glabHosts(options: ReadOptions = {}): string[] {
+  const hosts = fileHosts(options)
+  const env = options.tokenEnv ?? cliTokenEnv()
+  const envHost = glabEnvHost(env)
+  return envHost && glabEnvToken(envHost, env) && !hosts.includes(envHost)
+    ? [...hosts, envHost]
+    : hosts
+}
+
+export function glabKnowsHost(host: string, options: ReadOptions = {}): boolean {
+  return (
+    glabEnvToken(host, options.tokenEnv ?? cliTokenEnv()) ||
+    fileHosts(options).includes(host.toLowerCase())
+  )
+}
+
+export function configHosts(text: string): string[] {
+  try {
+    const parsed = parse(text) as unknown
+    if (!parsed || typeof parsed !== 'object' || !('hosts' in parsed)) {
+      return []
+    }
+    const hosts = parsed.hosts
+    if (!hosts || typeof hosts !== 'object') {
+      return []
+    }
+    return Object.keys(hosts).map((name) => name.toLowerCase())
+  } catch {
+    return []
   }
 }
 
 export function configHasHost(text: string, host: string): boolean {
-  try {
-    const parsed = parse(text) as unknown
-    if (!parsed || typeof parsed !== 'object' || !('hosts' in parsed)) {
-      return false
-    }
-    const hosts = parsed.hosts
-    if (!hosts || typeof hosts !== 'object') {
-      return false
-    }
-    return Object.keys(hosts).some((name) => name.toLowerCase() === host.toLowerCase())
-  } catch {
-    return false
-  }
+  return configHosts(text).includes(host.toLowerCase())
 }

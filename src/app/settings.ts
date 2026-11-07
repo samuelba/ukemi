@@ -7,6 +7,7 @@ import {
 import type { ChangedFilesView } from '../../shared/protocol'
 import type { HostLists } from '../forge/detect'
 import { ghHosts } from '../forge/ghConfig'
+import { glabHosts } from '../forge/glabConfig'
 import { clampRequestLimit } from '../forge/requestLimit'
 import { isRepositoryKey } from '../../shared/settingsScope'
 import { DEFAULT_EXCLUDES } from '../repo/discovery'
@@ -162,8 +163,12 @@ export function readSettings(c: SettingsSource): UkemiConfig {
   }
 }
 
-// Hosts that the user logged in to with `gh` count as GitHub hosts. That file is user-level, not workspace-level.
+// Hosts that the user logged in to with `gh` count as GitHub hosts, and with `glab` as GitLab hosts.
+// Those files are user-level, not workspace-level.
 export function readHostLists(settings: Settings): HostLists {
   const config = settings.read()
-  return { gitlabHosts: config.gitlabHosts, githubHosts: [...config.githubHosts, ...ghHosts()] }
+  return {
+    gitlabHosts: [...config.gitlabHosts, ...glabHosts()],
+    githubHosts: [...config.githubHosts, ...ghHosts()],
+  }
 }

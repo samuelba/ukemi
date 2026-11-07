@@ -18,6 +18,7 @@ vi.mock('../../src/forge/ghConfig', () => ({
 
 vi.mock('../../src/forge/glabConfig', () => ({
   glabKnowsHost: (host: string) => state.glabHostsKnown.has(host),
+  glabHosts: () => [...state.glabHostsKnown],
 }))
 
 vi.mock('../../src/forge/cli', async (importOriginal) => ({
@@ -168,6 +169,15 @@ describe('GitHub credentials for git', () => {
 })
 
 describe('GitLab with glab', () => {
+  test('treats a host glab is signed in to as a GitLab host', async () => {
+    const { forge } = service()
+    const model = { remotes: [{ name: 'origin', url: 'git@git.corp:team/app.git' }] }
+
+    expect(await forge.target(model as never)).toBeNull()
+    state.glabHostsKnown.add('git.corp')
+    expect(await forge.target(model as never)).toMatchObject({ kind: 'gitlab', host: 'git.corp' })
+  })
+
   test('does not hand the glab login to git', async () => {
     const { forge } = service()
     state.glabHostsKnown.add('gitlab.com')

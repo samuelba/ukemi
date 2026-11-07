@@ -231,6 +231,8 @@ Ukemi picks the first of these that is available for the host:
 
 If none is available and you start an action that needs the forge, Ukemi first tries an OAuth sign-in when the host has a client ID, and otherwise asks for a personal access token.
 
+Hosts that the `glab` config file lists, and the `GITLAB_HOST` of a token variable, are treated as GitLab hosts, so you do not need to list them in `ukemi.gitlab.hosts`.
+
 `glab` is not required. If it is not installed or has no login for the host, step 3 is skipped, and Ukemi asks for an OAuth sign-in or a token instead.
 
 ### Storage and safety

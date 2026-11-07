@@ -5,7 +5,7 @@ import type { CommandEnv } from './commands/context'
 import { readHostLists, type Settings } from './settings'
 
 const UNKNOWN_HOST_DETAIL =
-  'Ukemi reads the remotes from jj. It recognises github.com, gitlab.com and gitlab.* hosts. For a self-hosted server, tell Ukemi its type. Ukemi stores it in ukemi.gitlab.hosts or ukemi.github.hosts.'
+  'Ukemi reads the remotes from jj. It recognises github.com, gitlab.com, gitlab.* hosts and the hosts that gh or glab are signed in to. For a self-hosted server, tell Ukemi its type. Ukemi stores it in ukemi.gitlab.hosts or ukemi.github.hosts.'
 
 const NO_REMOTE_DETAIL = 'Add one with: jj git remote add origin <url>'
 
