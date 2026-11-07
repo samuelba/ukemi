@@ -52,6 +52,8 @@ export function PreviewRow({ node, commit, row, lanes, changeIdLength }: Preview
     <div
       className={classes}
       data-preview-id={node.id}
+      role="treeitem"
+      aria-level={1}
       title={node.role ? ROLE_TITLES[node.role] : undefined}
     >
       <GraphCell commit={shown} lanes={lanes} />

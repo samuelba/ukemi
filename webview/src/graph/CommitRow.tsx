@@ -1,4 +1,4 @@
-import { memo, useEffect, useSyncExternalStore, type DragEvent } from 'react'
+import { memo, useEffect, useId, useSyncExternalStore, type DragEvent } from 'react'
 import type { PreviewDrop } from '../../../shared/dropPreview'
 import { parseFileDrag } from '../../../shared/fileUri'
 import type { ChangedFile } from '../../../shared/model'
@@ -20,6 +20,7 @@ import { FileList, FILE_LOCKED_MIME, FILE_MIME } from './FileList'
 import { LineStats, lineTotals } from './LineStats'
 import { GraphCell } from './GraphCell'
 import { RelativeTime } from './RelativeTime'
+import { statusWords } from './rowStatus'
 
 export const COMMIT_MIME = 'application/x-ukemi-commit'
 
@@ -34,6 +35,8 @@ interface CommitRowProps {
   files: ChangedFile[] | undefined
   isExpanded: boolean
   isSelected: boolean
+  // The one row of the tree that Tab reaches (roving tabindex).
+  isTabStop: boolean
   // A search is open and this change does not match it.
   isDimmed: boolean
   hasRemotes: boolean
@@ -100,12 +103,14 @@ function runCommand(command: string, repoId: string, commitId: string) {
   postMessage({ type: 'command', command, context: { repoId, commitId } })
 }
 
-// The row selects on click, so an action must not let the click reach it.
+// The row selects on click, so an action must not let the click reach it. Out of the tab order:
+// the row is the tab stop, and the same commands are in its context menu.
 function RowAction({ title, icon, onClick }: { title: string; icon: string; onClick: () => void }) {
   return (
     <button
       className="icon-button"
       title={title}
+      tabIndex={-1}
       onClick={(event) => {
         event.stopPropagation()
         onClick()
@@ -131,6 +136,11 @@ export const CommitRow = memo(function CommitRow(props: CommitRowProps) {
     commit.isWorkingCopy && settings.showLineStats ? lineTotals(props.files ?? []) : null
   const canExpand = !commit.isWorkingCopy || (props.files?.length ?? 0) > 0
   const placeholder = commit.isEmpty ? (commit.isWorkingCopy ? '' : '(empty)') : '(no description)'
+  // GraphCell is aria-hidden, so the states its node shape shows are said in words.
+  const statusText = statusWords(commit).join(', ')
+  // Named by its summary, status and change id, so the file rows inside it and the action
+  // buttons stay out of the name.
+  const nameId = useId()
 
   const accepts = (kind: DropKind) => {
     if (kind === 'bookmark') {
@@ -249,6 +259,12 @@ export const CommitRow = memo(function CommitRow(props: CommitRowProps) {
     <div
       className={classes}
       data-commit-id={commit.commitId}
+      role="treeitem"
+      aria-level={1}
+      aria-selected={props.isSelected}
+      aria-expanded={canExpand ? isExpanded : undefined}
+      aria-labelledby={`${nameId}-summary ${nameId}-status ${nameId}-change`}
+      tabIndex={props.isTabStop ? 0 : -1}
       draggable={!commit.isImmutable || copyModifier}
       onDragStart={(event) => {
         const copy = event.ctrlKey || event.metaKey || dragModifiers.snapshot().copy
@@ -302,6 +318,7 @@ export const CommitRow = memo(function CommitRow(props: CommitRowProps) {
       <div className="commit-body">
         <div className="commit-head">
           <span
+            id={`${nameId}-change`}
             className={`change-id${commit.isDivergent ? ' divergent' : ''}`}
             title={commit.changeId}
           >
@@ -319,11 +336,17 @@ export const CommitRow = memo(function CommitRow(props: CommitRowProps) {
             showGitTags={settings.showGitTags}
           />
           <span
+            id={`${nameId}-summary`}
             className={`summary${summary ? '' : ' muted'}`}
             title={commit.description || undefined}
           >
             {summary || placeholder}
           </span>
+          {statusText && (
+            <span id={`${nameId}-status`} className="sr-only">
+              {statusText}
+            </span>
+          )}
           {fileCount !== null && fileCount > 0 && <span className="file-count">{fileCount}</span>}
           {totals && <LineStats added={totals.added} removed={totals.removed} />}
           <span className="time" title={`${commit.author.name} · ${commit.committer.timestamp}`}>
@@ -373,6 +396,7 @@ export const CommitRow = memo(function CommitRow(props: CommitRowProps) {
             showFullPaths={settings.showFullPaths}
             showLineStats={settings.showLineStats}
             changedFilesView={settings.changedFilesView}
+            level={2}
           />
         )}
       </div>
