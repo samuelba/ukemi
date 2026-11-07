@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { ghEnvToken, ghHosts, ghKnowsHost } from '../../src/forge/ghConfig'
-import { glabEnvToken, glabKnowsHost } from '../../src/forge/glabConfig'
+import { glabEnvToken, glabHosts, glabKnowsHost } from '../../src/forge/glabConfig'
 import { cliTokenEnv } from '../../src/util/hostProcess'
 
 const noFile = (): string => {
@@ -59,6 +59,17 @@ describe('glab token variables', () => {
 
     expect(glabKnowsHost('gitlab.com', { ...options, tokenEnv: { GITLAB_TOKEN: 'x' } })).toBe(true)
     expect(glabKnowsHost('gitlab.com', { ...options, tokenEnv: {} })).toBe(false)
+  })
+
+  test('lists the hosts from the config file and the token variables', () => {
+    const config = 'hosts:\n  Git.Corp:\n    use_keyring: true\n  gitlab.com:\n    user: sam\n'
+    const options = { env: {}, home: '/h', readFile: () => config }
+
+    expect(glabHosts({ ...options, tokenEnv: {} })).toEqual(['git.corp', 'gitlab.com'])
+    expect(
+      glabHosts({ ...options, tokenEnv: { GITLAB_TOKEN: 'x', GITLAB_HOST: 'git.other' } }),
+    ).toEqual(['git.corp', 'gitlab.com', 'git.other'])
+    expect(glabHosts({ env: {}, home: '/h', readFile: noFile, tokenEnv: {} })).toEqual([])
   })
 })
 

@@ -483,15 +483,18 @@ export class ForgeService implements Disposable {
       model.setForge(state, [])
       return
     }
-    model.setForge(
-      state,
-      await this.fetchRequests(
-        target,
-        credential,
-        branchNames(model),
-        this.host.settings.read(model.root).requestLimit,
-      ),
+    const branches = branchNames(model)
+    const started = Date.now()
+    const requests = await this.fetchRequests(
+      target,
+      credential,
+      branches,
+      this.host.settings.read(model.root).requestLimit,
     )
+    this.logger.info(
+      `${target.host}: ${requests.length} requests for ${branches.length} bookmarks via ${credential.kind} (${Date.now() - started} ms)`,
+    )
+    model.setForge(state, requests)
   }
 
   private reportMissing(host: string): void {

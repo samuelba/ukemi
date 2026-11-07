@@ -2254,7 +2254,7 @@
           },
           "default": [],
           "scope": "machine",
-          "description": "Additional self-hosted GitLab hosts, for example git.example.com. Credentials are only used for hosts you list here, so this cannot be set per workspace."
+          "description": "Additional self-hosted GitLab hosts, for example git.example.com. Hosts that glab is signed in to count without being listed. Credentials are only used for hosts you list here, so this cannot be set per workspace."
         },
         "ukemi.gitlab.oauthApplications": {
           "type": "object",
