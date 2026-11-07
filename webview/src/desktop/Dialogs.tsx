@@ -8,6 +8,7 @@ import type {
 } from '../../../shared/desktopProtocol'
 import { postMessage } from '../shared/hostApi'
 import { useHostListener } from '../shared/hooks'
+import { pointerMoved } from '../shared/pointer'
 import { useModalFocus } from '../shared/useModalFocus'
 
 interface Open {
@@ -409,7 +410,7 @@ function PickPrompt({
             aria-selected={position === active}
             data-active={position === active}
             className="pick-item"
-            onMouseEnter={() => setActive(position)}
+            onMouseMove={(e) => pointerMoved(e) && setActive(position)}
             onClick={() => (request.many ? toggle(index) : accept(index))}
           >
             {request.many && (

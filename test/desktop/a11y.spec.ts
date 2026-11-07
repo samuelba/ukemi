@@ -152,13 +152,14 @@ test('the palette keeps Tab inside, names its active option and gives focus back
       'true',
     )
 
-    const first = await input.getAttribute('aria-activedescendant')
-    expect(first).toBeTruthy()
-    await expect(page.locator(`[id="${first}"]`)).toHaveAttribute('aria-selected', 'true')
+    const options = page.locator('.palette [role="option"]')
+    const first = await options.nth(0).getAttribute('id')
+    const second = await options.nth(1).getAttribute('id')
+    await expect(input).toHaveAttribute('aria-activedescendant', first ?? '')
+    await expect(options.nth(0)).toHaveAttribute('aria-selected', 'true')
     await page.keyboard.press('ArrowDown')
-    const second = await input.getAttribute('aria-activedescendant')
-    expect(second).not.toBe(first)
-    await expect(page.locator(`[id="${second}"]`)).toHaveAttribute('aria-selected', 'true')
+    await expect(input).toHaveAttribute('aria-activedescendant', second ?? '')
+    await expect(options.nth(1)).toHaveAttribute('aria-selected', 'true')
 
     await page.keyboard.press('Tab')
     await expect(input).toBeFocused()
@@ -212,12 +213,43 @@ test('Describe keeps Tab inside, closes on Escape from a button and gives focus 
   }
 })
 
+test('a pointer resting where the palette opens does not move its active option', async () => {
+  const { app, page } = await launch(fixtureRepo())
+  try {
+    await tabIntoGraph(page)
+    await page.keyboard.press('F1')
+    const options = page.locator('.palette [role="option"]')
+    const box = await options.nth(3).boundingBox()
+    expect(box).toBeTruthy()
+    await page.keyboard.press('Escape')
+    await expect(page.locator('.palette')).toHaveCount(0)
+
+    // Park the pointer where the fourth option will be drawn, then open the palette under it.
+    await page.mouse.move((box?.x ?? 0) + 20, (box?.y ?? 0) + 5)
+    await page.keyboard.press('F1')
+    await expect(options.nth(3)).toBeVisible()
+    await page.waitForTimeout(200)
+    await expect(options.nth(0)).toHaveAttribute('aria-selected', 'true')
+    await expect(options.nth(3)).toHaveAttribute('aria-selected', 'false')
+
+    // Moving the pointer is still a way to pick.
+    await page.mouse.move((box?.x ?? 0) + 40, (box?.y ?? 0) + 8)
+    await expect(options.nth(3)).toHaveAttribute('aria-selected', 'true')
+  } finally {
+    await app.close()
+  }
+})
+
 test('a prompt opened from the palette gives focus back to the row the palette came from', async () => {
   const { app, page } = await launch(fixtureRepo())
   try {
     await tabIntoGraph(page)
     await page.keyboard.press('F1')
     await page.locator('.palette .prompt-input').fill('new change from bookmark')
+    // Enter runs the option active at the last render, so wait until the filter has picked it.
+    await expect(
+      page.getByRole('option', { name: /^New change from bookmark/i, selected: true }),
+    ).toBeVisible()
     await page.keyboard.press('Enter')
     const prompt = page.locator('.prompt[role="dialog"]:not(.palette)')
     await expect(prompt).toBeVisible()

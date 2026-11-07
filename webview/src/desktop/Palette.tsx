@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { DesktopRendererMessage, PaletteCommand } from '../../../shared/desktopProtocol'
 import { postMessage } from '../shared/hostApi'
+import { pointerMoved } from '../shared/pointer'
 import { useModalFocus } from '../shared/useModalFocus'
 
 const RECENT_KEY = 'ukemi.palette.recent'
@@ -134,7 +135,7 @@ export function Palette({
               aria-selected={position === active}
               data-active={position === active}
               className="pick-item"
-              onMouseEnter={() => setActive(position)}
+              onMouseMove={(e) => pointerMoved(e) && setActive(position)}
               onClick={() => run(command)}
             >
               <span className="pick-label">{command.title}</span>
