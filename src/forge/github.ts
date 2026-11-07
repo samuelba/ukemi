@@ -41,6 +41,9 @@ const pullSchema = z.object({
   isDraft: z.boolean(),
   headRefName: z.string(),
   baseRefName: z.string(),
+  isCrossRepository: z.boolean().optional(),
+  // Null once the fork is deleted.
+  headRepositoryOwner: z.object({ login: z.string() }).nullish(),
   author: z.object({ login: z.string() }).nullable().optional(),
   reviewDecision: z.enum(['APPROVED', 'CHANGES_REQUESTED', 'REVIEW_REQUIRED']).nullable(),
   latestReviews: z.object({ totalCount: z.number() }),
@@ -200,7 +203,8 @@ const LIST_QUERY = `query($owner: String!, $name: String!, $limit: Int!, $after:
     pullRequests(first: $limit, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {
       pageInfo { hasNextPage endCursor }
       nodes {
-        number title url state isDraft headRefName baseRefName reviewDecision
+        number title url state isDraft headRefName baseRefName reviewDecision isCrossRepository
+        headRepositoryOwner { login }
         author { login }
         latestReviews(first: 1) { totalCount }
         commits(last: 1) {
@@ -274,7 +278,7 @@ export class GithubClient implements ForgeClient {
     }
     const wanted = new Set(branches)
     return pulls
-      .filter((pull) => wanted.has(pull.headRefName))
+      .filter((pull) => wanted.has(pull.headRefName) && isOwnHead(pull, viewer))
       .map((pull) => this.toBadge(pull, viewer))
   }
 
@@ -442,6 +446,14 @@ export class GithubClient implements ForgeClient {
     })
     return 'extended'
   }
+}
+
+// A fork's branch only shares a name with a bookmark here, unless the signed-in user owns the fork.
+function isOwnHead(
+  pull: Pick<GithubPull, 'isCrossRepository' | 'headRepositoryOwner'>,
+  viewer: string | null,
+): boolean {
+  return !pull.isCrossRepository || sameLogin(pull.headRepositoryOwner?.login, viewer)
 }
 
 function sameLogin(author: string | null | undefined, viewer: string | null): boolean {

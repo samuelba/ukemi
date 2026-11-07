@@ -73,6 +73,8 @@ const mergeRequestSchema = z.object({
   work_in_progress: z.boolean().optional(),
   source_branch: z.string(),
   target_branch: z.string(),
+  source_project_id: z.number().optional(),
+  target_project_id: z.number().optional(),
   author: z.object({ id: z.number() }).optional(),
   head_pipeline: pipelineSchema.nullable().optional(),
 })
@@ -175,6 +177,20 @@ export function gitlabPipelineCi(status: string | undefined, checks: readonly Ci
   return pipeline
 }
 
+// A fork's branch only shares a name with a bookmark here, unless the signed-in user wrote the
+// merge request.
+function isOwnSource(
+  mr: Pick<GitlabMergeRequest, 'source_project_id' | 'target_project_id' | 'author'>,
+  userId: number | null,
+): boolean {
+  if (mr.source_project_id === undefined || mr.target_project_id === undefined) {
+    return true
+  }
+  return (
+    mr.source_project_id === mr.target_project_id || (userId !== null && mr.author?.id === userId)
+  )
+}
+
 export class GitlabClient implements ForgeClient {
   readonly kind = 'gitlab' as const
   private readonly projectId: string
@@ -218,7 +234,7 @@ export class GitlabClient implements ForgeClient {
       this.listMergeRequests(clampRequestLimit(limit)),
     ])
     const wanted = new Set(branches)
-    const mrs = listed.filter((mr) => wanted.has(mr.source_branch))
+    const mrs = listed.filter((mr) => wanted.has(mr.source_branch) && isOwnSource(mr, userId))
     const open = mrs.filter((mr) => mr.state === 'opened')
     const detailed = new Set(open.slice(0, DETAIL_LIMIT).map((mr) => mr.iid))
     const withJobs = new Set(
