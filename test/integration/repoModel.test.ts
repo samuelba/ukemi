@@ -703,3 +703,41 @@ describe('RepoModel paging', () => {
     expect(warnings.some((line) => line.includes('looking up the ancestors'))).toBe(true)
   })
 })
+
+describe('RepoModel forge state', () => {
+  const forge = { kind: 'github' as const, host: 'github.com', isSignedIn: true }
+  const request = {
+    number: 7,
+    title: 'Feature',
+    url: 'https://github.com/o/r/pull/7',
+    state: 'open' as const,
+    ci: 'none' as const,
+    isMine: true,
+    checks: [],
+    headBranch: 'feature',
+    baseBranch: 'main',
+  }
+
+  test('keeps the requests of a failed refresh marked stale until one succeeds', async () => {
+    jj(root, 'bookmark', 'set', 'feature', '-r', '@')
+    await model.refresh()
+    model.setForge(forge, [request])
+
+    model.markForgeStale('HTTP 502')
+    const bookmarked = () => model.graph?.commits.find((c) => c.isWorkingCopy)
+
+    expect(model.graph?.forge?.refreshError).toBe('HTTP 502')
+    expect(bookmarked()?.requests.map((r) => r.number)).toEqual([7])
+
+    model.setForge(forge, [request])
+    expect(model.graph?.forge?.refreshError).toBeUndefined()
+  })
+
+  test('marks nothing without a forge', async () => {
+    await model.refresh()
+
+    model.markForgeStale('HTTP 502')
+
+    expect(model.graph?.forge).toBeNull()
+  })
+})

@@ -42,6 +42,8 @@ interface CommitRowProps {
   isDimmed: boolean
   hasRemotes: boolean
   hasForge: boolean
+  // Set when the latest request refresh failed, so the request badges are left from an earlier one.
+  requestRefreshError: string | undefined
   settings: ViewSettings
   onToggle: (commit: CommitView) => void
   onSelect: (commitId: string) => void
@@ -409,6 +411,7 @@ export const CommitRow = memo(function CommitRow(props: CommitRowProps) {
           hasForge={props.hasForge}
           ciOnlyMine={settings.ciOnlyMine}
           showGitTags={settings.showGitTags}
+          refreshError={props.requestRefreshError}
         />
         {isExpanded && canExpand && (
           <FileList

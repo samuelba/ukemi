@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { CiCheck, RequestBadge } from '../../../shared/protocol'
+import { staleRequestsNote } from '../../../shared/forgeStale'
 import { stackLabel } from '../../../shared/stack'
 import { postMessage } from '../shared/hostApi'
 import { CiStatusIcon, REQUEST_LABEL } from './requestMeta'
@@ -28,7 +29,13 @@ function groupChecks(checks: readonly CiCheck[]): { stage: string; checks: CiChe
   return order.map((stage) => ({ stage, checks: groups.get(stage) ?? [] }))
 }
 
-function RequestPopoverBody({ request }: { request: RequestBadge }) {
+function RequestPopoverBody({
+  request,
+  refreshError,
+}: {
+  request: RequestBadge
+  refreshError: string | undefined
+}) {
   const groups = groupChecks(request.checks)
   const pipelineUrl = request.pipelineUrl
   return (
@@ -45,6 +52,9 @@ function RequestPopoverBody({ request }: { request: RequestBadge }) {
         {request.ci === 'none' ? '' : ` · CI ${request.ci}`}
         {request.stack ? ` · ${stackLabel(request.stack)} in stack` : ''}
       </div>
+      {refreshError && (
+        <div className="request-popover-stale">{staleRequestsNote(refreshError)}</div>
+      )}
       {pipelineUrl && (
         <button type="button" className="request-check" onClick={() => openExternal(pipelineUrl)}>
           Pipeline
@@ -74,9 +84,11 @@ function RequestPopoverBody({ request }: { request: RequestBadge }) {
 
 export function RequestHover({
   request,
+  refreshError,
   children,
 }: {
   request: RequestBadge
+  refreshError: string | undefined
   children: ReactNode
 }) {
   const anchor = useRef<HTMLSpanElement>(null)
@@ -124,7 +136,7 @@ export function RequestHover({
             onMouseLeave={scheduleClose}
             onClick={(event) => event.stopPropagation()}
           >
-            <RequestPopoverBody request={request} />
+            <RequestPopoverBody request={request} refreshError={refreshError} />
           </div>,
           document.body,
         )}

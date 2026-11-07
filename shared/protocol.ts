@@ -51,6 +51,8 @@ export interface ForgeState {
   kind: ForgeKind
   host: string
   isSignedIn: boolean
+  // Why the latest refresh failed; the requests shown are from an earlier one.
+  refreshError?: string
 }
 
 export interface GraphState {
