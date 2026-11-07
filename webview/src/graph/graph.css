@@ -921,6 +921,11 @@ div.files {
   background: color-mix(in srgb, var(--vscode-editor-background) 60%, transparent);
 }
 
+/* Focusable only so that a click on its text keeps focus inside. */
+.dialog:focus {
+  outline: none;
+}
+
 .dialog {
   display: flex;
   flex-direction: column;

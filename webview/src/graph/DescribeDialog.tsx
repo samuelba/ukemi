@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import type { SuggesterView } from '../../../shared/protocol'
 import { postMessage } from '../shared/hostApi'
+import { useModalFocus } from '../shared/useModalFocus'
 
 // The host's answer to a suggestion request.
 export interface SuggestionReply {
@@ -43,9 +44,11 @@ export function DescribeDialog({
   const [error, setError] = useState<string | null>(null)
   const textarea = useRef<HTMLTextAreaElement>(null)
   const pendingId = useRef<string | null>(null)
+  const dialog = useRef<HTMLDivElement>(null)
+  const titleId = useId()
+  const trapFocus = useModalFocus(dialog, { initial: textarea })
 
   useEffect(() => {
-    textarea.current?.focus()
     textarea.current?.select()
   }, [])
 
@@ -99,10 +102,18 @@ export function DescribeDialog({
     }
   }
 
-  const onKeyDown = (event: KeyboardEvent) => {
+  // Escape cancels from anywhere in the dialog, Ctrl+Enter saves from the message.
+  const onDialogKeyDown = (event: KeyboardEvent) => {
     if (event.key === 'Escape') {
+      event.preventDefault()
       onCancel()
-    } else if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+      return
+    }
+    trapFocus(event)
+  }
+
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
       event.preventDefault()
       onSave(message, canStartNew && event.shiftKey)
     }
@@ -111,12 +122,18 @@ export function DescribeDialog({
   return (
     <div className="dialog-backdrop" onClick={onCancel}>
       <div
+        ref={dialog}
         className="dialog"
         role="dialog"
-        aria-label={heading}
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={onDialogKeyDown}
       >
-        <div className="dialog-title">{heading}</div>
+        <div id={titleId} className="dialog-title">
+          {heading}
+        </div>
         <textarea
           ref={textarea}
           value={message}

@@ -948,6 +948,11 @@ button.detail-tag-conflict:hover {
   animation: scrim-in var(--shell-fast) ease-out;
 }
 
+/* Focusable only so that a click on its text keeps focus inside. */
+.prompt:focus {
+  outline: none;
+}
+
 .prompt {
   width: min(620px, calc(100vw - 32px));
   overflow: hidden;

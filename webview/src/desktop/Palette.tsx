@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { DesktopRendererMessage, PaletteCommand } from '../../../shared/desktopProtocol'
 import { postMessage } from '../shared/hostApi'
+import { useModalFocus } from '../shared/useModalFocus'
 
 const RECENT_KEY = 'ukemi.palette.recent'
 const RECENT_LIMIT = 5
@@ -49,6 +50,9 @@ export function Palette({
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const list = useRef<HTMLUListElement>(null)
+  const dialog = useRef<HTMLDivElement>(null)
+  const trapFocus = useModalFocus(dialog, { onEscape: onClose })
+  const listId = useId()
   const recent = useMemo(readRecent, [])
 
   const visible = useMemo(() => {
@@ -97,9 +101,23 @@ export function Palette({
 
   return (
     <div className="scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="prompt palette" role="dialog" aria-label="Command palette">
+      <div
+        ref={dialog}
+        className="prompt palette"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
+        tabIndex={-1}
+        onKeyDown={trapFocus}
+      >
         <input
           className="prompt-input"
+          role="combobox"
+          aria-label="Command"
+          aria-controls={listId}
+          aria-expanded="true"
+          aria-autocomplete="list"
+          aria-activedescendant={visible[active] ? `${listId}-${active}` : undefined}
           value={query}
           placeholder="Run a command…"
           autoFocus
@@ -107,10 +125,11 @@ export function Palette({
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKey}
         />
-        <ul className="pick-list" ref={list} role="listbox">
+        <ul className="pick-list" ref={list} id={listId} role="listbox" aria-label="Commands">
           {visible.map((command, position) => (
             <li
               key={command.command}
+              id={`${listId}-${position}`}
               role="option"
               aria-selected={position === active}
               data-active={position === active}
