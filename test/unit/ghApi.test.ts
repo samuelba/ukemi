@@ -31,12 +31,12 @@ describe('gh config', () => {
     const readFile = () => {
       throw new Error('missing')
     }
-    expect(ghHosts({ env: {}, home: '/h', readFile })).toEqual([])
-    expect(ghKnowsHost('github.com', { env: {}, home: '/h', readFile })).toBe(false)
+    expect(ghHosts({ env: {}, tokenEnv: {}, home: '/h', readFile })).toEqual([])
+    expect(ghKnowsHost('github.com', { env: {}, tokenEnv: {}, home: '/h', readFile })).toBe(false)
   })
 
   test('matches hosts case-insensitively', () => {
-    const options = { env: {}, home: '/h', readFile: () => HOSTS }
+    const options = { env: {}, tokenEnv: {}, home: '/h', readFile: () => HOSTS }
     expect(ghKnowsHost('GHE.example.com', options)).toBe(true)
     expect(ghKnowsHost('other.example.com', options)).toBe(false)
   })

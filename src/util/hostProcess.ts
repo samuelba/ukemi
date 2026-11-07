@@ -33,6 +33,12 @@ export function hostConfigEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.Proc
   return host ? { ...rest, XDG_CONFIG_HOME: host } : rest
 }
 
+// The variables gh and glab run with, for their token variables. From a Flatpak they run on the host
+// without the sandbox's variables (see hostSpawn), so none count there.
+export function cliTokenEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  return flatpakAppId(env) ? {} : env
+}
+
 export interface HostSpawn {
   command: string
   args: string[]

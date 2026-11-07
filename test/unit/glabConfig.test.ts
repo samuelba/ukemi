@@ -25,6 +25,7 @@ describe('glab config', () => {
     expect(
       glabKnowsHost('gitlab.com', {
         env: { GLAB_CONFIG_DIR: '/tmp/glab' },
+        tokenEnv: {},
         home: '/home/sam',
         readFile: (file) => {
           seen.push(file)
@@ -36,6 +37,7 @@ describe('glab config', () => {
     expect(
       glabKnowsHost('gitlab.com', {
         env: {},
+        tokenEnv: {},
         home: '/home/sam',
         readFile: () => {
           throw new Error('missing')
