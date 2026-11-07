@@ -8,6 +8,7 @@ import { dragModifiers } from './dragModifiers'
 import { buildFileTree, type FileTreeNode } from '../../../shared/fileTree'
 import { FileTypeIcon } from './FileIcon'
 import { LineStats } from './LineStats'
+import { fileLabel } from './rowStatus'
 
 export const FILE_MIME = 'application/x-ukemi-file'
 export const FILE_LOCKED_MIME = 'application/x-ukemi-file-locked'
@@ -22,6 +23,9 @@ interface FileListProps {
   showFullPaths: boolean
   showLineStats: boolean
   changedFilesView: ChangedFilesView
+  // The aria-level of the top rows: 2 under a commit row of the graph tree, 1 where the list is a
+  // tree of its own (the desktop detail pane).
+  level: number
 }
 
 interface FileRowProps {
@@ -33,6 +37,8 @@ interface FileRowProps {
   showLineStats: boolean
   showDirectory: boolean
   depth: number
+  level: number
+  isTabStop: boolean
 }
 
 function depthStyle(depth: number): CSSProperties {
@@ -45,13 +51,15 @@ interface DiscardButtonProps {
   context: { repoId: string; commitId: string; path: string }
 }
 
-// Sits inside a row that opens on click and double click, so neither may reach the row.
+// Sits inside a row that opens on click and double click, so neither may reach the row. Out of the
+// tab order: the row has the keyboard, and Discard is in its context menu.
 function DiscardButton({ title, command, context }: DiscardButtonProps) {
   return (
     <button
       type="button"
       className="icon-button"
       title={title}
+      tabIndex={-1}
       onClick={(event) => {
         event.stopPropagation()
         if (event.detail > 1) {
@@ -75,6 +83,8 @@ function FileRow({
   showLineStats,
   showDirectory,
   depth,
+  level,
+  isTabStop,
 }: FileRowProps) {
   const { name, dir } = splitPath(file.path)
   const open = (mode: 'diff' | 'file') =>
@@ -98,6 +108,10 @@ function FileRow({
   return (
     <li
       className={`file status-${file.status}${file.isConflicted ? ' conflicted' : ''}`}
+      role="treeitem"
+      aria-level={level + depth}
+      aria-label={fileLabel(file)}
+      tabIndex={isTabStop ? 0 : -1}
       title={file.sourcePath !== file.path ? `${file.sourcePath} → ${file.path}` : file.path}
       draggable
       style={depthStyle(depth)}
@@ -153,6 +167,8 @@ interface TreeProps {
   showLineStats: boolean
   nodes: readonly FileTreeNode[]
   depth: number
+  level: number
+  tabStop: string | null
   collapsed: ReadonlySet<string>
   onToggle: (path: string) => void
 }
@@ -164,6 +180,8 @@ function FileTreeItems({
   showLineStats,
   nodes,
   depth,
+  level,
+  tabStop,
   collapsed,
   onToggle,
 }: TreeProps) {
@@ -180,6 +198,8 @@ function FileTreeItems({
           showLineStats={showLineStats}
           showDirectory={false}
           depth={depth}
+          level={level}
+          isTabStop={tabStop === node.file.path}
         />
       )
     }
@@ -192,7 +212,15 @@ function FileTreeItems({
       isImmutable: commit.isImmutable,
     })
     return (
-      <li key={node.path} className="file-folder">
+      <li
+        key={node.path}
+        className="file-folder"
+        role="treeitem"
+        aria-level={level + depth}
+        aria-expanded={!isCollapsed}
+        aria-label={node.name}
+        tabIndex={tabStop === node.path ? 0 : -1}
+      >
         <div
           className="file file-dir-row"
           style={depthStyle(depth)}
@@ -206,7 +234,7 @@ function FileTreeItems({
           <button
             type="button"
             className="file-dir-toggle"
-            aria-expanded={!isCollapsed}
+            tabIndex={-1}
             onClick={(event) => {
               event.stopPropagation()
               onToggle(node.path)
@@ -229,7 +257,7 @@ function FileTreeItems({
           )}
         </div>
         {!isCollapsed && (
-          <ul className="file-children">
+          <ul className="file-children" role="group">
             <FileTreeItems
               commit={commit}
               repoId={repoId}
@@ -237,6 +265,8 @@ function FileTreeItems({
               showLineStats={showLineStats}
               nodes={node.children}
               depth={depth + 1}
+              level={level}
+              tabStop={tabStop}
               collapsed={collapsed}
               onToggle={onToggle}
             />
@@ -252,11 +282,13 @@ function FileTree({
   files,
   repoId,
   showLineStats,
+  level,
 }: {
   commit: CommitView
   files: ChangedFile[]
   repoId: string
   showLineStats: boolean
+  level: number
 }) {
   const nodes = useMemo(() => buildFileTree(files), [files])
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set())
@@ -267,8 +299,11 @@ function FileTree({
         : new Set([...current, path]),
     )
   }
+  const first = nodes[0]
+  const tabStop =
+    level === 1 && first ? (first.kind === 'file' ? first.file.path : first.path) : null
   return (
-    <ul className="files file-tree">
+    <ul className="files file-tree" {...listRole(level)}>
       <FileTreeItems
         commit={commit}
         repoId={repoId}
@@ -276,11 +311,19 @@ function FileTree({
         showLineStats={showLineStats}
         nodes={nodes}
         depth={0}
+        level={level}
+        tabStop={tabStop}
         collapsed={collapsed}
         onToggle={toggle}
       />
     </ul>
   )
+}
+
+// Nested under a commit row the files are a group of it. On their own they are a tree, whose first
+// row is the tab stop.
+function listRole(level: number) {
+  return level === 1 ? { role: 'tree', 'aria-label': 'Changed files' } : { role: 'group' }
 }
 
 export function FileList({
@@ -290,20 +333,37 @@ export function FileList({
   showFullPaths,
   showLineStats,
   changedFilesView,
+  level,
 }: FileListProps) {
   if (!files) {
-    return <div className="files muted">Loading files…</div>
+    return (
+      <div className="files muted" role="none">
+        Loading files…
+      </div>
+    )
   }
   if (files.length === 0) {
-    return <div className="files muted">No changed files</div>
+    return (
+      <div className="files muted" role="none">
+        No changed files
+      </div>
+    )
   }
   if (changedFilesView === 'tree') {
-    return <FileTree commit={commit} files={files} repoId={repoId} showLineStats={showLineStats} />
+    return (
+      <FileTree
+        commit={commit}
+        files={files}
+        repoId={repoId}
+        showLineStats={showLineStats}
+        level={level}
+      />
+    )
   }
   const canSplit = files.length > 1 && !commit.isImmutable
   return (
-    <ul className="files">
-      {files.map((file) => (
+    <ul className="files" {...listRole(level)}>
+      {files.map((file, index) => (
         <FileRow
           key={file.path}
           commit={commit}
@@ -314,6 +374,8 @@ export function FileList({
           showLineStats={showLineStats}
           showDirectory
           depth={0}
+          level={level}
+          isTabStop={level === 1 && index === 0}
         />
       ))}
     </ul>

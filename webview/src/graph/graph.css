@@ -220,6 +220,20 @@
   background: var(--ukemi-selected);
 }
 
+/* The graph is a tree with one tab stop. The ring shows where the keyboard is. */
+.commit,
+.file,
+.file-folder {
+  outline: none;
+}
+
+.commit:focus-visible,
+.file:focus-visible,
+.file-folder:focus-visible > .file-dir-row {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
 /* Rows that do not match an open search fade, but the graph lines stay. */
 .commit.is-dimmed .commit-body {
   opacity: 0.4;

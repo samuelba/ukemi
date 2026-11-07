@@ -444,7 +444,11 @@ export function App() {
           </div>
         )}
         {state.status === 'ready' && graph ? (
-          <div className={`graph${preview?.result.ok ? ' is-previewing' : ''}`} role="list">
+          <div
+            className={`graph${preview?.result.ok ? ' is-previewing' : ''}`}
+            role="tree"
+            aria-label="Changes"
+          >
             {previewRows() ??
               graph.commits.flatMap((commit, index) => [
                 <CommitRow
@@ -458,6 +462,7 @@ export function App() {
                   files={filesFor(commit)}
                   isExpanded={isExpanded(commit)}
                   isSelected={selected === commit.commitId}
+                  isTabStop={selected === commit.commitId}
                   isDimmed={matchSet !== null && !matchSet.has(commit.commitId)}
                   hasRemotes={graph.hasRemotes}
                   hasForge={graph.forge !== null}
@@ -477,7 +482,9 @@ export function App() {
               />
             )}
             {graph.commits.length === 0 && (
-              <div className="muted padded">No changes match this filter.</div>
+              <div className="muted padded" role="none">
+                No changes match this filter.
+              </div>
             )}
           </div>
         ) : (

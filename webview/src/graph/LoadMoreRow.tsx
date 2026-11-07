@@ -37,7 +37,7 @@ export function LoadMoreRow({ shown }: LoadMoreRowProps) {
   }, [shown])
 
   return (
-    <div ref={row} className="load-more" role="listitem">
+    <div ref={row} className="load-more" role="none">
       <span>Showing the newest {shown} changes.</span>
       <button className="link-button" onClick={loadMore}>
         Load more

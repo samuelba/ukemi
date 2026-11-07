@@ -152,6 +152,7 @@ function Summary({
             showFullPaths={settings.showFullPaths}
             showLineStats={settings.showLineStats}
             changedFilesView={settings.changedFilesView}
+            level={1}
           />
         </div>
       </section>

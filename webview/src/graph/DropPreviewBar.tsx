@@ -71,7 +71,7 @@ export function DropPreviewBar(props: DropPreviewBarProps) {
   }, [isApplying, canApply])
 
   return (
-    <div role="listitem">
+    <div role="none">
       <div
         ref={ref}
         className={`drop-preview${canApply ? '' : ' is-error'}`}
