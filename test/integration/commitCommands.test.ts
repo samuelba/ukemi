@@ -23,7 +23,7 @@ beforeEach(() => {
 
 afterEach(() => fixture.cleanup())
 
-function commands(): ReturnType<typeof commitCommands> {
+function commands(picked?: string): ReturnType<typeof commitCommands> {
   const env = {
     registry: { modelFor: () => model, activeModel: model },
     operations: new Operations(NULL_LOGGER),
@@ -33,6 +33,7 @@ function commands(): ReturnType<typeof commitCommands> {
         warnings.push(text)
         return undefined
       },
+      pickOrType: () => ({ choice: Promise.resolve(picked) }),
     },
   } as unknown as CommandEnv
   return commitCommands(env)
@@ -60,6 +61,52 @@ describe('squash', () => {
 
     expect(warnings).toEqual([])
     expect(description('@-')).toBe('parent\n\nchild\n')
+  })
+})
+
+describe('squash into', () => {
+  function setup(): void {
+    writeFile(root, 't.txt', 't\n')
+    jj(root, 'describe', '-m', 'target')
+    jj(root, 'bookmark', 'set', 'feature', '-r', '@')
+    jj(root, 'new', '-m', 'middle')
+    writeFile(root, 'm.txt', 'm\n')
+    jj(root, 'new', '-m', 'source')
+    writeFile(root, 's.txt', 's\n')
+  }
+
+  test('squashes into a typed bookmark with both descriptions', async () => {
+    setup()
+    await model.refresh()
+    const source = model.graph?.commits.find((c) => c.isWorkingCopy)
+
+    await commands('feature')['ukemi.commit.squashInto']?.({ commitId: source?.commitId })
+
+    expect(warnings).toEqual([])
+    expect(description('feature')).toBe('target\n\nsource\n')
+    expect(jj(root, 'file', 'list', '-r', 'feature')).toContain('s.txt')
+    expect(description('@-')).toBe('middle\n')
+  })
+
+  test('refuses an immutable destination', async () => {
+    setup()
+    await model.refresh()
+    const source = model.graph?.commits.find((c) => c.isWorkingCopy)
+
+    await commands('root()')['ukemi.commit.squashInto']?.({ commitId: source?.commitId })
+
+    expect(description('feature')).toBe('target\n')
+  })
+
+  test('does nothing when the pick is dismissed', async () => {
+    setup()
+    await model.refresh()
+    const source = model.graph?.commits.find((c) => c.isWorkingCopy)
+
+    await commands(undefined)['ukemi.commit.squashInto']?.({ commitId: source?.commitId })
+
+    expect(description('@')).toBe('source\n')
+    expect(description('feature')).toBe('target\n')
   })
 })
 

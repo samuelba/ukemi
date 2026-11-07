@@ -407,6 +407,17 @@ export class JjRepo {
     return this.mutate(['squash', '-r', commitId, `--message=${message}`])
   }
 
+  squashInto(fromRevision: string, intoRevision: string, message: string) {
+    return this.mutate([
+      'squash',
+      '--from',
+      fromRevision,
+      '--into',
+      intoRevision,
+      `--message=${message}`,
+    ])
+  }
+
   moveFiles(fromCommitId: string, intoCommitId: string, paths: readonly string[]) {
     return this.mutate([
       'squash',
