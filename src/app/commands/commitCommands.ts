@@ -221,6 +221,33 @@ function rebaseAt(
   })
 }
 
+// The destination is resolved inside the operation, so a bad revset shows as its error.
+function squashInto(env: CommandEnv): Handler {
+  return withTarget(env, async ({ model, commit }) => {
+    const destination = mutable(env, commit)
+      ? await pickDestination(env, model, `Squash ${shortId(commit)} into`)
+      : undefined
+    if (!destination) {
+      return
+    }
+    await env.operations.run('Squash', model, async () => {
+      const targets = await model.repo.log(destination, 2)
+      const [target] = targets
+      if (!target || targets.length > 1) {
+        throw new Error(`"${destination}" must name exactly one change.`)
+      }
+      if (target.commitId === commit.commitId) {
+        throw new Error('a change cannot be squashed into itself.')
+      }
+      if (target.isImmutable) {
+        throw new Error(`${shortId(target)} is immutable.`)
+      }
+      const message = combineDescriptions(target.description, commit.description)
+      await model.repo.squashInto(changeRevision(commit), changeRevision(target), message)
+    })
+  })
+}
+
 export function commitCommands(env: CommandEnv): Record<string, Handler> {
   const run = (label: string, fn: (t: Target) => Promise<unknown>, needsMutable = false): Handler =>
     withTarget(env, async (target) => {
@@ -277,6 +304,7 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
         model.repo.squashIntoParent(changeRevision(commit), message),
       )
     }),
+    'ukemi.commit.squashInto': squashInto(env),
     'ukemi.commit.split': withTarget(env, async (target) => {
       if (mutable(env, target.commit)) {
         await env.workbench.openSplit(target)

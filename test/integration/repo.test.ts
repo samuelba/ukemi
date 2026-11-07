@@ -482,6 +482,24 @@ describe('mutations', () => {
     expect(merged?.description).toBe('parent\n\nchild\n')
   })
 
+  test('squashInto moves a change into another and sets the message', async () => {
+    writeFile(root, 'a.txt', 'a\n')
+    jj(root, 'describe', '-m', 'target')
+    jj(root, 'new', '-m', 'middle')
+    writeFile(root, 'm.txt', 'm\n')
+    jj(root, 'new', '-m', 'source')
+    writeFile(root, 's.txt', 's\n')
+    const source = await current()
+    const [target] = await repo.log('@--')
+
+    await repo.squashInto(source.commitId, target?.changeId ?? '', 'target\n\nsource')
+
+    const [merged] = await repo.log(target?.changeId ?? '')
+    expect(merged?.description).toBe('target\n\nsource\n')
+    expect(jj(root, 'file', 'list', '-r', target?.changeId ?? '')).toContain('s.txt')
+    expect(jj(root, 'file', 'list', '-r', '@-')).toContain('s.txt')
+  })
+
   test('restoreFiles discards changes to one file', async () => {
     writeFile(root, 'a.txt', 'a\n')
     jj(root, 'new')
