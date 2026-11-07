@@ -1,4 +1,5 @@
 export {
+  formatDuration,
   relativeTime,
   shortId,
   splitId,

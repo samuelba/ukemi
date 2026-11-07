@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { definedSpan, pipelineFields, pipelineSpan, type TimeSpan } from '../../shared/ciTiming'
 import type { CiCheck, CiState, RequestBadge, RequestState } from '../../shared/protocol'
 import { isSafeHttpsHost } from './hostName'
 import { mapLimited } from '../util/mapLimited'
@@ -64,12 +65,13 @@ function byCreated<T extends { id?: number }>(items: readonly T[]): T[] {
   return [...items].sort((left, right) => (left.id ?? 0) - (right.id ?? 0))
 }
 
-function toCheck(job: { name: string; stage?: string; status: string; web_url: string }): CiCheck {
+function toCheck(job: GitlabJob): CiCheck {
   return {
     name: job.name,
     ...(job.stage ? { stage: job.stage } : {}),
     state: gitlabCi(job.status),
     url: job.web_url,
+    ...definedSpan(job.started_at, job.finished_at),
   }
 }
 
@@ -77,7 +79,16 @@ const pipelineSchema = z.object({
   id: z.number().optional(),
   status: z.string(),
   web_url: z.string().optional(),
+  started_at: z.string().nullish(),
+  finished_at: z.string().nullish(),
 })
+
+// The pipeline's own times when GitLab has them, else the span of its loaded jobs.
+function pipelineTiming(pipeline: GitlabPipeline | null, checks: readonly CiCheck[]): TimeSpan {
+  return pipeline?.started_at
+    ? definedSpan(pipeline.started_at, pipeline.finished_at)
+    : pipelineSpan(checks)
+}
 
 const mergeRequestSchema = z.object({
   iid: z.number(),
@@ -113,6 +124,8 @@ const jobSchema = z.object({
   stage: z.string().optional(),
   status: z.string(),
   web_url: z.string(),
+  started_at: z.string().nullish(),
+  finished_at: z.string().nullish(),
 })
 
 const bridgeSchema = jobSchema.extend({
@@ -318,6 +331,7 @@ export class GitlabClient implements ForgeClient {
       ci: gitlabPipelineCi(pipeline?.status, checks),
       isMine: userId !== null && mr.author?.id === userId,
       ...(pipeline?.web_url ? { pipelineUrl: pipeline.web_url } : {}),
+      ...pipelineFields(pipelineTiming(pipeline, checks)),
       checks,
       headBranch: mr.source_branch,
       baseBranch: mr.target_branch,

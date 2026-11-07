@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { definedSpan, pipelineFields, pipelineSpan } from '../../shared/ciTiming'
 import type { CiCheck, CiState, RequestBadge, RequestState } from '../../shared/protocol'
 import {
   clampRequestLimit,
@@ -23,6 +24,8 @@ const checkRunSchema = z.object({
   status: z.string(),
   conclusion: z.string().nullable(),
   detailsUrl: z.string().nullable(),
+  startedAt: z.string().nullish(),
+  completedAt: z.string().nullish(),
 })
 
 const statusContextSchema = z.object({
@@ -207,7 +210,7 @@ const PULL_FIELDS = `fragment PullFields on PullRequest {
           contexts(first: 50) {
             nodes {
               __typename
-              ... on CheckRun { name status conclusion detailsUrl }
+              ... on CheckRun { name status conclusion detailsUrl startedAt completedAt }
               ... on StatusContext { context state targetUrl }
             }
           }
@@ -333,6 +336,7 @@ export class GithubClient implements ForgeClient {
       ci: githubCi(rollup?.state),
       isMine: sameLogin(pull.author?.login, viewer),
       ...(pipelineUrl ? { pipelineUrl } : {}),
+      ...pipelineFields(pipelineSpan(checks)),
       checks,
       headBranch: pull.headRefName,
       baseBranch: pull.baseRefName,
@@ -475,6 +479,7 @@ function mapContexts(nodes: readonly (GithubContext | null)[]): CiCheck[] {
         name: checkRun.data.name,
         state: githubCheckState(checkRun.data.status, checkRun.data.conclusion),
         url: checkRun.data.detailsUrl ?? '',
+        ...definedSpan(checkRun.data.startedAt, checkRun.data.completedAt),
       })
       continue
     }
