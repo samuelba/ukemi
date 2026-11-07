@@ -5,7 +5,7 @@ import { mapLimited } from '../util/mapLimited'
 import {
   clampRequestLimit,
   DEFAULT_REQUEST_LIMIT,
-  GITLAB_BRANCH_CONCURRENCY,
+  GITLAB_CONCURRENCY,
   REQUESTS_PER_BRANCH,
 } from './requestLimit'
 import {
@@ -18,7 +18,8 @@ import {
   type MergeOutcome,
 } from './types'
 
-const DETAIL_LIMIT = 10
+// Job lists cost several calls each, so only this many of the user's open requests load them.
+const JOB_DETAIL_LIMIT = 10
 const JOB_LIMIT = 100
 const MAX_JOB_PAGES = 3
 const MISSING_BRANCH_RETRIES = 10
@@ -49,6 +50,14 @@ function isMissingSourceBranch(error: unknown): boolean {
   }
   const source = field(field(error.body, 'message'), 'source_branch')
   return Array.isArray(source) && source.includes('does not exist')
+}
+
+// A used-up rate limit still fails the refresh, so that the refreshes pause.
+function nullUnlessRateLimited(error: unknown): null {
+  if (error instanceof ForgeError && error.isRateLimited) {
+    throw error
+  }
+  return null
 }
 
 function byCreated<T extends { id?: number }>(items: readonly T[]): T[] {
@@ -92,6 +101,10 @@ const detailSchema = z.object({
 const approvalsSchema = z.object({
   approved: z.boolean().optional(),
   approved_by: z.array(z.unknown()).optional(),
+})
+
+const projectSchema = z.object({
+  remove_source_branch_after_merge: z.boolean().nullish(),
 })
 
 const jobSchema = z.object({
@@ -245,22 +258,21 @@ export class GitlabClient implements ForgeClient {
     ])
     const mrs = listed.filter((mr) => isOwnSource(mr, userId))
     const open = mrs.filter((mr) => mr.state === 'opened')
-    const detailed = new Set(open.slice(0, DETAIL_LIMIT).map((mr) => mr.iid))
     const withJobs = new Set(
       open
         .filter((mr) => userId !== null && mr.author?.id === userId)
-        .slice(0, DETAIL_LIMIT)
+        .slice(0, JOB_DETAIL_LIMIT)
         .map((mr) => mr.iid),
     )
-    return Promise.all(
-      mrs.map((mr) => this.toBadge(mr, userId, detailed.has(mr.iid), withJobs.has(mr.iid))),
+    return mapLimited(mrs, GITLAB_CONCURRENCY, (mr) =>
+      this.toBadge(mr, userId, mr.state === 'opened', withJobs.has(mr.iid)),
     )
   }
 
   // One lookup per head branch, so a busy project cannot push a bookmark's request out of a list
   // of the newest ones.
   private async listMergeRequests(branches: readonly string[]): Promise<GitlabMergeRequest[]> {
-    const lists = await mapLimited(branches, GITLAB_BRANCH_CONCURRENCY, async (branch) => {
+    const lists = await mapLimited(branches, GITLAB_CONCURRENCY, async (branch) => {
       const body = await this.call(
         this.projectUrl(
           `/merge_requests?state=all&order_by=updated_at&source_branch=${encodeURIComponent(branch)}` +
@@ -279,13 +291,9 @@ export class GitlabClient implements ForgeClient {
     return [...byIid.values()]
   }
 
-  private async currentUserId(): Promise<number | null> {
-    try {
-      const body = await this.call(this.api('/user'))
-      return z.object({ id: z.number() }).parse(body).id
-    } catch {
-      return null
-    }
+  private async currentUserId(): Promise<number> {
+    const body = await this.call(this.api('/user'))
+    return z.object({ id: z.number() }).parse(body).id
   }
 
   private async toBadge(
@@ -294,7 +302,8 @@ export class GitlabClient implements ForgeClient {
     withDetails: boolean,
     withJobs: boolean,
   ): Promise<RequestBadge> {
-    const extra = withDetails ? await this.details(mr.iid) : null
+    // Without its details a request still shows, with the listed pipeline and no approvals.
+    const extra = withDetails ? await this.details(mr.iid).catch(nullUnlessRateLimited) : null
     const listed = mr.head_pipeline ?? null
     const pipeline = listed?.id !== undefined ? listed : (extra?.pipeline ?? listed)
     const checks =
@@ -323,7 +332,7 @@ export class GitlabClient implements ForgeClient {
       this.call(this.projectUrl(`/merge_requests/${iid}`)).then((body) => detailSchema.parse(body)),
       this.call(this.projectUrl(`/merge_requests/${iid}/approvals`))
         .then((body) => approvalsSchema.parse(body))
-        .catch(() => null),
+        .catch(nullUnlessRateLimited),
     ])
     return {
       pipeline: detail.head_pipeline ?? null,
@@ -395,7 +404,19 @@ export class GitlabClient implements ForgeClient {
     return this.api(`/projects/${project}${path}`)
   }
 
+  // The API leaves a new request's "Delete source branch" unset, while the web form takes it from
+  // the project. Null when the project setting cannot be read.
+  private async removesSourceBranch(): Promise<boolean | null> {
+    try {
+      const body = await this.call(this.projectUrl(''))
+      return projectSchema.parse(body).remove_source_branch_after_merge ?? null
+    } catch (error: unknown) {
+      return nullUnlessRateLimited(error)
+    }
+  }
+
   async createRequest(input: CreateRequestInput): Promise<RequestBadge> {
+    const removeSource = await this.removesSourceBranch()
     const init: RequestInit = {
       method: 'POST',
       body: JSON.stringify({
@@ -403,7 +424,7 @@ export class GitlabClient implements ForgeClient {
         target_branch: input.base,
         title: input.isDraft ? `Draft: ${input.title}` : input.title,
         description: input.body,
-        remove_source_branch: true,
+        ...(removeSource === null ? {} : { remove_source_branch: removeSource }),
       }),
     }
     const url = this.projectUrl('/merge_requests')
@@ -434,7 +455,8 @@ export class GitlabClient implements ForgeClient {
   async mergeRequest(number: number, method: MergeMethod): Promise<MergeOutcome> {
     await this.call(this.projectUrl(`/merge_requests/${number}/merge`), {
       method: 'PUT',
-      body: JSON.stringify({ squash: method === 'squash', should_remove_source_branch: true }),
+      // The request's own "Delete source branch" setting decides.
+      body: JSON.stringify({ squash: method === 'squash' }),
     })
     return 'merged'
   }
