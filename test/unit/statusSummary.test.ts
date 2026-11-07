@@ -33,6 +33,7 @@ function commit(overrides: Partial<CommitView> = {}): CommitView {
     isMine: true,
     row: { id, column: 0, width: 1, incoming: [], outgoing: [] },
     isTrunk: false,
+    isBehindTrunk: false,
     requests: [],
     ...overrides,
   } as CommitView

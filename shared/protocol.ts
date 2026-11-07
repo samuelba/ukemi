@@ -44,6 +44,8 @@ export interface CommitView extends Commit {
   // The edges the row draws, elided ones included. A drop preview moves them around.
   edges: GraphEdgeInput[]
   isTrunk: boolean
+  // The newest change of a stack that is not based on the current trunk.
+  isBehindTrunk: boolean
   requests: RequestBadge[]
 }
 

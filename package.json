@@ -293,6 +293,11 @@
         "icon": "$(git-branch)"
       },
       {
+        "command": "ukemi.rebaseStacksTrunk",
+        "title": "Rebase My Stacks onto Trunk",
+        "category": "Ukemi"
+      },
+      {
         "command": "ukemi.goTo",
         "title": "New Change from Bookmark, Request or Revision…",
         "category": "Ukemi",

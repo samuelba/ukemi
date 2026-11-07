@@ -11,6 +11,7 @@ export function toCommitView(
   row: GraphRow | undefined,
   trunkId: string | undefined,
   edges: readonly GraphEdgeInput[] = [],
+  staleHeads: ReadonlySet<string> = new Set(),
 ): CommitView {
   return {
     ...commit,
@@ -24,6 +25,7 @@ export function toCommitView(
       passThrough: [],
     },
     isTrunk: commit.commitId === trunkId,
+    isBehindTrunk: staleHeads.has(commit.commitId),
     requests: [],
   }
 }

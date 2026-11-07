@@ -42,6 +42,7 @@ interface CommitRowProps {
   isDimmed: boolean
   hasRemotes: boolean
   hasForge: boolean
+  trunkName: string | null
   // Set when the latest request refresh failed, so the request badges are left from an earlier one.
   requestRefreshError: string | undefined
   settings: ViewSettings
@@ -396,6 +397,13 @@ export const CommitRow = memo(function CommitRow(props: CommitRowProps) {
                 title="Squash into parent"
                 icon="fold-down"
                 onClick={() => runCommand('ukemi.commit.squash', repoId, commit.commitId)}
+              />
+            )}
+            {commit.isBehindTrunk && (
+              <RowAction
+                title={`Rebase stack onto ${props.trunkName ?? 'trunk'}`}
+                icon="git-pull-request"
+                onClick={() => runCommand('ukemi.commit.rebaseStackTrunk', repoId, commit.commitId)}
               />
             )}
             <RowAction

@@ -42,6 +42,7 @@ import {
   pageChangedOnlyByRewrites,
   snapshotPageRevset,
   snapshotsKeepMembership,
+  STALE_STACK_HEADS_REVSET,
   type GraphView,
   type LookupTarget,
 } from './refreshRevsets'
@@ -529,7 +530,7 @@ export class RepoModel {
       }
       return page
     })
-    const [page, trunk, workspaces, remotes, listed, currentBookmarks, tracking] =
+    const [page, trunk, workspaces, remotes, listed, currentBookmarks, tracking, staleHeads] =
       await Promise.all([
         pageLoad,
         reader.trunk(),
@@ -538,6 +539,7 @@ export class RepoModel {
         reader.bookmarkList({ withTrunk: false }),
         reader.bookmarkNames(CURRENT_BOOKMARKS_REVSET),
         reader.bookmarkTracking(`@ | ${CURRENT_BOOKMARKS_REVSET}`),
+        this.staleStackHeads(reader),
       ])
     this.loadedRemotes = remotes
     return {
@@ -550,6 +552,17 @@ export class RepoModel {
       bookmarks: listed,
       currentBookmarks,
       tracking,
+      staleHeads,
+    }
+  }
+
+  // Only marks rows for the rebase action, so a failed lookup leaves them unmarked.
+  private async staleStackHeads(reader: JjRepo): Promise<Set<string>> {
+    try {
+      return new Set(await reader.commitIds(STALE_STACK_HEADS_REVSET))
+    } catch (error) {
+      this.logger.warn(`graph: the stale stack lookup failed: ${errorMessage(error)}`)
+      return new Set()
     }
   }
 
@@ -625,7 +638,7 @@ export class RepoModel {
   ): GraphState {
     const rows = layoutGraph(nodes)
     const views = commits.map((commit, index) =>
-      toCommitView(commit, rows[index], trunkId, nodes[index]?.parents),
+      toCommitView(commit, rows[index], trunkId, nodes[index]?.parents, shared.staleHeads),
     )
     return {
       repoId: this.root,
@@ -765,6 +778,7 @@ interface LoadedRepo {
   bookmarks: ParsedBookmark[]
   currentBookmarks: string[]
   tracking: BookmarkTracking[]
+  staleHeads: Set<string>
 }
 
 interface SharedGraph {
@@ -777,6 +791,7 @@ interface SharedGraph {
   currentBookmarks: string[]
   tracking: BookmarkTracking[]
   trunkName: string | null
+  staleHeads: ReadonlySet<string>
 }
 
 function sharedGraph(loaded: LoadedRepo, workingCopyFiles: ChangedFile[]): SharedGraph {
@@ -790,5 +805,6 @@ function sharedGraph(loaded: LoadedRepo, workingCopyFiles: ChangedFile[]): Share
     currentBookmarks: loaded.currentBookmarks,
     tracking: loaded.tracking,
     trunkName: loaded.trunk.bookmark,
+    staleHeads: loaded.staleHeads,
   }
 }

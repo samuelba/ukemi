@@ -78,6 +78,7 @@ function commitView(commit: Commit): CommitView {
     },
     edges: [],
     isTrunk: false,
+    isBehindTrunk: false,
     requests: [],
   }
 }
