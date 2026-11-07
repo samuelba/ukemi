@@ -1,4 +1,13 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FocusEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react'
 import { previewDrop, type PreviewDrop } from '../../../shared/dropPreview'
 import type { FileIconTheme } from '../../../shared/fileIconTheme'
 import type { ChangedFile } from '../../../shared/model'
@@ -19,6 +28,7 @@ import { DescribeDialog, type SuggestionReply } from './DescribeDialog'
 import { DropPreviewBar } from './DropPreviewBar'
 import { EmptyState } from './EmptyState'
 import { FileIconFonts, FileIconThemeContext } from './FileIcon'
+import { previewMovedFile } from './FileList'
 import { LANE_WIDTH } from './GraphCell'
 import { GraphSearch } from './GraphSearch'
 import { withUnchangedObjects } from './keepUnchanged'
@@ -38,6 +48,7 @@ import { PreviewRow } from './PreviewRow'
 import { RevsetBar, type RevsetReply } from './RevsetBar'
 import { selectedRow, type Selection } from './selection'
 import { Toolbar } from './Toolbar'
+import { onTreeKeyDown, TREE_ITEM } from './treeNav'
 
 interface Describing {
   commitId: string
@@ -250,6 +261,40 @@ export function App() {
     [graph, selection],
   )
 
+  // A snapshot gives the focused change a new commit, so its row mounts afresh and focus would
+  // drop to the page. Focus that was in the tree goes back to its tab stop.
+  const tree = useRef<HTMLDivElement>(null)
+  const hadFocus = useRef(false)
+  useEffect(() => {
+    const active = document.activeElement
+    if (!hadFocus.current || (active && active !== document.body && active.isConnected)) {
+      return
+    }
+    tree.current?.querySelector<HTMLElement>(`${TREE_ITEM}[tabindex="0"]`)?.focus({
+      preventScroll: true,
+    })
+  }, [graph, selected])
+  const onTreeBlur = (event: FocusEvent<HTMLDivElement>) => {
+    const next = event.relatedTarget
+    if (next instanceof Node && event.currentTarget.contains(next)) {
+      return
+    }
+    // A row that unmounts while focused may blur on its way out. Only a real move away counts.
+    const left = event.target
+    queueMicrotask(() => {
+      hadFocus.current = !left.isConnected
+    })
+  }
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) =>
+    onTreeKeyDown(event, (item) => {
+      const commitId = item.dataset.commitId
+      if (commitId) {
+        selectCommit(commitId)
+      } else {
+        previewMovedFile(item)
+      }
+    })
+
   // Another repository starts with its working copy selected.
   useEffect(() => {
     setSelection(null)
@@ -448,6 +493,12 @@ export function App() {
             className={`graph${preview?.result.ok ? ' is-previewing' : ''}`}
             role="tree"
             aria-label="Changes"
+            ref={tree}
+            onKeyDown={onKeyDown}
+            onFocus={() => {
+              hadFocus.current = true
+            }}
+            onBlur={onTreeBlur}
           >
             {previewRows() ??
               graph.commits.flatMap((commit, index) => [
