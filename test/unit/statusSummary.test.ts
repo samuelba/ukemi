@@ -311,6 +311,38 @@ describe('summarizeStatus', () => {
     })
   })
 
+  test('warns when the request is left from an earlier refresh', () => {
+    const commits = [
+      commit({
+        isWorkingCopy: true,
+        commitId: WC,
+        localBookmarks: [{ name: 'feature', synced: true, conflict: false }],
+        requests: [request()],
+      }),
+    ]
+    const forge = { kind: 'github' as const, host: 'github.com', isSignedIn: true }
+    const shown = (refreshError?: string) =>
+      item(
+        summarizeStatus(
+          state({
+            graph: graph({
+              commits,
+              forge: { ...forge, ...(refreshError ? { refreshError } : {}) },
+            }),
+          }),
+          NOW,
+        ),
+        'request',
+      )
+
+    expect(shown('HTTP 502')).toMatchObject({ tone: 'warning' })
+    expect(shown('HTTP 502')?.tooltip).toContain(
+      'Not updated: HTTP 502. Shown from the last successful refresh.',
+    )
+    expect(shown()).toMatchObject({ tone: 'normal' })
+    expect(shown()?.tooltip).not.toContain('Not updated')
+  })
+
   test('has no request item without a request', () => {
     expect(item(summarizeStatus(state(), NOW), 'request')).toBeUndefined()
   })

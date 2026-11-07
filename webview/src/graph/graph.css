@@ -691,6 +691,17 @@
   color: var(--vscode-descriptionForeground);
 }
 
+.badge.request.stale {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.request-popover-stale {
+  padding: 2px 4px;
+  color: var(--vscode-editorWarning-foreground, var(--vscode-descriptionForeground));
+  font-size: 0.85em;
+}
+
 .request-row {
   display: flex;
   flex-wrap: wrap;

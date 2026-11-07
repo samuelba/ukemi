@@ -224,6 +224,19 @@ export class RepoModel {
     }
   }
 
+  // A failed refresh keeps the requests shown, marked as left from an earlier one. The next
+  // setForge clears the mark.
+  markForgeStale(refreshError: string): void {
+    if (!this.forge || this.forge.refreshError === refreshError) {
+      return
+    }
+    this.forge = { ...this.forge, refreshError }
+    if (this.current) {
+      this.current = { ...this.current, forge: this.forge }
+      this.emit()
+    }
+  }
+
   // The remotes the last refresh read, so other services need not ask jj again.
   get remotes(): readonly Remote[] | null {
     return this.loadedRemotes

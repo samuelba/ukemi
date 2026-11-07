@@ -517,6 +517,7 @@ export function App() {
                   isDimmed={matchSet !== null && !matchSet.has(commit.commitId)}
                   hasRemotes={graph.hasRemotes}
                   hasForge={graph.forge !== null}
+                  requestRefreshError={graph.forge?.refreshError}
                   settings={state.settings}
                   onToggle={toggle}
                   onSelect={selectCommit}

@@ -1,5 +1,6 @@
 import type { DragEvent } from 'react'
 import type { CommitView, RequestBadge } from '../../../shared/protocol'
+import { staleRequestsNote } from '../../../shared/forgeStale'
 import { stackLabel } from '../../../shared/stack'
 import { isDesktop, postMessage, vscodeContext } from '../shared/hostApi'
 import { RequestHover } from './RequestHover'
@@ -143,7 +144,12 @@ export function Badges({ commit, repoId, hasForge, showGitTags }: BadgesProps) {
   )
 }
 
-export function RequestRow({ commit, repoId, ciOnlyMine }: BadgesProps) {
+export function RequestRow({
+  commit,
+  repoId,
+  ciOnlyMine,
+  refreshError,
+}: BadgesProps & { refreshError: string | undefined }) {
   if (commit.requests.length === 0) {
     return null
   }
@@ -156,6 +162,7 @@ export function RequestRow({ commit, repoId, ciOnlyMine }: BadgesProps) {
           repoId={repoId}
           commitId={commit.commitId}
           ciOnlyMine={ciOnlyMine}
+          refreshError={refreshError}
         />
       ))}
     </div>
@@ -167,20 +174,23 @@ function RequestBadge({
   repoId,
   commitId,
   ciOnlyMine,
+  refreshError,
 }: {
   request: RequestBadge
   repoId: string
   commitId: string
   ciOnlyMine: boolean
+  refreshError: string | undefined
 }) {
   const details = showCi(request, ciOnlyMine)
+  const staleNote = refreshError ? `\n${staleRequestsNote(refreshError)}` : ''
   const badge = (
     <span
-      className={`badge request request-${request.state}`}
+      className={`badge request request-${request.state}${refreshError ? ' stale' : ''}`}
       title={
         details
           ? undefined
-          : `#${request.number} ${request.title} (${REQUEST_LABEL[request.state]})${stackTitle(request)}`
+          : `#${request.number} ${request.title} (${REQUEST_LABEL[request.state]})${stackTitle(request)}${staleNote}`
       }
       data-vscode-context={vscodeContext({
         webviewSection: 'ukemi.request',
@@ -216,5 +226,9 @@ function RequestBadge({
   if (!details) {
     return badge
   }
-  return <RequestHover request={request}>{badge}</RequestHover>
+  return (
+    <RequestHover request={request} refreshError={refreshError}>
+      {badge}
+    </RequestHover>
+  )
 }

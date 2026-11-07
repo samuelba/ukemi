@@ -1,4 +1,5 @@
 import { relativeTime, shortId, title } from './format'
+import { staleRequestsNote } from './forgeStale'
 import type { BookmarkTracking } from './model'
 import type { CiState, CommitView, GraphState, ViewState } from './protocol'
 
@@ -213,11 +214,12 @@ function conflictItem(graph: GraphState, workingCopy: CommitView): StatusItem | 
   }
 }
 
-function requestItem(bookmark: StatusBookmark | null): StatusItem | null {
+function requestItem(graph: GraphState, bookmark: StatusBookmark | null): StatusItem | null {
   const request = bookmark?.commit?.requests[0]
   if (!request) {
     return null
   }
+  const refreshError = graph.forge?.refreshError
   return {
     id: 'request',
     side: 'right',
@@ -227,9 +229,10 @@ function requestItem(bookmark: StatusBookmark | null): StatusItem | null {
     tooltip: joinLines([
       request.title,
       `${request.headBranch} → ${request.baseBranch}, CI ${request.ci}`,
+      refreshError ? staleRequestsNote(refreshError) : '',
       'Click to open it in the browser',
     ]),
-    tone: request.ci === 'failure' ? 'warning' : 'normal',
+    tone: request.ci === 'failure' || refreshError ? 'warning' : 'normal',
     action: { kind: 'openUrl', url: request.url },
   }
 }
@@ -297,7 +300,7 @@ export function summarizeStatus(state: ViewState, now: number): StatusItem[] {
     bookmarkItem(graph, bookmark),
     conflictItem(graph, workingCopy),
     state.error ? errorItem(state.error) : null,
-    requestItem(bookmark),
+    requestItem(graph, bookmark),
     syncItem(state, graph, now),
   ]
   return items.filter((item): item is StatusItem => item !== null)

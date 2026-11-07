@@ -221,6 +221,7 @@ describe('refreshRequests', () => {
 describe('request refresh and rate limits', () => {
   function githubModel() {
     const states: unknown[] = []
+    const stale: string[] = []
     const model = {
       root: '/repo',
       remotes: [{ name: 'origin', url: 'https://github.com/o/r.git' }],
@@ -228,8 +229,9 @@ describe('request refresh and rate limits', () => {
         commits: [{ localBookmarks: [{ name: 'feature' }], remoteBookmarks: [], requests: [] }],
       },
       setForge: (state: unknown) => states.push(state),
+      markForgeStale: (reason: string) => stale.push(reason),
     }
-    return { model: model as never, states }
+    return { model: model as never, states, stale }
   }
 
   function answer(status: number, headers: Record<string, string>, body: unknown) {
@@ -282,6 +284,33 @@ describe('request refresh and rate limits', () => {
     expect(state.messages).toEqual([
       'Ukemi could not load the requests. GitHub: Could not resolve o/r.',
     ])
+    forge.dispose()
+    vi.unstubAllGlobals()
+  })
+
+  test('marks the shown requests stale when a refresh fails', async () => {
+    const { forge } = await signedIn()
+    answer(502, {}, { message: 'Bad Gateway' })
+    const { model, states, stale } = githubModel()
+
+    await forge.refreshRequests(model, { force: true })
+
+    expect(stale).toEqual(['HTTP 502: Bad Gateway'])
+    expect(states).toEqual([])
+    forge.dispose()
+    vi.unstubAllGlobals()
+  })
+
+  test('says why in plain words for a rate limit or an expired login', async () => {
+    const { forge } = await signedIn()
+    const { model, stale } = githubModel()
+
+    answer(429, { 'retry-after': '60' }, { message: 'slow down' })
+    await forge.refreshRequests(model, { force: true })
+    answer(401, {}, { message: 'Bad credentials' })
+    await forge.refreshRequests(model, { force: true })
+
+    expect(stale).toEqual(["the forge's rate limit is used up", 'the forge login has expired'])
     forge.dispose()
     vi.unstubAllGlobals()
   })

@@ -93,6 +93,16 @@ function requestsOf(model: RepoModel): RequestBadge[] {
   return model.graph?.commits.flatMap((commit) => commit.requests) ?? []
 }
 
+function refreshError(error: unknown): string {
+  if (error instanceof ForgeError && error.isRateLimited) {
+    return "the forge's rate limit is used up"
+  }
+  if (error instanceof ForgeError && error.isAuthError) {
+    return 'the forge login has expired'
+  }
+  return errorMessage(error)
+}
+
 export class ForgeService implements Disposable {
   private readonly lastRefresh = new Map<string, number>()
   // Per repository: until when background refreshes wait for the rate limit, and how many
@@ -385,6 +395,7 @@ export class ForgeService implements Disposable {
       this.rateLimit.delete(model.root)
     } catch (error: unknown) {
       this.logger.warn(`loading requests failed: ${errorMessage(error)}`)
+      model.markForgeStale(refreshError(error))
       if (error instanceof ForgeError && error.isRateLimited) {
         this.pauseForRateLimit(model, error)
       } else if (error instanceof ForgeError && error.isAuthError) {
