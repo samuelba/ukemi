@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { AboutInfo, DesktopRendererMessage } from '../../../shared/desktopProtocol'
 import { postMessage } from '../shared/hostApi'
+import { useModalFocus } from '../shared/useModalFocus'
 
 function send(message: DesktopRendererMessage): void {
   postMessage(message)
@@ -19,6 +20,8 @@ export function AboutDialog({
   onClose: () => void
 }) {
   const [isCopied, setIsCopied] = useState(false)
+  const dialog = useRef<HTMLDivElement>(null)
+  const trapFocus = useModalFocus(dialog)
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => event.key === 'Escape' && onClose()
@@ -45,7 +48,15 @@ export function AboutDialog({
 
   return (
     <div className="scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="prompt about" role="dialog" aria-modal="true" aria-labelledby="about-title">
+      <div
+        ref={dialog}
+        className="prompt about"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="about-title"
+        tabIndex={-1}
+        onKeyDown={trapFocus}
+      >
         <header className="about-header">
           <h2 id="about-title" className="about-wordmark">
             ukemi

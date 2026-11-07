@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type {
   DesktopHostMessage,
   DesktopRendererMessage,
@@ -8,6 +8,7 @@ import type {
 } from '../../../shared/desktopProtocol'
 import { postMessage } from '../shared/hostApi'
 import { useHostListener } from '../shared/hooks'
+import { useModalFocus } from '../shared/useModalFocus'
 
 interface Open {
   id: number
@@ -156,27 +157,48 @@ function Toast({ open }: { open: Open }) {
 function ModalPrompt({ open }: { open: Open }) {
   const cancel = () => answer(open.id, { kind: 'cancel' })
   const { request } = open
+  const dialog = useRef<HTMLDivElement>(null)
+  const trapFocus = useModalFocus(dialog, { onEscape: cancel })
+  const headingId = useId()
+  // Named by its heading. Without a title, by what it asks or the placeholder.
+  const name = request.kind === 'input' ? request.prompt : undefined
+  const label =
+    request.kind === 'input' || request.kind === 'pick' ? request.placeholder : undefined
   return (
     <div className="scrim" onMouseDown={(e) => e.target === e.currentTarget && cancel()}>
-      <div className="prompt" role="dialog" aria-modal="true">
+      <div
+        ref={dialog}
+        className="prompt"
+        role="dialog"
+        aria-modal="true"
+        tabIndex={-1}
+        aria-labelledby={'title' in request && request.title ? headingId : undefined}
+        aria-label={'title' in request && request.title ? undefined : (name ?? label ?? 'Prompt')}
+        onKeyDown={trapFocus}
+      >
         {request.kind === 'input' && (
-          <InputPrompt id={open.id} request={request} problem={open.problem} />
+          <InputPrompt
+            id={open.id}
+            request={request}
+            problem={open.problem}
+            headingId={headingId}
+          />
         )}
         {request.kind === 'pick' && (
-          <PickPrompt id={open.id} request={request} problem={open.problem} />
+          <PickPrompt id={open.id} request={request} problem={open.problem} headingId={headingId} />
         )}
       </div>
     </div>
   )
 }
 
-function PromptHeading({ title, prompt }: { title?: string; prompt?: string }) {
+function PromptHeading({ id, title, prompt }: { id: string; title?: string; prompt?: string }) {
   if (!title && !prompt) {
     return null
   }
   return (
     <header className="prompt-heading">
-      {title && <h2>{title}</h2>}
+      {title && <h2 id={id}>{title}</h2>}
       {prompt && <p>{prompt}</p>}
     </header>
   )
@@ -186,10 +208,12 @@ function InputPrompt({
   id,
   request,
   problem,
+  headingId,
 }: {
   id: number
   request: InputRequest
   problem?: string
+  headingId: string
 }) {
   const [value, setValue] = useState(request.value ?? '')
   const input = useRef<HTMLInputElement>(null)
@@ -205,7 +229,7 @@ function InputPrompt({
   }
   return (
     <>
-      <PromptHeading title={request.title} prompt={request.prompt} />
+      <PromptHeading id={headingId} title={request.title} prompt={request.prompt} />
       <input
         ref={input}
         className={`prompt-input${problem ? ' has-problem' : ''}`}
@@ -269,15 +293,18 @@ function PickPrompt({
   id,
   request,
   problem,
+  headingId,
 }: {
   id: number
   request: PickRequest
   problem?: string
+  headingId: string
 }) {
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const [checked, setChecked] = useState<ReadonlySet<number>>(new Set())
   const list = useRef<HTMLUListElement>(null)
+  const listId = useId()
   const visible = useMemo(
     () =>
       request.items
@@ -349,9 +376,15 @@ function PickPrompt({
 
   return (
     <>
-      <PromptHeading title={request.title} />
+      <PromptHeading id={headingId} title={request.title} />
       <input
         className={`prompt-input${problem ? ' has-problem' : ''}`}
+        role="combobox"
+        aria-label={request.title ?? request.placeholder ?? 'Filter'}
+        aria-controls={listId}
+        aria-expanded="true"
+        aria-autocomplete="list"
+        aria-activedescendant={visible[active] ? `${listId}-${active}` : undefined}
         value={query}
         placeholder={request.placeholder ?? (request.typed ? 'Pick or type…' : 'Filter…')}
         autoFocus
@@ -360,10 +393,18 @@ function PickPrompt({
         onKeyDown={onKey}
       />
       {problem && <p className="prompt-problem">{problem}</p>}
-      <ul className="pick-list" ref={list} role="listbox" aria-multiselectable={request.many}>
+      <ul
+        className="pick-list"
+        ref={list}
+        id={listId}
+        role="listbox"
+        aria-label={request.title ?? 'Items'}
+        aria-multiselectable={request.many}
+      >
         {visible.map(({ item, index }, position) => (
           <li
             key={index}
+            id={`${listId}-${position}`}
             role="option"
             aria-selected={position === active}
             data-active={position === active}

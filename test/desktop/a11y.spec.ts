@@ -139,3 +139,95 @@ test('Shift+F10 and the menu key ask for the context menu of the focused row', a
     await app.close()
   }
 })
+
+test('the palette keeps Tab inside, names its active option and gives focus back', async () => {
+  const { app, page } = await launch(fixtureRepo())
+  try {
+    await tabIntoGraph(page)
+    await page.keyboard.press('F1')
+    const input = page.getByRole('combobox', { name: 'Command' })
+    await expect(input).toBeFocused()
+    await expect(page.getByRole('dialog', { name: 'Command palette' })).toHaveAttribute(
+      'aria-modal',
+      'true',
+    )
+
+    const first = await input.getAttribute('aria-activedescendant')
+    expect(first).toBeTruthy()
+    await expect(page.locator(`[id="${first}"]`)).toHaveAttribute('aria-selected', 'true')
+    await page.keyboard.press('ArrowDown')
+    const second = await input.getAttribute('aria-activedescendant')
+    expect(second).not.toBe(first)
+    await expect(page.locator(`[id="${second}"]`)).toHaveAttribute('aria-selected', 'true')
+
+    await page.keyboard.press('Tab')
+    await expect(input).toBeFocused()
+    await page.keyboard.press('Shift+Tab')
+    await expect(input).toBeFocused()
+
+    await page.keyboard.press('Escape')
+    await expect(page.locator('.palette')).toHaveCount(0)
+    await expect(page.locator('.commit.is-wc')).toBeFocused()
+  } finally {
+    await app.close()
+  }
+})
+
+test('Describe keeps Tab inside, closes on Escape from a button and gives focus back', async () => {
+  const { app, page } = await launch(fixtureRepo())
+  try {
+    await tabIntoGraph(page)
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('ArrowDown')
+    const row = page.locator('.commit:focus')
+    await expect(row).toContainText('docs: explain the setup')
+    await row.locator('.commit-head').hover()
+    await row.locator('button[title="Describe"]').click()
+
+    const dialog = page.getByRole('dialog', { name: /^Describe/ })
+    await expect(dialog).toHaveAttribute('aria-modal', 'true')
+    const message = dialog.locator('textarea')
+    await expect(message).toBeFocused()
+
+    // Cancel, Save and new is only for the working copy, then Save, then back to the message.
+    await page.keyboard.press('Tab')
+    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(message).toBeFocused()
+    await page.keyboard.press('Shift+Tab')
+    await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeFocused()
+
+    // A click on the title keeps focus in the dialog, so Tab and Escape still work.
+    await dialog.locator('.dialog-title').click()
+    await page.keyboard.press('Tab')
+    await expect(message).toBeFocused()
+    await dialog.locator('.dialog-title').click()
+    await page.keyboard.press('Escape')
+    await expect(dialog).toHaveCount(0)
+    await expect(page.locator('.commit:focus')).toContainText('docs: explain the setup')
+  } finally {
+    await app.close()
+  }
+})
+
+test('a prompt opened from the palette gives focus back to the row the palette came from', async () => {
+  const { app, page } = await launch(fixtureRepo())
+  try {
+    await tabIntoGraph(page)
+    await page.keyboard.press('F1')
+    await page.locator('.palette .prompt-input').fill('new change from bookmark')
+    await page.keyboard.press('Enter')
+    const prompt = page.locator('.prompt[role="dialog"]:not(.palette)')
+    await expect(prompt).toBeVisible()
+    await expect(prompt.locator('.prompt-input')).toBeFocused()
+
+    await prompt.locator('.prompt-footer').click()
+    await page.keyboard.press('Escape')
+    await expect(prompt).toHaveCount(0)
+    await expect(page.locator('.commit.is-wc')).toBeFocused()
+  } finally {
+    await app.close()
+  }
+})
