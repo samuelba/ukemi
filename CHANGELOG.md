@@ -5,11 +5,8 @@
 
 ### Features
 
-* **graph:** keyboard navigation and the context menu key (U2) ([f748c83](https://github.com/samuelba/ukemi/commit/f748c83dab20855f2a3f044c26265a65afc7f666))
 * **graph:** keyboard navigation and the context menu key (U2) ([932ba7e](https://github.com/samuelba/ukemi/commit/932ba7ef3ecd346cf2765dcc137a2ca36fa9ca84))
-* **graph:** make graph and file rows an accessible tree (U1) ([b8c5d2e](https://github.com/samuelba/ukemi/commit/b8c5d2eac3284fd793d29ccf2a1418faf80bea92))
 * **graph:** make graph and file rows an accessible tree (U1) ([10b20cb](https://github.com/samuelba/ukemi/commit/10b20cbfd59491308b6c683800f663b9dcd84572))
-* **webview:** trap and restore focus in dialogs (U3) ([0103023](https://github.com/samuelba/ukemi/commit/0103023213660f538e3c74d5a5d50f9a1ac48517))
 * **webview:** trap and restore focus in dialogs (U3) ([96d6c67](https://github.com/samuelba/ukemi/commit/96d6c67110a95a80b9e8716e4240b589ede67d41))
 
 ## [0.12.0](https://github.com/samuelba/ukemi/compare/v0.11.0...v0.12.0) (2026-11-06)
