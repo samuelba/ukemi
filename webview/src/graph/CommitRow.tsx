@@ -21,6 +21,7 @@ import { LineStats, lineTotals } from './LineStats'
 import { GraphCell } from './GraphCell'
 import { RelativeTime } from './RelativeTime'
 import { statusWords } from './rowStatus'
+import { treeKeyAction } from './treeKeys'
 
 export const COMMIT_MIME = 'application/x-ukemi-commit'
 
@@ -296,6 +297,27 @@ export const CommitRow = memo(function CommitRow(props: CommitRowProps) {
       onDrop={onDrop}
       onClick={() => {
         props.onSelect(commit.commitId)
+        if (canExpand) {
+          props.onToggle(commit)
+        }
+      }}
+      onKeyDown={(event) => {
+        // Enter and Space act like a click. Right opens and Left closes the row; on a row already
+        // open or closed they move, which the tree does.
+        if (event.target !== event.currentTarget) {
+          return
+        }
+        const action = treeKeyAction(event)
+        const toggles =
+          canExpand &&
+          ((action === 'expand' && !isExpanded) || (action === 'collapse' && isExpanded))
+        if (action !== 'activate' && !toggles) {
+          return
+        }
+        event.preventDefault()
+        if (action === 'activate') {
+          props.onSelect(commit.commitId)
+        }
         if (canExpand) {
           props.onToggle(commit)
         }

@@ -71,6 +71,29 @@ test('shows the files as a tree, the evolution, and a diff that grows and closes
   }
 })
 
+test('shows the diff of each file the arrows move to', async () => {
+  const repo = fixtureRepo()
+  writeFileSync(join(repo, 'arrow-a.txt'), 'a\n')
+  writeFileSync(join(repo, 'arrow-b.txt'), 'b\n')
+  const { app, page } = await launch(repo)
+  try {
+    await page.locator('.commit.is-wc').click({ position: { x: 60, y: 8 } })
+    const files = page.locator('.detail-file-list')
+    await files.locator('.file', { hasText: 'arrow-a.txt' }).click()
+    const header = page.locator('.detail-diff .diff-file-header')
+    await expect(header).toHaveCount(1)
+    await expect(header).toContainText('arrow-a.txt')
+
+    await page.keyboard.press('ArrowDown')
+    await expect(files.locator('.file:focus')).toContainText('arrow-b.txt')
+    await expect(header).toContainText('arrow-b.txt')
+    await page.keyboard.press('ArrowUp')
+    await expect(header).toContainText('arrow-a.txt')
+  } finally {
+    await app.close()
+  }
+})
+
 test('keeps a narrow change pane as wide as its column, whatever the diff holds', async () => {
   const repo = fixtureRepo()
   writeFileSync(join(repo, 'src', 'cart.js'), `let sum = "${'x'.repeat(400)}"\n`)

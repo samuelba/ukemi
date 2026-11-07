@@ -1,14 +1,17 @@
-import { useMemo, useState, type CSSProperties, type DragEvent } from 'react'
+import { useMemo, useState, type CSSProperties, type DragEvent, type KeyboardEvent } from 'react'
 import { FILE_STATUS_LETTER, type ChangedFile } from '../../../shared/model'
 import type { ChangedFilesView, CommitView } from '../../../shared/protocol'
 import { fileDragTransfer } from '../../../shared/fileUri'
 import { splitPath } from '../shared/format'
-import { postMessage, vscodeContext } from '../shared/hostApi'
+import { isDesktop, postMessage, vscodeContext } from '../shared/hostApi'
+import { filePreviewMessage } from './previewFile'
 import { dragModifiers } from './dragModifiers'
 import { buildFileTree, type FileTreeNode } from '../../../shared/fileTree'
 import { FileTypeIcon } from './FileIcon'
 import { LineStats } from './LineStats'
 import { fileLabel } from './rowStatus'
+import { treeKeyAction } from './treeKeys'
+import { onTreeKeyDown } from './treeNav'
 
 export const FILE_MIME = 'application/x-ukemi-file'
 export const FILE_LOCKED_MIME = 'application/x-ukemi-file-locked'
@@ -113,6 +116,8 @@ function FileRow({
       aria-label={fileLabel(file)}
       tabIndex={isTabStop ? 0 : -1}
       title={file.sourcePath !== file.path ? `${file.sourcePath} → ${file.path}` : file.path}
+      data-preview-commit-id={commit.commitId}
+      data-preview-path={file.path}
       draggable
       style={depthStyle(depth)}
       onDragStart={onDragStart}
@@ -124,6 +129,17 @@ function FileRow({
       onDoubleClick={(event) => {
         event.stopPropagation()
         open('file')
+      }}
+      onKeyDown={(event) => {
+        // Enter does what a click does, Shift+Enter what a double click does.
+        if (event.target !== event.currentTarget) {
+          return
+        }
+        const action = treeKeyAction(event)
+        if (action === 'activate' || action === 'open') {
+          event.preventDefault()
+          open(action === 'open' || file.isConflicted ? 'file' : 'diff')
+        }
       }}
       data-vscode-context={vscodeContext({
         webviewSection: 'ukemi.file',
@@ -220,6 +236,22 @@ function FileTreeItems({
         aria-expanded={!isCollapsed}
         aria-label={node.name}
         tabIndex={tabStop === node.path ? 0 : -1}
+        onKeyDown={(event) => {
+          // The collapse state lives here, so the folder opens and closes itself. Right on an open
+          // folder and Left on a closed one move, which the tree does.
+          if (event.target !== event.currentTarget) {
+            return
+          }
+          const action = treeKeyAction(event)
+          if (
+            action === 'activate' ||
+            (action === 'expand' && isCollapsed) ||
+            (action === 'collapse' && !isCollapsed)
+          ) {
+            event.preventDefault()
+            onToggle(node.path)
+          }
+        }}
       >
         <div
           className="file file-dir-row"
@@ -323,7 +355,25 @@ function FileTree({
 // Nested under a commit row the files are a group of it. On their own they are a tree, whose first
 // row is the tab stop.
 function listRole(level: number) {
-  return level === 1 ? { role: 'tree', 'aria-label': 'Changed files' } : { role: 'group' }
+  return level === 1
+    ? {
+        role: 'tree',
+        'aria-label': 'Changed files',
+        onKeyDown: (event: KeyboardEvent<HTMLElement>) => onTreeKeyDown(event, previewMovedFile),
+      }
+    : { role: 'group' }
+}
+
+// The desktop shows a diff in place, so moving onto a file shows its diff. VS Code would open an
+// editor tab per step, so there the arrows only move.
+export function previewMovedFile(item: HTMLElement): void {
+  if (!isDesktop) {
+    return
+  }
+  const message = filePreviewMessage(item.dataset)
+  if (message) {
+    postMessage(message)
+  }
 }
 
 export function FileList({
