@@ -61,7 +61,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+          # No snap: electron-builder has a prebuilt snap template for x64 only. On arm64 it runs
+          # `snapcraft snap`, which snapcraft 8 removed. Every other Linux format is built.
+          - os: ubuntu-24.04-arm
+            targets: --linux AppImage deb rpm flatpak
+          - os: macos-latest
+          - os: windows-latest
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -73,7 +80,7 @@ jobs:
         uses: ./.github/actions/linux-packaging
       - run: npm ci
       # Unsigned: a macOS or Windows signing certificate costs money every year.
-      - run: npm run desktop:package
+      - run: npm run desktop:package -- ${{ matrix.targets }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - name: Attach the installers to the GitHub Release

@@ -27,7 +27,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+          # No snap: electron-builder has a prebuilt snap template for x64 only. On arm64 it runs
+          # `snapcraft snap`, which snapcraft 8 removed. Every other Linux format is built.
+          - os: ubuntu-24.04-arm
+            targets: --linux AppImage deb rpm flatpak
+          - os: macos-latest
+          - os: windows-latest
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -38,7 +45,7 @@ jobs:
       - if: runner.os == 'Linux'
         uses: ./.github/actions/linux-packaging
       - run: npm ci
-      - run: npm run desktop:package
+      - run: npm run desktop:package -- ${{ matrix.targets }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       # node-pty starts every shell through spawn-helper. Without the execute bit the terminal fails
@@ -50,7 +57,7 @@ jobs:
           done
       - uses: actions/upload-artifact@v7
         with:
-          name: desktop-${{ runner.os }}
+          name: desktop-${{ runner.os }}-${{ runner.arch }}
           if-no-files-found: error
           path: |
             out/desktop-release/*.AppImage

@@ -73,16 +73,18 @@ Ukemi also runs as an app of its own, without VS Code. It has the same change gr
 
 Every [GitHub release](https://github.com/samuelba/ukemi/releases) has these files:
 
-| System  | File                             | Install                                                                   |
-| ------- | -------------------------------- | ------------------------------------------------------------------------- |
-| Linux   | `ukemi-<version>.x86_64.rpm`     | `sudo dnf install ./ukemi-<version>.x86_64.rpm`                           |
-| Linux   | `ukemi_<version>_amd64.deb`      | `sudo apt install ./ukemi_<version>_amd64.deb`                            |
-| Linux   | `Ukemi-<version>-x86_64.flatpak` | `flatpak install --user ./Ukemi-<version>-x86_64.flatpak`                 |
-| Linux   | `ukemi-jj_<version>_amd64.snap`  | `sudo snap install --dangerous --classic ./ukemi-jj_<version>_amd64.snap` |
-| Linux   | `Ukemi-<version>.AppImage`       | See [AppImage](#appimage) below                                           |
-| macOS   | `Ukemi-<version>-arm64.dmg`      | Apple silicon. See [macOS](#macos) below                                  |
-| macOS   | `Ukemi-<version>-x64.dmg`        | Intel. See [macOS](#macos) below                                          |
-| Windows | `Ukemi Setup <version>.exe`      | Run the installer                                                         |
+| System  | File                                        | Install                                                                   |
+| ------- | ------------------------------------------- | ------------------------------------------------------------------------- |
+| Linux   | `ukemi-<version>.<x86_64\|aarch64>.rpm`     | `sudo dnf install ./ukemi-<version>.x86_64.rpm`                           |
+| Linux   | `ukemi_<version>_<amd64\|arm64>.deb`        | `sudo apt install ./ukemi_<version>_amd64.deb`                            |
+| Linux   | `Ukemi-<version>-<x86_64\|aarch64>.flatpak` | `flatpak install --user ./Ukemi-<version>-x86_64.flatpak`                 |
+| Linux   | `ukemi-jj_<version>_amd64.snap`             | `sudo snap install --dangerous --classic ./ukemi-jj_<version>_amd64.snap` |
+| Linux   | `Ukemi-<version>[-arm64].AppImage`          | See [AppImage](#appimage) below                                           |
+| macOS   | `Ukemi-<version>-arm64.dmg`                 | Apple silicon. See [macOS](#macos) below                                  |
+| macOS   | `Ukemi-<version>-x64.dmg`                   | Intel. See [macOS](#macos) below                                          |
+| Windows | `Ukemi Setup <version>.exe`                 | Run the installer                                                         |
+
+Linux packages come for x64 and arm64; the arm64 names use `aarch64` or `arm64` in place of `x86_64` or `amd64`. The snap is x64 only.
 
 The Windows build is not signed yet. Choose **More info** and **Run anyway**.
 
@@ -300,6 +302,8 @@ npm run desktop:package           # every installer for this system, in out/desk
 npm run desktop:package:dir       # the unpacked app only, the quickest build to try
 npm run desktop:package:appimage  # one Linux format: appimage, flatpak, snap, deb or rpm
 ```
+
+A package is built for the machine's own architecture. On Linux, node-pty is compiled at install time, so an arm64 package has to be built on arm64, not cross-built from x64.
 
 Flatpak needs `flatpak-builder` and the Flathub remote, snap needs `snapcraft`, and deb and rpm need `libcrypt.so.1` (`libxcrypt-compat` on Fedora).
 
