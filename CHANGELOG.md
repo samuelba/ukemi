@@ -5,15 +5,13 @@
 
 ### Features
 
-* build Linux arm64 desktop packages ([0b96e93](https://github.com/samuelba/ukemi/commit/0b96e9351b1a685773c0899f4eb7126b050e2b04))
-* build Linux arm64 desktop packages ([9f8c601](https://github.com/samuelba/ukemi/commit/9f8c601b60b114c9ed81139c6559eef9357bc164))
-* show the trunk commit's CI status in the graph ([1a5df06](https://github.com/samuelba/ukemi/commit/1a5df06b65d754cff54c506702563cab4edfd5a5))
-* show the trunk commit's CI status in the graph ([9ae0377](https://github.com/samuelba/ukemi/commit/9ae037707c94dc86d4a20b831a239dad3f347025))
+* build Linux arm64 desktop packages (@samuelba) ([9f8c601](https://github.com/samuelba/ukemi/commit/9f8c601b60b114c9ed81139c6559eef9357bc164))
+* show the trunk commit's CI status in the graph (@samuelba) ([9ae0377](https://github.com/samuelba/ukemi/commit/9ae037707c94dc86d4a20b831a239dad3f347025))
 
 
 ### Bug Fixes
 
-* skip the snap in the Linux arm64 package job ([3cd3a67](https://github.com/samuelba/ukemi/commit/3cd3a676cecfd929fed2832062a1d2a8d88ffac3))
+* skip the snap in the Linux arm64 package job (@samuelba) ([3cd3a67](https://github.com/samuelba/ukemi/commit/3cd3a676cecfd929fed2832062a1d2a8d88ffac3))
 
 ## [0.13.0](https://github.com/samuelba/ukemi/compare/v0.12.0...v0.13.0) (2026-11-07)
 
