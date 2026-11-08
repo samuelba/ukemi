@@ -1,6 +1,8 @@
 /* Prompts ----------------------------------------------------------------------------------- */
 
-.scrim {
+/* The graph's Describe dialog takes the look of the window's prompts. */
+.scrim,
+.shell .dialog-backdrop {
   position: fixed;
   inset: 0;
   z-index: 50;
@@ -18,7 +20,8 @@
   outline: none;
 }
 
-.prompt {
+.prompt,
+.shell .dialog {
   width: min(620px, calc(100vw - 32px));
   overflow: hidden;
   border: 1px solid var(--vscode-widget-border);
@@ -165,4 +168,40 @@
 .palette .prompt-input {
   margin: 10px 10px 8px;
   width: calc(100% - 20px);
+}
+
+/* The Describe dialog, laid out like a prompt: heading, field, then the buttons in its footer. */
+.shell .dialog {
+  max-width: none;
+  gap: 10px;
+  padding: 16px 18px;
+}
+
+.shell .dialog-title {
+  font-size: 14px;
+}
+
+.shell .dialog textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--vscode-input-border);
+  border-radius: var(--shell-radius);
+  font-size: 13.5px;
+  outline: none;
+}
+
+.shell .dialog textarea:focus {
+  border-color: var(--vscode-focusBorder);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--vscode-focusBorder) 18%, transparent);
+}
+
+.shell .dialog-hint {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.shell .dialog-buttons {
+  margin: 4px -18px -16px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--vscode-widget-border);
+  background: var(--vscode-sideBar-background);
 }
