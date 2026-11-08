@@ -78,13 +78,13 @@ Every [GitHub release](https://github.com/samuelba/ukemi/releases) has these fil
 | Linux   | `ukemi-<version>.<x86_64\|aarch64>.rpm`     | `sudo dnf install ./ukemi-<version>.x86_64.rpm`                           |
 | Linux   | `ukemi_<version>_<amd64\|arm64>.deb`        | `sudo apt install ./ukemi_<version>_amd64.deb`                            |
 | Linux   | `Ukemi-<version>-<x86_64\|aarch64>.flatpak` | `flatpak install --user ./Ukemi-<version>-x86_64.flatpak`                 |
-| Linux   | `ukemi-jj_<version>_<amd64\|arm64>.snap`    | `sudo snap install --dangerous --classic ./ukemi-jj_<version>_amd64.snap` |
+| Linux   | `ukemi-jj_<version>_amd64.snap`             | `sudo snap install --dangerous --classic ./ukemi-jj_<version>_amd64.snap` |
 | Linux   | `Ukemi-<version>[-arm64].AppImage`          | See [AppImage](#appimage) below                                           |
 | macOS   | `Ukemi-<version>-arm64.dmg`                 | Apple silicon. See [macOS](#macos) below                                  |
 | macOS   | `Ukemi-<version>-x64.dmg`                   | Intel. See [macOS](#macos) below                                          |
 | Windows | `Ukemi Setup <version>.exe`                 | Run the installer                                                         |
 
-Linux packages come for x64 and arm64; the arm64 names use `aarch64` or `arm64` in place of `x86_64` or `amd64`.
+Linux packages come for x64 and arm64; the arm64 names use `aarch64` or `arm64` in place of `x86_64` or `amd64`. The snap is x64 only.
 
 The Windows build is not signed yet. Choose **More info** and **Run anyway**.
 
