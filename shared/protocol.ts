@@ -28,18 +28,26 @@ export interface StackInfo {
   size: number
 }
 
-export interface RequestBadge {
-  number: number
-  title: string
-  url: string
-  state: RequestState
+// The CI of one commit: its overall state, its pipeline and its jobs.
+export interface CiSummary {
   ci: CiState
-  isMine: boolean
   pipelineUrl?: string
   // ISO 8601. The finish is unset while the pipeline still runs.
   pipelineStartedAt?: string
   pipelineFinishedAt?: string
   checks: CiCheck[]
+}
+
+export interface CommitCi extends CiSummary {
+  commitId: string
+}
+
+export interface RequestBadge extends CiSummary {
+  number: number
+  title: string
+  url: string
+  state: RequestState
+  isMine: boolean
   headBranch: string
   baseBranch: string
   stack?: StackInfo
@@ -61,6 +69,8 @@ export interface ForgeState {
   isSignedIn: boolean
   // Why the latest refresh failed; the requests shown are from an earlier one.
   refreshError?: string
+  // The CI of the trunk commit, when `ukemi.forge.trunkCi` is on and the forge knows the commit.
+  trunkCi?: CommitCi
 }
 
 export interface GraphState {

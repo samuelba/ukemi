@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { checkElapsed, spanElapsed } from '../../../shared/ciTiming'
-import type { CiCheck, RequestBadge } from '../../../shared/protocol'
+import type { CiCheck, CiSummary, CommitCi, RequestBadge } from '../../../shared/protocol'
 import { formatDuration } from '../shared/format'
 import { staleRequestsNote } from '../../../shared/forgeStale'
 import { stackLabel } from '../../../shared/stack'
@@ -46,54 +46,31 @@ function useNow(ticking: boolean): number {
   return now
 }
 
-function isRunning(request: RequestBadge): boolean {
+function isRunning(summary: CiSummary): boolean {
   return (
-    (request.ci === 'pending' && !!request.pipelineStartedAt && !request.pipelineFinishedAt) ||
-    request.checks.some((check) => check.state === 'pending' && !!check.startedAt)
+    (summary.ci === 'pending' && !!summary.pipelineStartedAt && !summary.pipelineFinishedAt) ||
+    summary.checks.some((check) => check.state === 'pending' && !!check.startedAt)
   )
 }
 
-function Elapsed({ ms }: { ms: number | undefined }) {
-  return ms === undefined ? null : <span className="request-check-time">{formatDuration(ms)}</span>
-}
-
-function RequestPopoverBody({
-  request,
-  refreshError,
-}: {
-  request: RequestBadge
-  refreshError: string | undefined
-}) {
-  const groups = groupChecks(request.checks)
-  const pipelineUrl = request.pipelineUrl
-  const now = useNow(isRunning(request))
-  const pipelineMs = spanElapsed(
-    { startedAt: request.pipelineStartedAt, finishedAt: request.pipelineFinishedAt },
-    request.ci === 'pending',
+function pipelineElapsed(summary: CiSummary, now: number): number | undefined {
+  return spanElapsed(
+    { startedAt: summary.pipelineStartedAt, finishedAt: summary.pipelineFinishedAt },
+    summary.ci === 'pending',
     now,
   )
+}
+
+// The pipeline link and the jobs, grouped by stage.
+function CiChecks({ summary, now }: { summary: CiSummary; now: number }) {
+  const groups = groupChecks(summary.checks)
+  const pipelineUrl = summary.pipelineUrl
   return (
     <>
-      <button
-        type="button"
-        className="request-popover-title"
-        onClick={() => openExternal(request.url)}
-      >
-        #{request.number} {request.title}
-      </button>
-      <div className="request-popover-meta">
-        {REQUEST_LABEL[request.state]}
-        {request.ci === 'none' ? '' : ` · CI ${request.ci}`}
-        {!pipelineUrl && pipelineMs !== undefined ? ` · ${formatDuration(pipelineMs)}` : ''}
-        {request.stack ? ` · ${stackLabel(request.stack)} in stack` : ''}
-      </div>
-      {refreshError && (
-        <div className="request-popover-stale">{staleRequestsNote(refreshError)}</div>
-      )}
       {pipelineUrl && (
         <button type="button" className="request-check" onClick={() => openExternal(pipelineUrl)}>
           <span className="request-check-name">Pipeline</span>
-          <Elapsed ms={pipelineMs} />
+          <Elapsed ms={pipelineElapsed(summary, now)} />
         </button>
       )}
       {groups.length === 0 && <div className="request-popover-empty">No jobs</div>}
@@ -119,6 +96,70 @@ function RequestPopoverBody({
   )
 }
 
+function Elapsed({ ms }: { ms: number | undefined }) {
+  return ms === undefined ? null : <span className="request-check-time">{formatDuration(ms)}</span>
+}
+
+function RequestPopoverBody({
+  request,
+  refreshError,
+}: {
+  request: RequestBadge
+  refreshError: string | undefined
+}) {
+  const pipelineUrl = request.pipelineUrl
+  const now = useNow(isRunning(request))
+  const pipelineMs = pipelineElapsed(request, now)
+  return (
+    <>
+      <button
+        type="button"
+        className="request-popover-title"
+        onClick={() => openExternal(request.url)}
+      >
+        #{request.number} {request.title}
+      </button>
+      <div className="request-popover-meta">
+        {REQUEST_LABEL[request.state]}
+        {request.ci === 'none' ? '' : ` · CI ${request.ci}`}
+        {!pipelineUrl && pipelineMs !== undefined ? ` · ${formatDuration(pipelineMs)}` : ''}
+        {request.stack ? ` · ${stackLabel(request.stack)} in stack` : ''}
+      </div>
+      {refreshError && (
+        <div className="request-popover-stale">{staleRequestsNote(refreshError)}</div>
+      )}
+      <CiChecks summary={request} now={now} />
+    </>
+  )
+}
+
+function TrunkCiPopoverBody({
+  trunkCi,
+  trunkName,
+  refreshError,
+}: {
+  trunkCi: CommitCi
+  trunkName: string
+  refreshError: string | undefined
+}) {
+  const now = useNow(isRunning(trunkCi))
+  const pipelineMs = trunkCi.pipelineUrl ? undefined : pipelineElapsed(trunkCi, now)
+  return (
+    <>
+      <div className="request-popover-title static">CI of {trunkName}</div>
+      <div className="request-popover-meta">
+        {trunkCi.ci === 'none' ? 'No CI' : `CI ${trunkCi.ci}`}
+        {pipelineMs !== undefined ? ` · ${formatDuration(pipelineMs)}` : ''}
+        {` · ${trunkCi.commitId.slice(0, 12)}`}
+      </div>
+      {refreshError && (
+        <div className="request-popover-stale">{staleRequestsNote(refreshError)}</div>
+      )}
+      {trunkCi.ci !== 'none' && <CiChecks summary={trunkCi} now={now} />}
+    </>
+  )
+}
+
 export function RequestHover({
   request,
   refreshError,
@@ -128,6 +169,37 @@ export function RequestHover({
   refreshError: string | undefined
   children: ReactNode
 }) {
+  return (
+    <CiHover content={<RequestPopoverBody request={request} refreshError={refreshError} />}>
+      {children}
+    </CiHover>
+  )
+}
+
+export function TrunkCiHover({
+  trunkCi,
+  trunkName,
+  refreshError,
+  children,
+}: {
+  trunkCi: CommitCi
+  trunkName: string
+  refreshError: string | undefined
+  children: ReactNode
+}) {
+  return (
+    <CiHover
+      content={
+        <TrunkCiPopoverBody trunkCi={trunkCi} trunkName={trunkName} refreshError={refreshError} />
+      }
+    >
+      {children}
+    </CiHover>
+  )
+}
+
+// Opens its content in a popover while the pointer is over the children or the popover.
+function CiHover({ content, children }: { content: ReactNode; children: ReactNode }) {
   const anchor = useRef<HTMLSpanElement>(null)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
@@ -173,7 +245,7 @@ export function RequestHover({
             onMouseLeave={scheduleClose}
             onClick={(event) => event.stopPropagation()}
           >
-            <RequestPopoverBody request={request} refreshError={refreshError} />
+            {content}
           </div>,
           document.body,
         )}

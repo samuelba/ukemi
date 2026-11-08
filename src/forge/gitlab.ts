@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { definedSpan, pipelineFields, pipelineSpan, type TimeSpan } from '../../shared/ciTiming'
-import type { CiCheck, CiState, RequestBadge, RequestState } from '../../shared/protocol'
+import type { CiCheck, CiState, CommitCi, RequestBadge, RequestState } from '../../shared/protocol'
 import { isSafeHttpsHost } from './hostName'
 import { mapLimited } from '../util/mapLimited'
 import {
@@ -103,6 +103,10 @@ const mergeRequestSchema = z.object({
   target_project_id: z.number().optional(),
   author: z.object({ id: z.number() }).optional(),
   head_pipeline: pipelineSchema.nullable().optional(),
+})
+
+const commitSchema = z.object({
+  last_pipeline: pipelineSchema.nullable().optional(),
 })
 
 const detailSchema = z.object({
@@ -335,6 +339,30 @@ export class GitlabClient implements ForgeClient {
       checks,
       headBranch: mr.source_branch,
       baseBranch: mr.target_branch,
+    }
+  }
+
+  async commitCi(commitId: string): Promise<CommitCi | null> {
+    let body: unknown
+    try {
+      body = await this.call(this.projectUrl(`/repository/commits/${encodeURIComponent(commitId)}`))
+    } catch (error: unknown) {
+      if (error instanceof ForgeError && error.status === 404) {
+        return null
+      }
+      throw error
+    }
+    const pipeline = commitSchema.parse(body).last_pipeline ?? null
+    if (!pipeline) {
+      return { commitId, ci: 'none', checks: [] }
+    }
+    const checks = pipeline.id === undefined ? [] : await this.jobs(pipeline.id)
+    return {
+      commitId,
+      ci: gitlabPipelineCi(pipeline.status, checks),
+      ...(pipeline.web_url ? { pipelineUrl: pipeline.web_url } : {}),
+      ...pipelineFields(pipelineTiming(pipeline, checks)),
+      checks,
     }
   }
 

@@ -42,7 +42,7 @@ const editorSession = async (host: string) =>
     ? { username: state.session.account.label, token: state.session.accessToken }
     : null
 
-function service() {
+function service(overrides: Record<string, unknown> = {}) {
   const secrets = new Map<string, string>()
   const store = {
     get: async (key: string) => secrets.get(key),
@@ -56,7 +56,11 @@ function service() {
   const host = {
     secrets: store,
     settings: {
-      read: () => readSettings({ get: (_key, fallback) => fallback }),
+      read: () =>
+        readSettings({
+          get: <T>(key: string, fallback: T) =>
+            key in overrides ? (overrides[key] as T) : fallback,
+        }),
       update: async () => undefined,
       onDidChange: NO_EVENT,
     },
@@ -331,6 +335,124 @@ describe('request refresh and rate limits', () => {
 
     await forge.refreshRequests(githubModel().model, { force: true })
     expect(state.messages).toEqual(['Ukemi: the forge login has expired. Sign in again.'])
+    forge.dispose()
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('trunk CI', () => {
+  const trunkId = 'abc123'
+
+  function trunkModel() {
+    const states: { trunkCi?: unknown }[] = []
+    const model = {
+      root: '/repo',
+      remotes: [{ name: 'origin', url: 'https://github.com/o/r.git' }],
+      graph: {
+        commits: [
+          {
+            commitId: 'feat1',
+            isTrunk: false,
+            localBookmarks: [{ name: 'feature' }],
+            remoteBookmarks: [],
+            requests: [],
+          },
+          {
+            commitId: trunkId,
+            isTrunk: true,
+            localBookmarks: [{ name: 'main' }],
+            remoteBookmarks: [],
+            requests: [],
+          },
+        ],
+      },
+      setForge: (forgeState: { trunkCi?: unknown }) => states.push(forgeState),
+      markForgeStale: () => undefined,
+    }
+    return { model: model as never, states }
+  }
+
+  function github(answerTrunk: () => Response) {
+    const queries: string[] = []
+    vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body)) as { query: string }
+      queries.push(body.query.includes('object(oid') ? 'trunk' : 'requests')
+      if (body.query.includes('object(oid')) {
+        return answerTrunk()
+      }
+      return new Response(
+        JSON.stringify({ data: { viewer: { login: 'u' }, repository: { b0: { nodes: [] } } } }),
+        { status: 200 },
+      )
+    })
+    return queries
+  }
+
+  function signedIn(overrides: Record<string, unknown>) {
+    const setup = service(overrides)
+    setup.secrets.set(
+      'ukemi.github.credential.github.com',
+      JSON.stringify({ username: 'u', token: 't' }),
+    )
+    return setup
+  }
+
+  const passing = () =>
+    new Response(
+      JSON.stringify({
+        data: {
+          repository: {
+            object: {
+              url: `https://github.com/o/r/commit/${trunkId}`,
+              statusCheckRollup: { state: 'SUCCESS', contexts: { nodes: [] } },
+            },
+          },
+        },
+      }),
+      { status: 200 },
+    )
+
+  test('is not loaded while the setting is off', async () => {
+    const { forge } = signedIn({})
+    const queries = github(passing)
+    const { model, states } = trunkModel()
+
+    await forge.refreshRequests(model, { force: true })
+
+    expect(queries).toEqual(['requests'])
+    expect(states[0]?.trunkCi).toBeUndefined()
+    forge.dispose()
+    vi.unstubAllGlobals()
+  })
+
+  test('is loaded for the trunk commit when the setting is on', async () => {
+    const { forge } = signedIn({ 'forge.trunkCi': true })
+    const queries = github(passing)
+    const { model, states } = trunkModel()
+
+    await forge.refreshRequests(model, { force: true })
+
+    expect(queries).toEqual(['requests', 'trunk'])
+    expect(states[0]?.trunkCi).toEqual({
+      commitId: trunkId,
+      ci: 'success',
+      pipelineUrl: `https://github.com/o/r/commit/${trunkId}`,
+      checks: [],
+    })
+    forge.dispose()
+    vi.unstubAllGlobals()
+  })
+
+  test('a failed lookup still shows the requests', async () => {
+    const { forge } = signedIn({ 'forge.trunkCi': true })
+    github(() => new Response(JSON.stringify({ message: 'Bad Gateway' }), { status: 502 }))
+    const { model, states } = trunkModel()
+
+    await forge.refreshRequests(model, { force: true })
+
+    expect(states).toHaveLength(1)
+    expect(states[0]?.trunkCi).toBeUndefined()
+    expect(state.messages).toEqual([])
     forge.dispose()
     vi.unstubAllGlobals()
   })

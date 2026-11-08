@@ -2,7 +2,7 @@ import { memo, useEffect, useId, useSyncExternalStore, type DragEvent } from 're
 import type { PreviewDrop } from '../../../shared/dropPreview'
 import { parseFileDrag } from '../../../shared/fileUri'
 import type { ChangedFile } from '../../../shared/model'
-import type { CommitView, ViewSettings } from '../../../shared/protocol'
+import type { CommitCi, CommitView, ViewSettings } from '../../../shared/protocol'
 import { splitId, title } from '../shared/format'
 import { isDesktop, postMessage, vscodeContext } from '../shared/hostApi'
 import { BOOKMARK_MIME, Badges, RequestRow } from './Badges'
@@ -45,6 +45,8 @@ interface CommitRowProps {
   trunkName: string | null
   // Set when the latest request refresh failed, so the request badges are left from an earlier one.
   requestRefreshError: string | undefined
+  // The trunk's CI, passed to the trunk row only.
+  trunkCi?: CommitCi
   settings: ViewSettings
   onToggle: (commit: CommitView) => void
   onSelect: (commitId: string) => void
@@ -420,6 +422,8 @@ export const CommitRow = memo(function CommitRow(props: CommitRowProps) {
           ciOnlyMine={settings.ciOnlyMine}
           showGitTags={settings.showGitTags}
           refreshError={props.requestRefreshError}
+          trunkCi={props.trunkCi}
+          trunkName={props.trunkName}
         />
         {isExpanded && canExpand && (
           <FileList

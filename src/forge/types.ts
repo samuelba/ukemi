@@ -1,4 +1,4 @@
-import type { ForgeKind, RequestBadge } from '../../shared/protocol'
+import type { CommitCi, ForgeKind, RequestBadge } from '../../shared/protocol'
 
 export type MergeMethod = 'merge' | 'squash' | 'rebase'
 export type MergeOutcome = 'merged' | 'enqueued'
@@ -21,6 +21,8 @@ export interface ForgeClient {
   mergeRequest(number: number, method: MergeMethod): Promise<MergeOutcome>
   updateRequestBase(number: number, base: string): Promise<void>
   syncNativeStack?(numbers: readonly number[]): Promise<NativeStackResult>
+  // The CI of a pushed commit. Null when the forge does not know the commit.
+  commitCi?(commitId: string): Promise<CommitCi | null>
 }
 
 export type HttpFetch = (url: string, init: RequestInit) => Promise<Response>

@@ -1,6 +1,13 @@
 import { z } from 'zod'
 import { definedSpan, pipelineFields, pipelineSpan } from '../../shared/ciTiming'
-import type { CiCheck, CiState, RequestBadge, RequestState } from '../../shared/protocol'
+import type {
+  CiCheck,
+  CiState,
+  CiSummary,
+  CommitCi,
+  RequestBadge,
+  RequestState,
+} from '../../shared/protocol'
 import {
   clampRequestLimit,
   DEFAULT_REQUEST_LIMIT,
@@ -41,6 +48,16 @@ const contextNodeSchema = z.union([
   z.object({ __typename: z.string() }).passthrough(),
 ])
 
+const rollupSchema = z
+  .object({
+    state: z.string(),
+    contexts: z
+      .object({ nodes: z.array(contextNodeSchema.nullable()) })
+      .nullable()
+      .optional(),
+  })
+  .nullable()
+
 const pullSchema = z.object({
   number: z.number(),
   title: z.string(),
@@ -58,19 +75,25 @@ const pullSchema = z.object({
   commits: z.object({
     nodes: z.array(
       z.object({
-        commit: z.object({
-          statusCheckRollup: z
-            .object({
-              state: z.string(),
-              contexts: z
-                .object({ nodes: z.array(contextNodeSchema.nullable()) })
-                .nullable()
-                .optional(),
-            })
-            .nullable(),
-        }),
+        commit: z.object({ statusCheckRollup: rollupSchema }),
       }),
     ),
+  }),
+})
+
+const commitCiSchema = z.object({
+  data: z.object({
+    repository: z
+      .object({
+        // Null when GitHub has no such commit; a non-commit object has no fields.
+        object: z
+          .object({
+            url: z.string().optional(),
+            statusCheckRollup: rollupSchema.optional(),
+          })
+          .nullable(),
+      })
+      .nullable(),
   }),
 })
 
@@ -197,6 +220,19 @@ export function githubCheckState(status: string, conclusion: string | null): CiS
   }
 }
 
+const ROLLUP_FIELDS = `fragment RollupFields on Commit {
+  statusCheckRollup {
+    state
+    contexts(first: 50) {
+      nodes {
+        __typename
+        ... on CheckRun { name status conclusion detailsUrl startedAt completedAt }
+        ... on StatusContext { context state targetUrl }
+      }
+    }
+  }
+}`
+
 const PULL_FIELDS = `fragment PullFields on PullRequest {
   number title url state isDraft headRefName baseRefName reviewDecision isCrossRepository
   headRepositoryOwner { login }
@@ -204,21 +240,32 @@ const PULL_FIELDS = `fragment PullFields on PullRequest {
   latestReviews(first: 1) { totalCount }
   commits(last: 1) {
     nodes {
-      commit {
-        statusCheckRollup {
-          state
-          contexts(first: 50) {
-            nodes {
-              __typename
-              ... on CheckRun { name status conclusion detailsUrl startedAt completedAt }
-              ... on StatusContext { context state targetUrl }
-            }
-          }
-        }
-      }
+      commit { ...RollupFields }
     }
   }
-}`
+}
+${ROLLUP_FIELDS}`
+
+export const COMMIT_CI_QUERY = `query($owner: String!, $name: String!, $oid: GitObjectID!) {
+  repository(owner: $owner, name: $name) {
+    object(oid: $oid) {
+      ... on Commit { url ...RollupFields }
+    }
+  }
+}
+${ROLLUP_FIELDS}`
+
+type GithubRollup = z.infer<typeof rollupSchema>
+
+function rollupCi(rollup: GithubRollup, pipelineUrl: string | undefined): CiSummary {
+  const checks = mapContexts(rollup?.contexts?.nodes ?? [])
+  return {
+    ci: githubCi(rollup?.state),
+    ...(rollup && pipelineUrl ? { pipelineUrl } : {}),
+    ...pipelineFields(pipelineSpan(checks)),
+    checks,
+  }
+}
 
 // One aliased lookup per head branch, so a busy repository cannot push a bookmark's request out of
 // a list of the newest ones.
@@ -326,21 +373,39 @@ export class GithubClient implements ForgeClient {
 
   private toBadge(pull: GithubPull, viewer: string | null): RequestBadge {
     const rollup = pull.commits.nodes[0]?.commit.statusCheckRollup ?? null
-    const checks = mapContexts(rollup?.contexts?.nodes ?? [])
-    const pipelineUrl = rollup ? `${pull.url}/checks` : undefined
     return {
       number: pull.number,
       title: pull.title,
       url: pull.url,
       state: githubState(pull),
-      ci: githubCi(rollup?.state),
       isMine: sameLogin(pull.author?.login, viewer),
-      ...(pipelineUrl ? { pipelineUrl } : {}),
-      ...pipelineFields(pipelineSpan(checks)),
-      checks,
+      ...rollupCi(rollup, `${pull.url}/checks`),
       headBranch: pull.headRefName,
       baseBranch: pull.baseRefName,
     }
+  }
+
+  async commitCi(commitId: string): Promise<CommitCi | null> {
+    const body = await this.call(this.graphqlUrl, {
+      method: 'POST',
+      body: JSON.stringify({
+        query: COMMIT_CI_QUERY,
+        variables: { owner: this.owner, name: this.name, oid: commitId },
+      }),
+    })
+    const parsed = commitCiSchema.safeParse(body)
+    const error = graphqlError(body)
+    if (error?.status === 404) {
+      return null
+    }
+    if (!parsed.success || error) {
+      throw error ?? parsed.error
+    }
+    const commit = parsed.data.data.repository?.object
+    if (!commit || commit.statusCheckRollup === undefined) {
+      return null
+    }
+    return { commitId, ...rollupCi(commit.statusCheckRollup, commit.url) }
   }
 
   async createRequest(input: CreateRequestInput): Promise<RequestBadge> {

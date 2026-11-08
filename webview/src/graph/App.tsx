@@ -519,6 +519,7 @@ export function App() {
                   hasForge={graph.forge !== null}
                   trunkName={graph.trunkName}
                   requestRefreshError={graph.forge?.refreshError}
+                  trunkCi={commit.isTrunk ? graph.forge?.trunkCi : undefined}
                   settings={state.settings}
                   onToggle={toggle}
                   onSelect={selectCommit}
