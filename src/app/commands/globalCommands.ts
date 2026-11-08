@@ -1,6 +1,12 @@
 import { basename } from 'node:path'
 import type { ChangedFilesView } from '../../../shared/protocol'
-import { InitIncompleteError, JjRepo, readInitFolder, type NewRepoOptions } from '../../jj/repo'
+import {
+  InitIncompleteError,
+  initColocated,
+  initNewRepo,
+  readInitFolder,
+  type NewRepoOptions,
+} from '../../jj/newRepo'
 import { changeRevision } from '../../jj/revsets'
 import type { RepoModel } from '../../repo/repoModel'
 import {
@@ -118,7 +124,7 @@ async function initColocatedRepo(env: CommandEnv, folder: string): Promise<void>
   }
   try {
     await env.operations.indicate('Initializing', async () => {
-      await JjRepo.initColocated(env.runner, folder)
+      await initColocated(env.runner, folder)
       await env.registry.addRepo(folder)
     })
   } catch (error: unknown) {
@@ -168,7 +174,7 @@ async function createNewRepo(
 ): Promise<void> {
   const cloning = Boolean(options.remoteUrl) && (await readInitFolder(folder)) === 'empty'
   const create = async () => {
-    const result = await JjRepo.initNew(env.runner, folder, options)
+    const result = await initNewRepo(env.runner, folder, options)
     await env.registry.addRepo(folder)
     return result
   }
