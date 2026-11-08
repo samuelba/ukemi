@@ -3,6 +3,7 @@
 // GH_TOKEN or GITHUB_TOKEN is used when set; the release is public, so it is optional.
 import { writeFile } from 'node:fs/promises'
 import { parseArgs } from 'node:util'
+import { pickAssets } from './releaseAssets.mjs'
 
 const { values } = parseArgs({
   options: {
@@ -17,20 +18,6 @@ if (!values.tag || !values.out) {
   )
   process.exit(2)
 }
-
-// Asset names differ per format, so each key matches by suffix.
-const patterns = {
-  exe: /\.exe$/i,
-  dmgArm64: /-arm64\.dmg$/i,
-  dmgX64: /-x64\.dmg$/i,
-  appimage: /\.AppImage$/i,
-  deb: /\.deb$/i,
-  rpm: /\.rpm$/i,
-  snap: /\.snap$/i,
-  flatpak: /\.flatpak$/i,
-}
-// Without these the page would show a dead main button.
-const required = ['exe', 'dmgArm64', 'dmgX64', 'appimage']
 
 const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN
 const response = await fetch(
@@ -49,12 +36,7 @@ if (!response.ok) {
 }
 const release = await response.json()
 
-const assets = {}
-for (const [key, pattern] of Object.entries(patterns)) {
-  const asset = release.assets.find((a) => pattern.test(a.name))
-  if (asset) assets[key] = asset.browser_download_url
-}
-const missing = required.filter((key) => !assets[key])
+const { assets, missing } = pickAssets(release.assets)
 if (missing.length > 0) {
   process.stderr.write(`release ${values.tag} has no asset for: ${missing.join(', ')}\n`)
   process.exit(1)
