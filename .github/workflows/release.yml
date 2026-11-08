@@ -17,7 +17,7 @@ jobs:
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       # Also drops merge commits and rebased copies from the notes of the release pull request.
-      - uses: samuelba/actions/release-please@2528c31b37b1f1ce12f27f66eb05b9e1282cdf58 # v1.0.1
+      - uses: samuelba/actions/release-please@563bf7ae6023a9191920575d554f912a7389a888 # v1.1.0
         id: release
         with:
           # A fine-grained PAT lets CI run on the release pull request. Without it, the release still works.
