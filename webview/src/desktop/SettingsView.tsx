@@ -1,48 +1,20 @@
+import { useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import type { SettingField, SettingsRepository } from '../../../shared/desktopProtocol'
+import { SaveContext, sendSettings, type Save } from './settingsSave'
 import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type KeyboardEvent,
-  type ReactNode,
-} from 'react'
-import {
-  acceleratorOf,
-  formatAccelerator,
-  normalizeAccelerator,
-} from '../../../shared/accelerators'
-import type {
-  DesktopRendererMessage,
-  SettingField,
-  SettingsRepository,
-  ShortcutField,
-} from '../../../shared/desktopProtocol'
-import { postMessage } from '../shared/hostApi'
+  currentValue,
+  matchesQuery,
+  readText,
+  repositoryField,
+  TEXT_FORMATS,
+  type TextFieldType,
+} from './settingsValues'
+import { ShortcutsControl } from './ShortcutsControl'
 
 export type SettingsScope = 'global' | 'repository'
 
 // The setting of the keyboard shortcuts, which File > Keyboard Shortcuts scrolls to.
 export const KEYBINDINGS_KEY = 'desktop.keybindings'
-
-const PLATFORM = /Mac/.test(navigator.platform) ? 'darwin' : navigator.platform
-
-type Save = (key: string, value: unknown) => void
-
-function send(message: DesktopRendererMessage): void {
-  postMessage(message)
-}
-
-// Writes the global value, or the override of the repository the form shows.
-const SaveContext = createContext<Save>((key, value) =>
-  send({ type: 'desktop.setSetting', key, value }),
-)
-
-// In the repository mode a field shows the override, with the global value as its fallback.
-function repositoryField(field: SettingField, repository: SettingsRepository): SettingField {
-  const inherited = field.value === undefined ? field.default : field.value
-  return { ...field, value: repository.values[field.key], default: inherited }
-}
 
 // Shows `code` from the package.json descriptions as code.
 function Description({ text }: { text: string }) {
@@ -60,95 +32,23 @@ function Description({ text }: { text: string }) {
   )
 }
 
-function current(field: SettingField): unknown {
-  return field.value === undefined ? field.default : field.value
-}
-
-function listText(value: unknown): string {
-  return Array.isArray(value) ? value.join('\n') : ''
-}
-
-function mapText(value: unknown): string {
-  return typeof value === 'object' && value !== null
-    ? Object.entries(value)
-        .map(([key, item]) => `${key} = ${String(item)}`)
-        .join('\n')
-    : ''
-}
-
-function parseList(text: string): string[] {
-  return text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-}
-
-function parseMap(text: string): Record<string, string> | string {
-  const entries: Array<[string, string]> = []
-  for (const line of text
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean)) {
-    const at = line.indexOf('=')
-    if (at <= 0) {
-      return `Write each line as "host = value": ${line}`
-    }
-    entries.push([line.slice(0, at).trim(), line.slice(at + 1).trim()])
-  }
-  return Object.fromEntries(entries)
-}
-
 // A text control that saves when it loses focus or on Enter, after its check passes.
-function TextControl({
-  field,
-  multiline,
-  toText,
-  fromText,
-}: {
-  field: SettingField
-  multiline: boolean
-  toText: (value: unknown) => string
-  fromText: (text: string) => unknown
-}) {
-  const shown = toText(current(field))
+function TextControl({ field, type }: { field: SettingField; type: TextFieldType }) {
+  const { multiline, toText } = TEXT_FORMATS[type]
+  const shown = toText(currentValue(field))
   const [text, setText] = useState(shown)
   const [problem, setProblem] = useState<string | null>(null)
   const save = useContext(SaveContext)
   useEffect(() => setText(shown), [shown])
 
   const commit = () => {
-    if (text === shown) {
-      setProblem(null)
-      return
-    }
-    // An empty field goes back to the default.
-    if (text.trim() === '' && (field.type === 'number' || field.type === 'string')) {
-      setProblem(null)
+    const outcome = readText(field, type, text)
+    setProblem(outcome.kind === 'problem' ? outcome.problem : null)
+    if (outcome.kind === 'reset') {
       save(field.key, undefined)
-      return
+    } else if (outcome.kind === 'value') {
+      save(field.key, outcome.value)
     }
-    const value = fromText(text)
-    if (typeof value === 'string' && field.type === 'map') {
-      setProblem(value)
-      return
-    }
-    if (field.pattern && typeof value === 'string' && !new RegExp(field.pattern).test(value)) {
-      setProblem(field.patternMessage ?? 'This value has the wrong format.')
-      return
-    }
-    if (field.type === 'number') {
-      const number = value as number
-      if (
-        !Number.isFinite(number) ||
-        (field.minimum !== undefined && number < field.minimum) ||
-        (field.maximum !== undefined && number > field.maximum)
-      ) {
-        setProblem(`Enter a number from ${field.minimum ?? '…'} to ${field.maximum ?? '…'}.`)
-        return
-      }
-    }
-    setProblem(null)
-    save(field.key, value)
   }
 
   const common = {
@@ -165,7 +65,7 @@ function TextControl({
       ) : (
         <input
           {...common}
-          type={field.type === 'number' ? 'number' : 'text'}
+          type={type === 'number' ? 'number' : 'text'}
           min={field.minimum}
           max={field.maximum}
           onKeyDown={(e) => e.key === 'Enter' && commit()}
@@ -173,165 +73,6 @@ function TextControl({
       )}
       {problem && <p className="setting-problem">{problem}</p>}
     </>
-  )
-}
-
-function ownKeys(value: unknown): Record<string, string> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? Object.fromEntries(
-        Object.entries(value).filter(
-          (entry): entry is [string, string] => typeof entry[1] === 'string',
-        ),
-      )
-    : {}
-}
-
-function recordShortcut(isRecording: boolean): void {
-  send({ type: 'desktop.recordShortcut', isRecording })
-}
-
-interface ShortcutRowProps {
-  action: ShortcutField
-  shortcut: string
-  isOwn: boolean
-  // The other commands with the same keys.
-  clashes: string[]
-  onSet: (key: string) => void
-  onReset: () => void
-}
-
-// One command with its keys. Clicking the keys records new ones: the next key press with a
-// modifier, or a function key. Escape cancels.
-function ShortcutRow({ action, shortcut, isOwn, clashes, onSet, onReset }: ShortcutRowProps) {
-  const [isRecording, setIsRecording] = useState(false)
-  useEffect(() => {
-    if (!isRecording) {
-      return
-    }
-    recordShortcut(true)
-    return () => recordShortcut(false)
-  }, [isRecording])
-
-  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    if (!isRecording) {
-      return
-    }
-    event.preventDefault()
-    event.stopPropagation()
-    const hasModifier = event.ctrlKey || event.metaKey || event.altKey || event.shiftKey
-    if (event.key === 'Escape' && !hasModifier) {
-      setIsRecording(false)
-      return
-    }
-    const key = acceleratorOf(event, PLATFORM)
-    if (key) {
-      setIsRecording(false)
-      onSet(key)
-    }
-  }
-
-  return (
-    <tr className={`shortcut${clashes.length > 0 ? ' has-clash' : ''}`}>
-      <th scope="row" className="shortcut-title">
-        {action.title}
-      </th>
-      <td className="shortcut-keys">
-        <button
-          className={`shortcut-key${isRecording ? ' is-recording' : ''}${shortcut ? '' : ' is-empty'}`}
-          title={isRecording ? 'Press the new keys, or Escape to cancel' : 'Change the shortcut'}
-          aria-label={`Shortcut of ${action.title}: ${shortcut ? formatAccelerator(shortcut, PLATFORM) : 'none'}`}
-          onClick={() => setIsRecording(true)}
-          onKeyDown={onKeyDown}
-          onBlur={() => setIsRecording(false)}
-        >
-          {isRecording ? (
-            'Press keys…'
-          ) : shortcut ? (
-            <kbd>{formatAccelerator(shortcut, PLATFORM)}</kbd>
-          ) : (
-            'None'
-          )}
-        </button>
-        {clashes.length > 0 && (
-          <p className="setting-problem shortcut-clash">Also {clashes.join(', ')}</p>
-        )}
-      </td>
-      <td className="shortcut-tools">
-        {shortcut && (
-          <button
-            className="icon-button"
-            title="Remove the shortcut"
-            aria-label={`Remove the shortcut of ${action.title}`}
-            onClick={() => onSet('')}
-          >
-            <span className="codicon codicon-close" aria-hidden />
-          </button>
-        )}
-        {isOwn && (
-          <button
-            className="icon-button"
-            title={`Reset to ${action.default ? formatAccelerator(action.default, PLATFORM) : 'none'}`}
-            aria-label={`Reset the shortcut of ${action.title}`}
-            onClick={onReset}
-          >
-            <span className="codicon codicon-discard" aria-hidden />
-          </button>
-        )}
-      </td>
-    </tr>
-  )
-}
-
-// The keyboard shortcuts of the menu commands, by menu. The setting keeps only the ones the
-// user changed.
-function ShortcutsControl({ field }: { field: SettingField }) {
-  const save = useContext(SaveContext)
-  const own = ownKeys(field.value)
-  const actions = field.shortcuts ?? []
-  const keyOf = (action: ShortcutField) => own[action.id] ?? action.default
-  const byKey = new Map<string, string[]>()
-  for (const action of actions) {
-    const normal = normalizeAccelerator(keyOf(action), PLATFORM)
-    if (normal) {
-      byKey.set(normal, [...(byKey.get(normal) ?? []), action.title])
-    }
-  }
-  const store = (next: Record<string, string>) =>
-    save(field.key, Object.keys(next).length > 0 ? next : undefined)
-  const without = (id: string) => Object.fromEntries(Object.entries(own).filter(([k]) => k !== id))
-  const set = (action: ShortcutField, key: string) =>
-    store(key === action.default ? without(action.id) : { ...without(action.id), [action.id]: key })
-  const menus = [...new Set(actions.map((action) => action.menu))]
-  return (
-    <div className="shortcuts">
-      {menus.map((menu) => (
-        <table key={menu} className="shortcut-table">
-          <caption>{menu}</caption>
-          <tbody>
-            {actions
-              .filter((action) => action.menu === menu)
-              .map((action) => {
-                const shortcut = keyOf(action)
-                const normal = normalizeAccelerator(shortcut, PLATFORM)
-                const clashes = normal
-                  ? (byKey.get(normal) ?? []).filter((title) => title !== action.title)
-                  : []
-                return (
-                  <ShortcutRow
-                    key={action.id}
-                    action={action}
-                    shortcut={shortcut}
-                    isOwn={action.id in own}
-                    clashes={clashes}
-                    onSet={(key) => set(action, key)}
-                    onReset={() => store(without(action.id))}
-                  />
-                )
-              })}
-          </tbody>
-        </table>
-      ))}
-    </div>
   )
 }
 
@@ -343,15 +84,15 @@ function Control({ field }: { field: SettingField }) {
         <label className="switch">
           <input
             type="checkbox"
-            checked={current(field) === true}
+            checked={currentValue(field) === true}
             onChange={(e) => save(field.key, e.target.checked)}
           />
           <span className="switch-track" aria-hidden />
-          <span className="switch-label">{current(field) === true ? 'On' : 'Off'}</span>
+          <span className="switch-label">{currentValue(field) === true ? 'On' : 'Off'}</span>
         </label>
       )
     case 'enum': {
-      const selected = String(current(field))
+      const selected = String(currentValue(field))
       const option = field.options?.find((o) => o.value === selected)
       return (
         <>
@@ -371,29 +112,12 @@ function Control({ field }: { field: SettingField }) {
       )
     }
     case 'list':
-      return <TextControl field={field} multiline toText={listText} fromText={parseList} />
     case 'map':
-      return <TextControl field={field} multiline toText={mapText} fromText={parseMap} />
+    case 'number':
+    case 'string':
+      return <TextControl field={field} type={field.type} />
     case 'shortcuts':
       return <ShortcutsControl field={field} />
-    case 'number':
-      return (
-        <TextControl
-          field={field}
-          multiline={false}
-          toText={(v) => String(v ?? '')}
-          fromText={Number}
-        />
-      )
-    case 'string':
-      return (
-        <TextControl
-          field={field}
-          multiline={false}
-          toText={(v) => String(v ?? '')}
-          fromText={(t) => t.trim()}
-        />
-      )
   }
 }
 
@@ -432,16 +156,6 @@ function Field({ field, scope }: { field: SettingField; scope: SettingsScope }) 
       </div>
       <p className="setting-key">ukemi.{field.key}</p>
     </div>
-  )
-}
-
-function matches(field: SettingField, query: string): boolean {
-  const needle = query.trim().toLowerCase()
-  return (
-    !needle ||
-    `${field.title} ${field.key} ${field.description} ${(field.shortcuts ?? []).map((s) => s.title).join(' ')}`
-      .toLowerCase()
-      .includes(needle)
   )
 }
 
@@ -515,7 +229,7 @@ export function SettingsView({
     })
     return () => cancelAnimationFrame(frame)
   }, [focus, hasFields])
-  useEffect(() => send({ type: 'desktop.loadSettings' }), [])
+  useEffect(() => sendSettings({ type: 'desktop.loadSettings' }), [])
   // Without a repository, the form falls back to the settings of all repositories.
   const repo = scope === 'repository' ? repository : null
   const shownScope: SettingsScope = repo ? 'repository' : 'global'
@@ -528,11 +242,16 @@ export function SettingsView({
   )
   const save = useMemo<Save>(
     () => (key, value) =>
-      send({ type: 'desktop.setSetting', key, value, ...(repo ? { repoId: repo.id } : {}) }),
+      sendSettings({
+        type: 'desktop.setSetting',
+        key,
+        value,
+        ...(repo ? { repoId: repo.id } : {}),
+      }),
     [repo],
   )
   const visible = useMemo(
-    () => shown.filter((f) => matches(f, query) && (!onlyModified || f.value !== undefined)),
+    () => shown.filter((f) => matchesQuery(f, query) && (!onlyModified || f.value !== undefined)),
     [shown, query, onlyModified],
   )
   const groups = [...new Set(visible.map((f) => f.group))]
@@ -587,7 +306,7 @@ export function SettingsView({
           </span>
           <button
             className="link-button"
-            onClick={() => send({ type: 'desktop.openSettingsFile' })}
+            onClick={() => sendSettings({ type: 'desktop.openSettingsFile' })}
           >
             Open the file
           </button>
