@@ -1,0 +1,46 @@
+/* Panes ------------------------------------------------------------------------------------- */
+
+.workspace {
+  display: grid;
+  min-height: 0;
+}
+
+.workspace > * {
+  min-width: 0;
+  min-height: 0;
+}
+
+.splitter {
+  position: relative;
+  z-index: 3;
+  background: var(--vscode-widget-border);
+  touch-action: none;
+}
+
+.splitter-columns {
+  cursor: col-resize;
+}
+
+.splitter-rows {
+  cursor: row-resize;
+}
+
+.splitter::after {
+  content: '';
+  position: absolute;
+  inset: 0 -4px;
+}
+
+.splitter-rows::after {
+  inset: -4px 0;
+}
+
+.splitter:hover,
+.splitter:active {
+  background: var(--vscode-focusBorder);
+}
+
+.graph-pane {
+  overflow: auto;
+  background: var(--vscode-editor-background);
+}

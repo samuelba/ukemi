@@ -1,0 +1,167 @@
+/* Toasts ------------------------------------------------------------------------------------ */
+
+.toasts {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  width: min(400px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 10px 10px 12px;
+  border: 1px solid var(--vscode-widget-border);
+  border-left: 3px solid var(--vscode-descriptionForeground);
+  border-radius: 8px;
+  background: var(--vscode-editorWidget-background);
+  box-shadow: 0 12px 32px -10px var(--vscode-widget-shadow);
+  pointer-events: auto;
+  animation: toast-in 220ms var(--shell-ease);
+}
+
+.toast-info {
+  border-left-color: var(--vscode-charts-blue);
+}
+
+.toast-warning {
+  border-left-color: var(--vscode-editorWarning-foreground);
+}
+
+.toast-error {
+  border-left-color: var(--vscode-errorForeground);
+}
+
+.toast-progress {
+  border-left-color: var(--vscode-focusBorder);
+}
+
+.toast-icon {
+  margin-top: 1px;
+}
+
+.toast-info .toast-icon {
+  color: var(--vscode-charts-blue);
+}
+
+.toast-warning .toast-icon {
+  color: var(--vscode-editorWarning-foreground);
+}
+
+.toast-error .toast-icon {
+  color: var(--vscode-errorForeground);
+}
+
+.toast-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-text {
+  margin: 0;
+  line-height: 1.45;
+  user-select: text;
+  overflow-wrap: anywhere;
+}
+
+.toast-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.toast-close {
+  width: 22px;
+  height: 22px;
+}
+
+.toast-spinner {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  border: 2px solid color-mix(in srgb, var(--vscode-focusBorder) 25%, transparent);
+  border-top-color: var(--vscode-focusBorder);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.button-primary,
+.button-quiet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--shell-radius);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background var(--shell-fast),
+    border-color var(--shell-fast);
+}
+
+.button-primary {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.button-primary:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.button-quiet {
+  border-color: var(--vscode-widget-border);
+  background: transparent;
+  color: var(--vscode-foreground);
+}
+
+.button-quiet:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes prompt-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scrim,
+  .prompt,
+  .toast {
+    animation: none;
+  }
+
+  .toast-spinner {
+    animation-duration: 2.4s;
+  }
+}

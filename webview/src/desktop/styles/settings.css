@@ -1,0 +1,427 @@
+/* Settings ----------------------------------------------------------------------------------- */
+
+.settings {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 24px 32px;
+  user-select: text;
+}
+
+.settings-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 18px 0 12px;
+  border-bottom: 1px solid var(--vscode-widget-border);
+  background: var(--vscode-editor-background);
+}
+
+.settings-header h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.settings-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+
+.settings-title h1 {
+  margin: 0;
+}
+
+/* All repositories | This repository: a segmented control, the active side raised. */
+.scope-switch {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: var(--shell-radius);
+  background: var(--vscode-sideBar-background);
+}
+
+.scope-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 220px;
+  padding: 3px 10px;
+  border: none;
+  border-radius: calc(var(--shell-radius) - 2px);
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition:
+    background var(--shell-fast),
+    color var(--shell-fast);
+}
+
+.scope-option:hover:not(:disabled) {
+  color: var(--vscode-foreground);
+}
+
+.scope-option.is-active {
+  background: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+  box-shadow: 0 1px 2px var(--vscode-widget-shadow);
+}
+
+.scope-option:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.scope-option:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+/* In the repository mode the header carries the accent of the working copy, so the mode is
+   hard to miss while editing. */
+.settings.is-repository .settings-header {
+  border-bottom-color: var(--shu-ink);
+}
+
+.settings-scope-note {
+  margin: -4px 0 10px;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.settings-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-search {
+  flex: 1;
+  margin: 0;
+}
+
+.settings-group h2 {
+  margin: 26px 0 4px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--vscode-descriptionForeground);
+}
+
+.setting {
+  position: relative;
+  padding: 12px 0 12px 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--vscode-widget-border) 60%, transparent);
+}
+
+.setting.is-modified::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--vscode-focusBorder);
+}
+
+.setting-scope {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.setting-scope.is-own {
+  color: var(--shu-ink);
+}
+
+.settings.is-repository .setting.is-modified::before {
+  background: var(--shu-ink);
+}
+
+.setting-overridden {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.setting-overridden .codicon {
+  font-size: 12px;
+}
+
+.setting-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.setting-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.setting-description,
+.setting-hint {
+  margin: 4px 0 0;
+  max-width: 62ch;
+  line-height: 1.45;
+  color: var(--vscode-descriptionForeground);
+}
+
+.setting-description code,
+.setting-key {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 11.5px;
+}
+
+.setting-description code {
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--vscode-sideBar-background);
+}
+
+.setting-key {
+  margin: 6px 0 0;
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.7;
+}
+
+.setting-control {
+  margin-top: 8px;
+}
+
+.setting-input {
+  display: block;
+  width: min(100%, 420px);
+  padding: 5px 8px;
+  border: 1px solid var(--vscode-input-border);
+  border-radius: var(--shell-radius);
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font: inherit;
+  outline: none;
+}
+
+textarea.setting-input {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.setting-select {
+  width: auto;
+  min-width: 160px;
+}
+
+.setting-input:focus {
+  border-color: var(--vscode-focusBorder);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--vscode-focusBorder) 18%, transparent);
+}
+
+.setting-input.has-problem {
+  border-color: var(--vscode-inputValidation-errorBorder);
+}
+
+.setting-problem {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--vscode-errorForeground);
+}
+
+/* Keyboard shortcuts: one table per menu, the keys in a column that lines up. */
+.shortcuts {
+  display: grid;
+  gap: 14px;
+  max-width: 560px;
+}
+
+.shortcut-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.shortcut-table caption {
+  padding-bottom: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+  color: var(--vscode-descriptionForeground);
+}
+
+.shortcut th,
+.shortcut td {
+  padding: 3px 0;
+  vertical-align: middle;
+  border-top: 1px solid color-mix(in srgb, var(--vscode-widget-border) 45%, transparent);
+}
+
+.shortcut-title {
+  font-weight: normal;
+  text-align: left;
+}
+
+.shortcut-keys {
+  width: 180px;
+}
+
+.shortcut-tools {
+  width: 56px;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.shortcut-tools .icon-button {
+  width: 24px;
+  height: 24px;
+  opacity: 0;
+  transition: opacity var(--shell-fast);
+}
+
+.shortcut:hover .shortcut-tools .icon-button,
+.shortcut-tools .icon-button:focus-visible {
+  opacity: 1;
+}
+
+.shortcut-key {
+  min-width: 112px;
+  padding: 2px 8px;
+  border: 1px dashed transparent;
+  border-radius: var(--shell-radius);
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--shell-fast),
+    border-color var(--shell-fast);
+}
+
+.shortcut-key kbd {
+  font-size: 11.5px;
+  color: var(--vscode-foreground);
+}
+
+.shortcut-key.is-empty {
+  font-style: italic;
+}
+
+.shortcut-key:hover {
+  border-color: var(--vscode-widget-border);
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.shortcut-key:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+/* Recording takes the keyboard, so it looks like a field waiting for input. */
+.shortcut-key.is-recording {
+  border-style: solid;
+  border-color: var(--vscode-focusBorder);
+  background: var(--vscode-input-background);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--vscode-focusBorder) 18%, transparent);
+  color: var(--vscode-foreground);
+  outline: none;
+}
+
+.shortcut.has-clash .shortcut-key kbd {
+  border-color: var(--vscode-inputValidation-errorBorder);
+}
+
+.shortcut-clash {
+  margin-top: 2px;
+}
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+}
+
+.switch-track {
+  position: relative;
+  width: 30px;
+  height: 17px;
+  border-radius: 999px;
+  background: var(--vscode-widget-border);
+  transition: background var(--shell-fast);
+}
+
+.switch-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--vscode-editorWidget-background);
+  box-shadow: 0 1px 2px var(--vscode-widget-shadow);
+  transition: transform 160ms var(--shell-ease);
+}
+
+.switch input:checked + .switch-track {
+  background: var(--vscode-focusBorder);
+}
+
+.switch input:checked + .switch-track::after {
+  transform: translateX(13px);
+}
+
+.switch input:focus-visible + .switch-track {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
+
+.switch-label {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--vscode-textLink-foreground);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+.button-quiet.is-on {
+  border-color: var(--vscode-focusBorder);
+  color: var(--vscode-foreground);
+}
+
+.settings-footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 24px;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}

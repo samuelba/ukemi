@@ -1,6 +1,7 @@
 import type { Dirent } from 'node:fs'
-import { readdir, stat } from 'node:fs/promises'
+import { readdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+import { isDirectory, pathExists } from '../util/fs'
 
 export type RepoKind = 'jj' | 'git'
 
@@ -27,28 +28,11 @@ export const DEFAULT_EXCLUDES = [
   '__pycache__',
 ]
 
-async function isDirectory(path: string): Promise<boolean> {
-  try {
-    return (await stat(path)).isDirectory()
-  } catch {
-    return false
-  }
-}
-
-async function exists(path: string): Promise<boolean> {
-  try {
-    await stat(path)
-    return true
-  } catch {
-    return false
-  }
-}
-
 async function repoKindAt(dir: string): Promise<RepoKind | null> {
   if (await isDirectory(join(dir, '.jj'))) {
     return 'jj'
   }
-  if (await exists(join(dir, '.git'))) {
+  if (await pathExists(join(dir, '.git'))) {
     return 'git'
   }
   return null
@@ -89,7 +73,7 @@ export async function discoverRepos(
   if (enclosing) {
     return [{ root: enclosing, kind: 'jj' }]
   }
-  if (await exists(join(folder, '.git'))) {
+  if (await pathExists(join(folder, '.git'))) {
     return [{ root: folder, kind: 'git' }]
   }
 

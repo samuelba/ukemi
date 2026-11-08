@@ -1,0 +1,54 @@
+/* The standalone window: a titlebar over sidebar | graph | details. */
+
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  user-select: none;
+}
+
+:root {
+  --shell-titlebar: 40px;
+  --shell-statusbar: 24px;
+  --shell-radius: 6px;
+  --shell-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --shell-fast: 120ms;
+}
+
+/* Chromium's overlay scrollbars only show while scrolling. Styled ones stay visible wherever a
+   pane overflows. A rule that sets scrollbar-width, like the tab strips, still wins. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--vscode-scrollbarSlider-background) padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--vscode-scrollbarSlider-hoverBackground) padding-box;
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: var(--vscode-scrollbarSlider-activeBackground) padding-box;
+}
+
+.shell {
+  display: grid;
+  /* The hidden panel slot leaves the grid, so the status bar takes the last row either way. */
+  grid-template-rows: var(--shell-titlebar) 1fr var(--shell-statusbar);
+  grid-template-columns: minmax(0, 1fr);
+  height: 100%;
+}

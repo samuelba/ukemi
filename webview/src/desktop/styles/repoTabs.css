@@ -1,0 +1,164 @@
+/* Repository tabs ---------------------------------------------------------------------------- */
+
+.repo-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  margin-left: 14px;
+  padding-left: 10px;
+  border-left: 1px solid var(--vscode-widget-border);
+}
+
+.repo-tabs-list {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.repo-tab,
+.pane-tab {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 4px 0 10px;
+  border-radius: var(--shell-radius);
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition:
+    background var(--shell-fast),
+    color var(--shell-fast);
+}
+
+.repo-tab:hover,
+.pane-tab:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-foreground);
+}
+
+.repo-tab.is-active {
+  background: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+  box-shadow:
+    0 0 0 1px var(--vscode-widget-border),
+    0 1px 2px var(--vscode-widget-shadow);
+}
+
+.repo-tab.is-active::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--shu-ink);
+}
+
+.repo-tab-label,
+.pane-tab-label {
+  max-width: 180px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* A pinned tab keeps its pin in sight, and a gap sets the pinned tabs apart from the others. */
+.repo-tab .repo-tab-pin {
+  opacity: 0.7;
+}
+
+.repo-tab.is-last-pinned {
+  margin-right: 9px;
+}
+
+.repo-tab.is-last-pinned::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: -6px;
+  bottom: 6px;
+  width: 1px;
+  background: var(--vscode-widget-border);
+}
+
+.repo-tab-input {
+  width: auto;
+  min-width: 0;
+  max-width: 180px;
+  height: 20px;
+  padding: 0 4px;
+  border: 1px solid var(--vscode-focusBorder);
+  border-radius: 4px;
+  outline: none;
+  background: var(--vscode-input-background, var(--vscode-editor-background));
+  color: var(--vscode-foreground);
+  font: inherit;
+  user-select: text;
+}
+
+/* Where a dragged tab lands: a bar in the gap before or after the tab under the pointer. */
+.repo-tab.drop-before::after,
+.repo-tab.drop-after::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--vscode-focusBorder);
+}
+
+.repo-tab.drop-before::after {
+  left: -2px;
+}
+
+.repo-tab.drop-after::after {
+  right: -2px;
+}
+
+.repo-tab-count {
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--ukemi-here-bg);
+  color: var(--ukemi-here-fg);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.repo-tab-close {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.repo-tab:hover .repo-tab-close,
+.repo-tab.is-active .repo-tab-close,
+.pane-tab:hover .repo-tab-close,
+.pane-tab.is-active .repo-tab-close {
+  opacity: 0.7;
+}
+
+.repo-tab-close:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  opacity: 1;
+}
+
+.repo-tab-close .codicon {
+  font-size: 12px;
+}

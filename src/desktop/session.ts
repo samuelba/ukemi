@@ -1,8 +1,7 @@
 import { homedir } from 'node:os'
 import { basename } from 'node:path'
-import { BrowserWindow, Menu, clipboard, dialog, shell } from 'electron'
+import { Menu, clipboard, dialog, shell, type BrowserWindow } from 'electron'
 import type {
-  ChangeDetail,
   LogLine,
   SidePanelRow,
   DesktopRendererMessage,
@@ -11,8 +10,7 @@ import type {
 } from '../../shared/desktopProtocol'
 import { isDesktopMessage } from '../../shared/desktopProtocol'
 import type { MenuEntry } from '../../shared/menus'
-import type { CommitView, WebviewMessage } from '../../shared/protocol'
-import { isRepositoryKey } from '../../shared/settingsScope'
+import type { WebviewMessage } from '../../shared/protocol'
 import { answerPrompt } from '../app/askpassPrompts'
 import { AutoFetcher } from '../app/autoFetch'
 import { ChangeSelection } from '../app/changeSelection'
@@ -23,18 +21,17 @@ import { operationCommands } from '../app/commands/operationCommands'
 import { fileHistoryCommands } from '../app/commands/fileHistoryCommands'
 import { fileCommands } from '../app/commands/fileCommands'
 import { globalCommands } from '../app/commands/globalCommands'
-import { refCommands } from '../app/commands/refCommands'
+import { bookmarkCommands } from '../app/commands/bookmarkCommands'
+import { requestCommands } from '../app/commands/requestCommands'
 import { workspaceCommands } from '../app/commands/workspaceCommands'
 import { Emitter, disposeAll, type Disposable } from '../app/events'
 import { ForgeService } from '../app/forgeService'
 import type { FolderSource, Host, WindowState } from '../app/host'
 import { createMessageHandler } from '../app/messages'
 import { Operations } from '../app/operations'
-import type { PanelChannel, PanelHandler } from '../app/panel'
 import { RepoRegistry } from '../app/registry'
 import { watchRepositorySettings } from '../app/settingsEffects'
 import { sidePanels } from '../app/sidePanels'
-import { evolutionVersionNodes } from '../repo/evolutionItems'
 import { buildViewState } from '../app/viewState'
 import { AskpassServer } from '../askpass/server'
 import { JjRunner } from '../jj/runner'
@@ -53,13 +50,14 @@ import {
   webviewMenu,
 } from './menus'
 import { aboutText } from './about'
-import { isValidSettingValue, runsProgram, settingFields } from './settingsSchema'
+import { DetailPresenter } from './detailPresenter'
+import { PanelTabs } from './panelTabs'
+import { createSessionWindow } from './sessionWindow'
+import { SettingsPresenter } from './settingsPresenter'
 import { foldersAfterClosing, windowShowing, type WindowContents } from './startup'
-import { SAVE_DELAY_MS } from './windowBounds'
-import { watchRenderer } from './rendererRecovery'
 import { Terminals } from './terminals'
 import { zoomPercent } from './zoom'
-import { desktopWorkbench, type PanelEntry } from './workbench'
+import { desktopWorkbench } from './workbench'
 import { cliSuggesters, DescriptionSuggestions } from '../app/describeSuggest/service'
 
 const COMMAND_ID = /^ukemi\.[\w.]+$/
@@ -83,11 +81,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-interface Tab {
-  receive: (message: unknown) => void
-  closed: () => void
-}
-
 // One window of the app: its folders, its repositories and every service behind its graph.
 export class DesktopSession implements Disposable {
   readonly window: BrowserWindow
@@ -107,25 +100,17 @@ export class DesktopSession implements Disposable {
   private readonly env: CommandEnv
   private readonly handlers: Record<string, Handler>
   private readonly handleWebview: (message: WebviewMessage) => Promise<void>
-  private readonly tabs = new Map<string, Tab>()
-  private nextTab = 1
-  // Tab ids by the key their opener gave, for tabs that open once.
-  private readonly tabKeys = new Map<string, string>()
+  private readonly panelTabs: PanelTabs
+  private readonly detail: DetailPresenter
+  private readonly settingsForm: SettingsPresenter
   private readonly disposables: Disposable[] = []
   private isReady = false
   // The page crashed and loaded again, so its terminals need tabs again once it is ready.
   private needsReattach = false
-  // The repository the settings form last showed.
-  private settingsRoot: string | null = null
   private isClosed = false
   // Native dialogs need a mapped parent. On Wayland, a dialog on a hidden window kills the app.
-  private shown!: Promise<void>
+  private readonly shown: Promise<void>
   private stateTimer: ReturnType<typeof setTimeout> | null = null
-  private detail: { repoId: string; commitId: string; changeId: string } | null = null
-  private detailGeneration = 0
-  // What the renderer shows, so a refresh that changes nothing does not redraw the panel.
-  private postedDetail: string | null = null
-  private postedChangeId: string | null = null
 
   constructor(
     private readonly context: DesktopContext,
@@ -135,6 +120,7 @@ export class DesktopSession implements Disposable {
     const logger = context.logger
     this.ui = new RendererUi((message) => this.post(message), this.nativeUi())
     this.terminals = new Terminals((message) => this.post(message), logger)
+    this.panelTabs = new PanelTabs((message) => this.post(message), logger)
     this.runner = new JjRunner(context.jj.path ?? 'jj', logger)
     this.runner.onWarning((warning) => void this.ui.warn(`jj: ${warning.text}`))
     this.askpass = new AskpassServer(
@@ -153,6 +139,22 @@ export class DesktopSession implements Disposable {
       untrustedMessage: UNTRUSTED_MESSAGE,
     })
     this.autoFetch = new AutoFetcher(this.registry, this.forge, this.operations, logger, host)
+    this.detail = new DetailPresenter({
+      activeModel: () => this.registry.activeModel,
+      changeIdLength: () => context.settings.read().changeIdLength,
+      post: (detail) => this.post({ type: 'desktop.detail', detail }),
+      withActions: (row) => this.withActions(row),
+      logger,
+    })
+    this.settingsForm = new SettingsPresenter({
+      settings: context.settings,
+      repos: () => this.registry.summaries(),
+      activeRoot: () => this.registry.activeModel?.root ?? null,
+      post: (message) => this.post(message),
+      confirm: async (text, detail, action) =>
+        (await this.nativeUi().ask('warning', text, detail, [action])) === action,
+      logger,
+    })
     this.env = this.commandEnv(host)
     this.handlers = this.commandHandlers()
     this.handleWebview = createMessageHandler(this.env, (command, arg) => this.run(command, arg))
@@ -172,10 +174,7 @@ export class DesktopSession implements Disposable {
         if (root) {
           void context.recentRepos.remember(root)
         }
-        // The form's "This repository" mode follows the active repository.
-        if (this.settingsRoot !== (this.registry.activeModel?.root ?? null)) {
-          this.postSettings()
-        }
+        this.settingsForm.followActiveRepo()
       }),
       this.registry.onDidChangeModel(() => this.scheduleState()),
       this.operations.onDidChange(() => this.scheduleState()),
@@ -183,12 +182,20 @@ export class DesktopSession implements Disposable {
       context.repoTabs.onDidChange(() => this.scheduleState()),
       context.settings.onDidChange(() => {
         this.scheduleState()
-        this.postSettings()
+        this.settingsForm.post()
         this.post({ type: 'desktop.fonts', fonts: context.fonts() })
       }),
       watchRepositorySettings(context.settings, this.registry),
     )
-    this.window = this.createWindow()
+    const created = createSessionWindow(context, {
+      title: this.title(),
+      onFocus: () => this.focusEmitter.fire(),
+      onClosed: () => context.closeSession(this),
+      beforeReload: () => this.pageReloading(),
+      isClosed: () => this.isClosed,
+    })
+    this.window = created.window
+    this.shown = created.shown
     void this.start(logger)
   }
 
@@ -251,7 +258,7 @@ export class DesktopSession implements Disposable {
       }
       await this.handleWebview(message)
       if (message.type === 'selectCommit') {
-        await this.showDetail(message.commitId)
+        await this.detail.show(message.commitId)
       }
     } catch (error: unknown) {
       this.context.logger.error(`window message ${raw.type} failed: ${errorMessage(error)}`)
@@ -311,7 +318,7 @@ export class DesktopSession implements Disposable {
 
   // Shows the settings form, or its keyboard shortcuts.
   showSettings(action: 'settings' | 'keyboardShortcuts' = 'settings'): void {
-    this.postSettings()
+    this.settingsForm.post()
     this.shell(action)
   }
 
@@ -319,7 +326,7 @@ export class DesktopSession implements Disposable {
     if (this.registry.activeModel?.root !== root) {
       await this.registry.setActive(root)
     }
-    this.postSettings()
+    this.settingsForm.post()
     this.shell('repositorySettings')
   }
 
@@ -351,10 +358,7 @@ export class DesktopSession implements Disposable {
       clearTimeout(this.stateTimer)
     }
     this.ui.cancelAll()
-    for (const tab of this.tabs.values()) {
-      tab.closed()
-    }
-    this.tabs.clear()
+    this.panelTabs.closeAll()
     disposeAll(this.disposables)
     this.folderEmitter.dispose()
     this.focusEmitter.dispose()
@@ -398,7 +402,7 @@ export class DesktopSession implements Disposable {
         {
           post: (message) => this.post(message),
           openPanelWindow: (entry, title, connect, key) =>
-            this.openPanelTab(entry, title, connect, key),
+            this.panelTabs.open(entry, title, connect, key),
           openWindow: (root) => void this.addFolder(root),
           addFolder: (root) => void this.addFolder(root),
           hasFolders: () => false,
@@ -423,90 +427,13 @@ export class DesktopSession implements Disposable {
     }
   }
 
-  private createWindow(): BrowserWindow {
-    const saved = this.context.windowBounds()
-    const window = new BrowserWindow({
-      width: saved.width,
-      height: saved.height,
-      ...(saved.x !== undefined && saved.y !== undefined ? { x: saved.x, y: saved.y } : {}),
-      minWidth: 720,
-      minHeight: 480,
-      title: this.title(),
-      show: false,
-      backgroundColor: this.context.backgroundColor(),
-      ...(process.platform === 'darwin' ? {} : { icon: this.context.paths.icon }),
-      webPreferences: {
-        preload: this.context.paths.preload,
-        contextIsolation: true,
-        sandbox: true,
-        nodeIntegration: false,
-        spellcheck: true,
-      },
-    })
-    this.shown = new Promise((resolve) => {
-      window.once('show', () => resolve())
-      window.once('closed', () => resolve())
-    })
-    window.once('ready-to-show', () => {
-      if (saved.isMaximized) {
-        window.maximize()
-      }
-      window.show()
-    })
-    window.webContents.on('did-finish-load', () =>
-      window.webContents.setZoomFactor(this.context.zoomFactor()),
-    )
-    window.on('focus', () => this.focusEmitter.fire())
-    this.rememberPlacement(window)
-    window.on('closed', () => this.context.closeSession(this))
-    this.context.guardNavigation(window)
-    watchRenderer(window, this.context.logger, {
-      beforeReload: () => this.pageReloading(),
-      isClosed: () => this.isClosed,
-    })
-    void window.loadURL(this.context.pageUrl('desktop'))
-    return window
-  }
-
-  // Resizing fires many events, so the place is written once the window stays still, and on close.
-  // The normal bounds are kept while maximized, so restoring goes back to them.
-  private rememberPlacement(window: BrowserWindow): void {
-    let timer: ReturnType<typeof setTimeout> | null = null
-    const save = () => {
-      if (timer) {
-        clearTimeout(timer)
-        timer = null
-      }
-      if (window.isDestroyed() || window.isMinimized() || window.isFullScreen()) {
-        return
-      }
-      const bounds = window.getNormalBounds()
-      this.context.saveWindowBounds({ ...bounds, isMaximized: window.isMaximized() })
-    }
-    const later = () => {
-      if (timer) {
-        clearTimeout(timer)
-      }
-      timer = setTimeout(save, SAVE_DELAY_MS)
-    }
-    window.on('resize', later)
-    window.on('move', later)
-    window.on('maximize', later)
-    window.on('unmaximize', later)
-    window.on('close', save)
-  }
-
   // The crashed page took its prompts and Split or Clean up tabs with it. Their state lived there,
   // so they close. The graph and the details are sent again when the new page is ready.
   private pageReloading(): void {
     this.isReady = false
     this.needsReattach = true
     this.ui.cancelAll()
-    for (const tab of this.tabs.values()) {
-      tab.closed()
-    }
-    this.tabs.clear()
-    this.tabKeys.clear()
+    this.panelTabs.closeAll()
   }
 
   private title(): string {
@@ -590,7 +517,8 @@ export class DesktopSession implements Disposable {
       ...globalCommands(env),
       ...commitCommands(env),
       ...fileCommands(env),
-      ...refCommands(env),
+      ...bookmarkCommands(env),
+      ...requestCommands(env),
       ...workspaceCommands(env),
       ...evolutionCommands(env),
       ...operationCommands(env),
@@ -675,21 +603,16 @@ export class DesktopSession implements Disposable {
         }
         return
       case 'desktop.panel':
-        this.tabs.get(String(message.panelId))?.receive(message.message)
+        this.panelTabs.receive(String(message.panelId), message.message)
         return
-      case 'desktop.tabClosed': {
-        const id = String(message.id)
-        const tab = this.tabs.get(id)
-        this.tabs.delete(id)
-        tab?.closed()
-        this.post({ type: 'desktop.tabClose', id })
+      case 'desktop.tabClosed':
+        this.panelTabs.closedInWindow(String(message.id))
         return
-      }
       case 'desktop.loadSettings':
-        this.postSettings()
+        this.settingsForm.post()
         return
       case 'desktop.setSetting':
-        await this.setSetting(message.key, message.value, message.repoId)
+        await this.settingsForm.set(message.key, message.value, message.repoId)
         return
       case 'desktop.openSettingsFile':
         this.context.openSettingsFile()
@@ -787,8 +710,7 @@ export class DesktopSession implements Disposable {
   }
 
   private sendInitial(): void {
-    this.postedDetail = null
-    this.postedChangeId = null
+    this.detail.forgetPosted()
     const offers = (command: string) => this.offers(command)
     this.post({ type: 'fileIcons', theme: null })
     this.post({ type: 'desktop.window', title: this.title(), platform: process.platform })
@@ -840,57 +762,7 @@ export class DesktopSession implements Disposable {
         operations: panels.operations.map((row) => this.withActions(row)),
       },
     })
-    void this.refreshDetail()
-  }
-
-  private async showDetail(commitId: string): Promise<void> {
-    const model = this.registry.activeModel
-    const commit = model?.findCommit(commitId)
-    this.detail =
-      model && commit ? { repoId: model.root, commitId, changeId: commit.changeId } : null
-    await this.refreshDetail()
-  }
-
-  // Follows the selected change through rewrites, by its change id.
-  private async refreshDetail(): Promise<void> {
-    const generation = ++this.detailGeneration
-    const model = this.registry.activeModel
-    const selected = this.detail
-    const commit =
-      model && selected?.repoId === model.root
-        ? model.commitFor(selected.commitId, selected.changeId)
-        : null
-    if (!model || !selected || !commit) {
-      this.postDetail(null)
-      return
-    }
-    this.detail = { ...selected, commitId: commit.commitId }
-    try {
-      const files = commit.isWorkingCopy
-        ? (model.graph?.workingCopyFiles ?? [])
-        : await model.filesFor(commit.commitId)
-      const detail: ChangeDetail = { repoId: model.root, commit, files, evolution: null }
-      // Another change shows "Loading…" at once; the same one is posted once, with its evolution, so the rows never blank out.
-      if (generation === this.detailGeneration && this.postedChangeId !== commit.changeId) {
-        this.postDetail(detail)
-      }
-      const evolution = await this.evolution(commit)
-      if (generation === this.detailGeneration) {
-        this.postDetail({ ...detail, evolution })
-      }
-    } catch (error: unknown) {
-      this.context.logger.warn(`loading the change details failed: ${errorMessage(error)}`)
-    }
-  }
-
-  private postDetail(detail: ChangeDetail | null): void {
-    const serialized = JSON.stringify(detail)
-    if (serialized === this.postedDetail) {
-      return
-    }
-    this.postedDetail = serialized
-    this.postedChangeId = detail?.commit.changeId ?? null
-    this.post({ type: 'desktop.detail', detail })
+    void this.detail.refresh()
   }
 
   private async askTrust(): Promise<void> {
@@ -914,164 +786,13 @@ export class DesktopSession implements Disposable {
     this.trustEmitter.fire()
   }
 
-  // Opens Split or Clean up as a tab next to the change details. Its messages travel wrapped,
-  // so several tabs and the graph share the window's channel.
-  private openPanelTab<H, W>(
-    entry: PanelEntry,
-    title: string,
-    connect: (channel: PanelChannel<H>) => PanelHandler<W>,
-    key?: string,
-  ): void {
-    const known = key ? this.tabKeys.get(key) : undefined
-    if (known && this.tabs.has(known)) {
-      this.post({ type: 'desktop.tabOpen', tab: { id: known, kind: entry, title } })
-      return
-    }
-    const id = `${entry}-${this.nextTab++}`
-    if (key) {
-      this.tabKeys.set(key, id)
-    }
-    let closed = false
-    const channel: PanelChannel<H> = {
-      post: async (message) => {
-        if (!closed) {
-          this.post({ type: 'desktop.panel', panelId: id, message })
-        }
-      },
-      close: () => {
-        if (!closed) {
-          closed = true
-          this.tabs.delete(id)
-          this.post({ type: 'desktop.tabClose', id })
-        }
-      },
-      get isClosed() {
-        return closed
-      },
-    }
-    const handler = connect(channel)
-    this.tabs.set(id, {
-      receive: (message) => {
-        if (isMessage(message)) {
-          void handler(message as W).catch((error: unknown) =>
-            this.context.logger.error(`${entry} message failed: ${errorMessage(error)}`),
-          )
-        }
-      },
-      closed: () => {
-        closed = true
-      },
-    })
-    this.post({ type: 'desktop.tabOpen', tab: { id, kind: entry, title } })
-  }
-
   private withActions(row: SidePanelRow): SidePanelRow {
     return { ...row, inline: treeItemActions(row.view, row.contextValue, (c) => this.offers(c)) }
-  }
-
-  private async setSetting(key: unknown, value: unknown, repoId: unknown): Promise<void> {
-    const field = settingFields({}).find((f) => f.key === key)
-    if (typeof key !== 'string' || !field) {
-      return
-    }
-    if (!isValidSettingValue(field, value)) {
-      this.context.logger.warn(`ignored an invalid value for the setting ${key}`)
-      this.postSettings()
-      return
-    }
-    if (runsProgram(key) && !(await this.confirmProgram(key, value))) {
-      this.postSettings()
-      return
-    }
-    if (repoId === undefined) {
-      await this.context.settings.update(key, value)
-      return
-    }
-    // Only open repositories, so the renderer cannot write overrides for arbitrary paths.
-    const isOpen = this.registry.summaries().some((summary) => summary.id === repoId)
-    if (typeof repoId === 'string' && isOpen && isRepositoryKey(key)) {
-      await this.context.settings.update(key, value, { root: repoId })
-    }
   }
 
   // A message in this window with buttons, like the editor's notifications.
   notify(text: string, ...actions: string[]): Promise<string | undefined> {
     return this.ui.info(text, ...actions)
-  }
-
-  // Asked in a native dialog, which the page cannot answer itself.
-  private async confirmProgram(key: string, value: unknown): Promise<boolean> {
-    if (typeof value !== 'string' || value.trim() === '') {
-      return true
-    }
-    const use = 'Use It'
-    const answer = await this.nativeUi().ask(
-      'warning',
-      `Run jj from ${value}?`,
-      `Ukemi runs this program for every jj command. The setting is ${key}.`,
-      [use],
-    )
-    return answer === use
-  }
-
-  private postSettings(): void {
-    const settings = this.context.settings
-    const overrides = settings.overrides()
-    const labels = new Map(this.registry.summaries().map((s) => [s.id, s.label]))
-    const overriddenIn = (key: string) =>
-      [...overrides]
-        .filter(([, values]) => key in values)
-        .map(([root]) => labels.get(root) ?? basename(root))
-    const root = this.registry.activeModel?.root ?? null
-    this.settingsRoot = root
-    this.post({
-      type: 'desktop.settings',
-      fields: settingFields(settings.values(), overriddenIn),
-      path: settings.path,
-      repository: root
-        ? {
-            id: root,
-            label: labels.get(root) ?? basename(root),
-            values: { ...settings.values(root) },
-          }
-        : null,
-    })
-  }
-
-  private async evolution(commit: CommitView): Promise<SidePanelRow[]> {
-    const model = this.registry.activeModel
-    if (!model) {
-      return []
-    }
-    try {
-      const entries = await model.evolutionFor(commit.commitId)
-      const config = this.context.settings.read()
-      return evolutionVersionNodes(
-        entries,
-        {
-          repoId: model.root,
-          commitId: commit.commitId,
-          changeId: commit.changeId,
-          isImmutable: commit.isImmutable,
-        },
-        { now: Date.now(), changeIdLength: config.changeIdLength },
-      ).map((node) =>
-        this.withActions({
-          id: node.id,
-          label: node.label,
-          description: node.description,
-          tooltip: node.tooltip,
-          icon: node.versionCommitId === commit.commitId ? 'circle-filled' : 'circle-outline',
-          contextValue: node.contextValue,
-          view: 'ukemi.evolution',
-          arg: node,
-          ...(node.previousCommitId ? { defaultCommand: 'ukemi.evolution.open' } : {}),
-        }),
-      )
-    } catch (error: unknown) {
-      this.context.logger.warn(`loading the evolution failed: ${errorMessage(error)}`)
-      return []
-    }
   }
 
   private post(message: ShellInbound): void {

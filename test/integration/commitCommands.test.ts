@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { commitCommands } from '../../src/app/commands/commitCommands'
-import { bookmarkPointsElsewhere } from '../../src/app/commands/refCommands'
+import { bookmarkPointsElsewhere } from '../../src/app/commands/requestCommands'
 import type { CommandEnv } from '../../src/app/commands/context'
 import { Operations } from '../../src/app/operations'
 import { RepoModel } from '../../src/repo/repoModel'

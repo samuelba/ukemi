@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
-import { JjRepo } from '../../src/jj/repo'
+import { initNewRepo } from '../../src/jj/newRepo'
 import { makeRepo, makeRunner, makeTempDir, writeFile, type Fixture } from '../helpers/jjFixture'
 
 let fixture: Fixture
@@ -36,7 +36,7 @@ describe('initNew', () => {
     const dest = join(fixture.dir, 'dest')
     mkdirSync(dest)
 
-    const result = await JjRepo.initNew(makeRunner(), dest, {
+    const result = await initNewRepo(makeRunner(), dest, {
       branch: 'main',
       remoteName: 'upstream',
       remoteUrl: remote,
@@ -55,7 +55,7 @@ describe('initNew', () => {
     const dest = join(fixture.dir, 'dest')
     mkdirSync(dest)
 
-    const result = await JjRepo.initNew(makeRunner(), dest, {
+    const result = await initNewRepo(makeRunner(), dest, {
       branch: 'main',
       remoteName: 'upstream',
       remoteUrl: remote,
@@ -72,7 +72,7 @@ describe('initNew', () => {
     const dest = join(fixture.dir, 'dest')
     mkdirSync(dest)
 
-    const result = await JjRepo.initNew(makeRunner(), dest, {
+    const result = await initNewRepo(makeRunner(), dest, {
       branch: 'main',
       remoteName: 'origin',
     })
@@ -91,7 +91,7 @@ describe('initNew', () => {
     mkdirSync(dest)
     writeFile(dest, 'local.txt', 'local\n')
 
-    const result = await JjRepo.initNew(makeRunner(), dest, {
+    const result = await initNewRepo(makeRunner(), dest, {
       branch: 'main',
       remoteName: 'upstream',
       remoteUrl: remote,
@@ -113,7 +113,7 @@ describe('initNew', () => {
     mkdirSync(dest)
 
     await expect(
-      JjRepo.initNew(makeRunner(), dest, {
+      initNewRepo(makeRunner(), dest, {
         branch: 'missing',
         remoteName: 'upstream',
         remoteUrl: remote,

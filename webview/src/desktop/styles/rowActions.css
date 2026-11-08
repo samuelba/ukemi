@@ -1,0 +1,39 @@
+/* Row hover buttons ------------------------------------------------------------------------ */
+
+.row-actions {
+  display: flex;
+  flex: none;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity var(--shell-fast);
+}
+
+.side-row:hover .row-actions,
+.side-row:focus-within .row-actions,
+.evolution-row:hover .row-actions,
+.evolution-row:focus-within .row-actions {
+  opacity: 1;
+}
+
+.row-actions .icon-button {
+  width: 22px;
+  height: 22px;
+}
+
+.row-actions .codicon {
+  font-size: 14px;
+}
+
+/* In the sidebar the buttons float over the end of the row, as in VS Code, so the name keeps
+   its room. The fade lets the text run under them. */
+.side-row {
+  position: relative;
+}
+
+.side-row .row-actions {
+  position: absolute;
+  top: 1px;
+  right: 4px;
+  padding-left: 14px;
+  background: linear-gradient(to right, transparent, var(--vscode-sideBar-background) 14px);
+}
