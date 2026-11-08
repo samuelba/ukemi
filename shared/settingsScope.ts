@@ -9,6 +9,7 @@ export const REPOSITORY_KEYS: ReadonlySet<string> = new Set([
   'autoFetch.interval',
   'workspaces.snapshotOnRefresh',
   'forge.ciOnlyMine',
+  'forge.trunkCi',
   'forge.requestLimit',
   'forge.nativeStacks',
   'forge.statusInterval',

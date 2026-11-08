@@ -94,7 +94,7 @@ describe('settingFields', () => {
       isRepositoryScoped: false,
       overriddenIn: [],
     })
-    expect(scoped.filter((f) => f.isRepositoryScoped)).toHaveLength(13)
+    expect(scoped.filter((f) => f.isRepositoryScoped)).toHaveLength(14)
   })
 
   test('marks unset values as undefined', () => {

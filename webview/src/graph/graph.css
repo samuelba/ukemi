@@ -758,6 +758,10 @@
   font-weight: 600;
 }
 
+.request-popover-title.static {
+  cursor: default;
+}
+
 .request-check .codicon,
 .request-check .svg-icon {
   flex: none;

@@ -1,4 +1,4 @@
-import type { ForgeState, RequestBadge } from '../../shared/protocol'
+import type { CommitCi, ForgeState, RequestBadge } from '../../shared/protocol'
 import type { CredentialRequest } from '../askpass/prompt'
 import { detectForge, forgeKindForHost, type ForgeTarget } from '../forge/detect'
 import { cliAvailable, type CliBinary } from '../forge/cli'
@@ -89,6 +89,10 @@ function branchNames(model: RepoModel): string[] {
   ]
 }
 
+function trunkCommitId(model: RepoModel): string | undefined {
+  return model.graph?.commits.find((commit) => commit.isTrunk)?.commitId
+}
+
 function requestsOf(model: RepoModel): RequestBadge[] {
   return model.graph?.commits.flatMap((commit) => commit.requests) ?? []
 }
@@ -165,6 +169,9 @@ export class ForgeService implements Disposable {
         const model = this.registry.activeModel
         if (model && change.affects('forge.statusInterval', model.root)) {
           this.schedule(model)
+        }
+        if (model && change.affects('forge.trunkCi', model.root)) {
+          void this.refreshRequests(model, { force: true })
         }
       }),
     )
@@ -484,17 +491,17 @@ export class ForgeService implements Disposable {
       return
     }
     const branches = branchNames(model)
+    const limit = this.host.settings.read(model.root).requestLimit
     const started = Date.now()
-    const requests = await this.fetchRequests(
-      target,
-      credential,
-      branches,
-      this.host.settings.read(model.root).requestLimit,
+    const listed = await this.withClient(target, credential, (client) =>
+      client.listRequests(branches, limit),
     )
+    const requests = listed.value
     this.logger.info(
       `${target.host}: ${requests.length} requests for ${branches.length} bookmarks via ${credential.kind} (${Date.now() - started} ms)`,
     )
-    model.setForge(state, requests)
+    const trunkCi = await this.fetchTrunkCi(model, target, listed.credential)
+    model.setForge(trunkCi ? { ...state, trunkCi } : state, requests)
   }
 
   private reportMissing(host: string): void {
@@ -505,26 +512,52 @@ export class ForgeService implements Disposable {
     this.logger.info(`no GitLab credentials for ${host}`)
   }
 
-  private async fetchRequests(
+  // Runs one forge call, again with a refreshed token when a GitLab OAuth login has expired.
+  // Returns the credential that worked, for the calls after it.
+  private async withClient<T>(
     target: ForgeTarget,
     credential: ForgeCredential,
-    branches: readonly string[],
-    limit: number,
-  ): Promise<RequestBadge[]> {
+    call: (client: ForgeClient) => Promise<T>,
+  ): Promise<{ value: T; credential: ForgeCredential }> {
     try {
-      return await makeClient(target, credential).listRequests(branches, limit)
+      return { value: await call(makeClient(target, credential)), credential }
     } catch (error: unknown) {
-      if (!(error instanceof ForgeError) || !error.isAuthError) {
+      if (!(error instanceof ForgeError) || !error.isAuthError || credential.kind !== 'oauth') {
         throw error
       }
-      if (credential.kind === 'oauth') {
-        const refreshed = await this.gitlabAuth.forceRefresh(target.host)
-        if (!refreshed) {
-          throw error
-        }
-        return makeClient(target, { token: refreshed, kind: 'oauth' }).listRequests(branches, limit)
+      const refreshed = await this.gitlabAuth.forceRefresh(target.host)
+      if (!refreshed) {
+        throw error
       }
-      throw error
+      const renewed: ForgeCredential = { token: refreshed, kind: 'oauth' }
+      return { value: await call(makeClient(target, renewed)), credential: renewed }
+    }
+  }
+
+  // A failed lookup only hides the trunk's CI. A used-up rate limit still fails the refresh, so
+  // that the refreshes pause.
+  private async fetchTrunkCi(
+    model: RepoModel,
+    target: ForgeTarget,
+    credential: ForgeCredential,
+  ): Promise<CommitCi | null> {
+    const trunkId = trunkCommitId(model)
+    if (!trunkId || !this.host.settings.read(model.root).trunkCi) {
+      return null
+    }
+    try {
+      const { value } = await this.withClient(
+        target,
+        credential,
+        async (client) => (await client.commitCi?.(trunkId)) ?? null,
+      )
+      return value
+    } catch (error: unknown) {
+      if (error instanceof ForgeError && error.isRateLimited) {
+        throw error
+      }
+      this.logger.warn(`loading the trunk CI failed: ${errorMessage(error)}`)
+      return null
     }
   }
 }

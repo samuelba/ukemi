@@ -2276,6 +2276,12 @@
           "default": true,
           "description": "Show CI status only on open merge and pull requests that you authored."
         },
+        "ukemi.forge.trunkCi": {
+          "scope": "resource",
+          "type": "boolean",
+          "default": false,
+          "description": "Show the CI status of the trunk commit in the graph. This costs one more forge lookup per status refresh, plus the job list on GitLab."
+        },
         "ukemi.forge.requestLimit": {
           "scope": "resource",
           "type": "integer",

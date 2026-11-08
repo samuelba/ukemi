@@ -1,9 +1,9 @@
 import type { DragEvent } from 'react'
-import type { CommitView, RequestBadge } from '../../../shared/protocol'
+import type { CiState, CommitCi, CommitView, RequestBadge } from '../../../shared/protocol'
 import { staleRequestsNote } from '../../../shared/forgeStale'
 import { stackLabel } from '../../../shared/stack'
 import { isDesktop, postMessage, vscodeContext } from '../shared/hostApi'
-import { RequestHover } from './RequestHover'
+import { RequestHover, TrunkCiHover } from './RequestHover'
 import { CiStatusIcon, REQUEST_LABEL } from './requestMeta'
 
 export const BOOKMARK_MIME = 'application/x-ukemi-bookmark'
@@ -144,17 +144,34 @@ export function Badges({ commit, repoId, hasForge, showGitTags }: BadgesProps) {
   )
 }
 
+interface RequestRowProps extends BadgesProps {
+  refreshError: string | undefined
+  // Set on the trunk row only, when the trunk's CI is shown.
+  trunkCi?: CommitCi
+  trunkName: string | null
+}
+
 export function RequestRow({
   commit,
   repoId,
   ciOnlyMine,
   refreshError,
-}: BadgesProps & { refreshError: string | undefined }) {
-  if (commit.requests.length === 0) {
+  trunkCi,
+  trunkName,
+}: RequestRowProps) {
+  const ownCi = trunkCi && commit.isTrunk && trunkCi.commitId === commit.commitId ? trunkCi : null
+  if (commit.requests.length === 0 && !ownCi) {
     return null
   }
   return (
     <div className="request-row">
+      {ownCi && (
+        <TrunkCiBadge
+          trunkCi={ownCi}
+          trunkName={trunkName ?? 'trunk'}
+          refreshError={refreshError}
+        />
+      )}
       {commit.requests.map((request) => (
         <RequestBadge
           key={`pr-${request.number}`}
@@ -166,6 +183,49 @@ export function RequestRow({
         />
       ))}
     </div>
+  )
+}
+
+const CI_LABEL: Record<CiState, string> = {
+  success: 'passed',
+  failure: 'failed',
+  pending: 'running',
+  manual: 'waiting',
+  skipped: 'skipped',
+  none: 'no CI',
+}
+
+function TrunkCiBadge({
+  trunkCi,
+  trunkName,
+  refreshError,
+}: {
+  trunkCi: CommitCi
+  trunkName: string
+  refreshError: string | undefined
+}) {
+  const url = trunkCi.pipelineUrl
+  return (
+    <TrunkCiHover trunkCi={trunkCi} trunkName={trunkName} refreshError={refreshError}>
+      <span className={`badge request trunk-ci${refreshError ? ' stale' : ''}`}>
+        <i className="codicon codicon-pulse" />
+        <span className="request-state">{CI_LABEL[trunkCi.ci]}</span>
+        <CiStatusIcon state={trunkCi.ci} />
+        {url && (
+          <button
+            type="button"
+            className="request-link"
+            title="Open the pipeline in the browser"
+            onClick={(event) => {
+              event.stopPropagation()
+              openExternal(url)
+            }}
+          >
+            <i className="codicon codicon-link-external" />
+          </button>
+        )}
+      </span>
+    </TrunkCiHover>
   )
 }
 
