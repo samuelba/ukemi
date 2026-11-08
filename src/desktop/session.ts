@@ -23,7 +23,8 @@ import { operationCommands } from '../app/commands/operationCommands'
 import { fileHistoryCommands } from '../app/commands/fileHistoryCommands'
 import { fileCommands } from '../app/commands/fileCommands'
 import { globalCommands } from '../app/commands/globalCommands'
-import { refCommands } from '../app/commands/refCommands'
+import { bookmarkCommands } from '../app/commands/bookmarkCommands'
+import { requestCommands } from '../app/commands/requestCommands'
 import { workspaceCommands } from '../app/commands/workspaceCommands'
 import { Emitter, disposeAll, type Disposable } from '../app/events'
 import { ForgeService } from '../app/forgeService'
@@ -590,7 +591,8 @@ export class DesktopSession implements Disposable {
       ...globalCommands(env),
       ...commitCommands(env),
       ...fileCommands(env),
-      ...refCommands(env),
+      ...bookmarkCommands(env),
+      ...requestCommands(env),
       ...workspaceCommands(env),
       ...evolutionCommands(env),
       ...operationCommands(env),

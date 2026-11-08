@@ -1,8 +1,9 @@
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import type { RequestBadge } from '../../shared/protocol'
-import type { CommandEnv } from '../../src/app/commands/context'
-import { refCommands } from '../../src/app/commands/refCommands'
+import type { CommandEnv, Handler } from '../../src/app/commands/context'
+import { bookmarkCommands } from '../../src/app/commands/bookmarkCommands'
+import { requestCommands } from '../../src/app/commands/requestCommands'
 import { Operations } from '../../src/app/operations'
 import type { MergeMethod } from '../../src/forge/types'
 import { RepoModel } from '../../src/repo/repoModel'
@@ -42,7 +43,7 @@ beforeEach(async () => {
 
 afterEach(() => fixture.cleanup())
 
-function commands(): ReturnType<typeof refCommands> {
+function commands(): Record<string, Handler> {
   const client = {
     kind: 'github',
     mergeRequest: async (number: number, _method: MergeMethod) => {
@@ -61,7 +62,7 @@ function commands(): ReturnType<typeof refCommands> {
       warn: async () => undefined,
     },
   } as unknown as CommandEnv
-  return refCommands(env)
+  return { ...bookmarkCommands(env), ...requestCommands(env) }
 }
 
 describe('ship request', () => {

@@ -11,7 +11,6 @@ import type { MergeMethod } from '../../forge/types'
 import {
   type ChangeRef,
   changeRevision,
-  bookmarkRevision,
   confirmedRevset,
   exactBookmark,
   quoteRevsetString,
@@ -19,13 +18,12 @@ import {
 } from '../../jj/revsets'
 import type { JjRepo } from '../../jj/repo'
 import type { RepoModel } from '../../repo/repoModel'
-import { isBookmarkTreeElement } from '../../repo/bookmarkItems'
 import { bodyAfterTitle, bookmarkSlug, firstLine, validateBookmarkName } from '../../util/text'
 import { describeSync, syncStacks } from '../stackSync'
 import { errorMessage } from '../../util/logger'
-import { editOrNew } from './commitCommands'
 import { showForgeMissing } from '../forgeMissing'
 import { confirm, pickLabel, type PickItem } from '../ui'
+import { bookmarkHandler, commitForBookmark, type BookmarkTarget } from './bookmarkCommands'
 import {
   contextCommit,
   contextModel,
@@ -35,62 +33,24 @@ import {
   type Handler,
 } from './context'
 
-interface BookmarkTarget {
-  model: RepoModel
-  name: string
-  remote: string | undefined
-  commitId: string | null
-}
+// Forge requests (pull and merge requests): create, ship, sync and clean up.
 
-function bookmarkTarget(env: CommandEnv, arg: unknown): BookmarkTarget | null {
-  if (isBookmarkTreeElement(arg)) {
-    const model = env.registry.modelFor(arg.repoId) ?? env.registry.activeModel
-    return model
-      ? { model, name: arg.name, remote: arg.remote ?? undefined, commitId: arg.commitId }
-      : null
-  }
-  const ctx = parseContext(arg)
-  const model = contextModel(env, ctx)
-  if (!model || !ctx.bookmark) {
-    return null
-  }
-  return {
-    model,
-    name: ctx.bookmark,
-    remote: ctx.remote,
-    commitId: ctx.commitId ?? null,
-  }
-}
+type CommandContext = ReturnType<typeof parseContext>
 
-function bookmarkHandler(
-  env: CommandEnv,
-  fn: (target: BookmarkTarget) => Promise<unknown>,
-): Handler {
-  return async (arg?: unknown) => {
-    const target = bookmarkTarget(env, arg)
-    if (target) {
-      await fn(target)
-    }
-  }
-}
-
-function requestFor(
-  model: RepoModel,
-  ctx: ReturnType<typeof parseContext>,
-): RequestBadge | undefined {
+function requestFor(model: RepoModel, ctx: CommandContext): RequestBadge | undefined {
   return model.graph?.commits.flatMap((c) => c.requests).find((r) => r.number === ctx.number)
 }
 
 function requestHandler(
   env: CommandEnv,
-  fn: (model: RepoModel, request: RequestBadge) => Promise<unknown>,
+  fn: (model: RepoModel, request: RequestBadge, ctx: CommandContext) => Promise<unknown>,
 ): Handler {
   return async (arg?: unknown) => {
     const ctx = parseContext(arg)
     const model = contextModel(env, ctx)
     const request = model ? requestFor(model, ctx) : undefined
     if (model && request) {
-      await fn(model, request)
+      await fn(model, request, ctx)
     }
   }
 }
@@ -452,24 +412,6 @@ async function cleanupRequest(
   })
 }
 
-async function newChangeFromBookmark(env: CommandEnv, target: BookmarkTarget): Promise<void> {
-  if (!target.commitId) {
-    return
-  }
-  const revision = bookmarkRevision(target.name, target.remote)
-  await env.operations.run('New working copy', target.model, () =>
-    target.model.repo.newChange([revision]),
-  )
-}
-
-async function commitForBookmark(target: BookmarkTarget): Promise<Commit | undefined> {
-  const commitId = target.commitId
-  if (!commitId) {
-    return undefined
-  }
-  return target.model.findCommit(commitId) ?? (await target.model.repo.log(commitId, 1))[0]
-}
-
 async function createRequestFromBookmark(env: CommandEnv, target: BookmarkTarget): Promise<void> {
   if (!target.commitId) {
     return
@@ -482,83 +424,11 @@ async function createRequestFromBookmark(env: CommandEnv, target: BookmarkTarget
   await createRequest(env, target.model, commit, false, target.name)
 }
 
-async function editBookmark(env: CommandEnv, target: BookmarkTarget): Promise<void> {
-  const commit = await commitForBookmark(target)
-  if (!commit) {
-    return
-  }
-  const visible = target.model.findCommit(commit.commitId)
-  if (visible) {
-    await editOrNew(env, target.model, visible)
-    return
-  }
-  const label = commit.isImmutable ? 'New change' : 'Edit'
-  const task = commit.isImmutable
-    ? () => target.model.repo.newChange([changeRevision(commit)])
-    : () => target.model.repo.edit(changeRevision(commit))
-  await env.operations.run(label, target.model, task)
-}
-
-async function renameBookmark(env: CommandEnv, target: BookmarkTarget): Promise<void> {
-  const next = await env.ui.input({
-    title: `Rename bookmark "${target.name}"`,
-    value: target.name,
-    validate: validateBookmarkName,
-  })
-  if (!next || next === target.name) {
-    return
-  }
-  await env.operations.run('Rename bookmark', target.model, () =>
-    target.model.repo.renameBookmark(target.name, next),
-  )
-}
-
-async function copyBookmarkName(env: CommandEnv, target: BookmarkTarget): Promise<void> {
-  const label = target.remote ? `${target.name}@${target.remote}` : target.name
-  await env.ui.copy(label)
-}
-
-export function refCommands(env: CommandEnv): Record<string, Handler> {
+export function requestCommands(env: CommandEnv): Record<string, Handler> {
   const op = (label: string, model: RepoModel, task: () => Promise<unknown>) =>
     env.operations.run(label, model, task)
 
-  const pushBookmark = bookmarkHandler(env, ({ model, name }) =>
-    op('Push', model, () => model.repo.push(name)),
-  )
-
   return {
-    'ukemi.bookmark.push': pushBookmark,
-    'ukemi.bookmark.pushDeleted': pushBookmark,
-    'ukemi.bookmark.delete': bookmarkHandler(env, async ({ model, name }) => {
-      if (
-        await confirm(
-          env.ui,
-          `Delete bookmark "${name}"?`,
-          'Delete',
-          'The remote branch is deleted on the next push.',
-        )
-      ) {
-        await op('Delete bookmark', model, () => model.repo.deleteBookmark(name))
-      }
-    }),
-    'ukemi.bookmark.forget': bookmarkHandler(env, ({ model, name }) =>
-      op('Forget bookmark', model, () => model.repo.forgetBookmark(name)),
-    ),
-    'ukemi.bookmark.track': bookmarkHandler(env, ({ model, name, remote }) =>
-      op('Track bookmark', model, () => model.repo.trackBookmark(name, remote ?? 'origin')),
-    ),
-    'ukemi.bookmark.trackOrigin': bookmarkHandler(env, ({ model, name }) =>
-      op('Track origin', model, () => model.repo.trackBookmark(name, 'origin')),
-    ),
-    'ukemi.bookmark.untrack': bookmarkHandler(env, ({ model, name, remote }) =>
-      op('Untrack bookmark', model, () => model.repo.untrackBookmark(name, remote ?? 'origin')),
-    ),
-    'ukemi.bookmark.rename': bookmarkHandler(env, (target) => renameBookmark(env, target)),
-    'ukemi.bookmark.newChange': bookmarkHandler(env, (target) =>
-      newChangeFromBookmark(env, target),
-    ),
-    'ukemi.bookmark.edit': bookmarkHandler(env, (target) => editBookmark(env, target)),
-    'ukemi.bookmark.copyName': bookmarkHandler(env, (target) => copyBookmarkName(env, target)),
     'ukemi.bookmark.createRequest': bookmarkHandler(env, (target) =>
       createRequestFromBookmark(env, target),
     ),
@@ -581,14 +451,9 @@ export function refCommands(env: CommandEnv): Record<string, Handler> {
     'ukemi.request.syncStack': requestHandler(env, (model, request) =>
       syncStackFor(env, model, request),
     ),
-    'ukemi.request.rebaseStack': async (arg?: unknown) => {
-      const ctx = parseContext(arg)
-      const model = contextModel(env, ctx)
-      const request = model ? requestFor(model, ctx) : undefined
-      if (model && request) {
-        await rebaseStack(env, model, request, ctx.commitId)
-      }
-    },
+    'ukemi.request.rebaseStack': requestHandler(env, (model, request, ctx) =>
+      rebaseStack(env, model, request, ctx.commitId),
+    ),
     'ukemi.request.merge': requestHandler(env, (model, request) =>
       mergeRequest(env, model, request),
     ),

@@ -9,7 +9,8 @@ import { operationCommands } from './app/commands/operationCommands'
 import { fileHistoryCommands } from './app/commands/fileHistoryCommands'
 import { fileCommands } from './app/commands/fileCommands'
 import { globalCommands } from './app/commands/globalCommands'
-import { refCommands } from './app/commands/refCommands'
+import { bookmarkCommands } from './app/commands/bookmarkCommands'
+import { requestCommands } from './app/commands/requestCommands'
 import { workspaceCommands } from './app/commands/workspaceCommands'
 import { ForgeService } from './app/forgeService'
 import { createMessageHandler } from './app/messages'
@@ -204,7 +205,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
     ...viewCommands(graphView),
     ...conflictCommands(env),
     ...conflictDecorator.commands(),
-    ...refCommands(env),
+    ...bookmarkCommands(env),
+    ...requestCommands(env),
     ...workspaceCommands(env),
     ...evolutionCommands(env),
     ...operationCommands(env),
