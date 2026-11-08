@@ -1,0 +1,87 @@
+/* About -------------------------------------------------------------------------------------- */
+
+.about {
+  width: min(520px, calc(100vw - 32px));
+}
+
+.about-header {
+  position: relative;
+  padding: 28px 24px 18px;
+  border-bottom: 1px solid var(--vscode-widget-border);
+  background:
+    radial-gradient(120% 140% at 100% 0%, var(--ukemi-here-bg), transparent 60%),
+    var(--vscode-editorWidget-background);
+}
+
+.about-wordmark {
+  display: inline-block;
+  margin: 0;
+  font-size: 30px;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  line-height: 1;
+}
+
+.about-wordmark::after {
+  content: '';
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: var(--shu-ink);
+  vertical-align: 4px;
+}
+
+.about-version {
+  margin-left: 12px;
+  padding: 1px 8px;
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 999px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 11.5px;
+  vertical-align: 6px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.about-description {
+  margin: 12px 0 0;
+  color: var(--vscode-descriptionForeground);
+}
+
+.about-facts {
+  margin: 0;
+  padding: 12px 24px 4px;
+}
+
+.about-fact {
+  display: grid;
+  grid-template-columns: 6.5em 1fr;
+  gap: 12px;
+  padding: 3px 0;
+}
+
+.about-fact dt {
+  color: var(--vscode-descriptionForeground);
+}
+
+.about-fact dd {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  user-select: text;
+}
+
+.about-links {
+  display: flex;
+  gap: 18px;
+  padding: 10px 24px 16px;
+}
+
+.about-footer {
+  align-items: center;
+  gap: 8px;
+}

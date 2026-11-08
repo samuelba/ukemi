@@ -1,0 +1,328 @@
+/* Diff -------------------------------------------------------------------------------------- */
+
+.diff-file + .diff-file {
+  border-top: 1px solid var(--vscode-widget-border);
+}
+
+.diff-file-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 14px;
+  border: none;
+  background: color-mix(in srgb, var(--vscode-editor-background) 92%, var(--vscode-foreground));
+  color: var(--vscode-foreground);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Sits close to its path, like in the file list. */
+.diff-file-header .file-icon {
+  margin-right: -4px;
+}
+
+.diff-path {
+  overflow: hidden;
+  flex: 1;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.diff-status {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--vscode-editor-background);
+  background: var(--vscode-gitDecoration-modifiedResourceForeground);
+}
+
+.diff-status-added {
+  background: var(--vscode-gitDecoration-addedResourceForeground);
+}
+
+.diff-status-removed {
+  background: var(--vscode-gitDecoration-deletedResourceForeground);
+}
+
+.diff-status-renamed,
+.diff-status-copied {
+  background: var(--vscode-gitDecoration-renamedResourceForeground);
+}
+
+.diff-counts {
+  display: flex;
+  gap: 6px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.diff-count-added {
+  color: var(--vscode-gitDecoration-addedResourceForeground);
+}
+
+.diff-count-removed {
+  color: var(--vscode-gitDecoration-deletedResourceForeground);
+}
+
+.diff-view {
+  flex: 1;
+  overflow: auto;
+}
+
+.diff-table {
+  width: 100%;
+  font-weight: var(--vscode-editor-font-weight, normal);
+  border-collapse: collapse;
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--vscode-editor-font-size);
+  line-height: 1.55;
+  tab-size: 4;
+}
+
+.diff-num {
+  width: 1%;
+  min-width: 3.2em;
+  padding: 0 8px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.7;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.diff-sign {
+  width: 1%;
+  padding: 0 4px;
+  color: var(--vscode-descriptionForeground);
+  user-select: none;
+}
+
+.diff-text {
+  padding-right: 16px;
+  white-space: pre;
+}
+
+/* The editor's syntax colors, from editor.css. */
+.diff-text .tok-keyword,
+.diff-text .tok-heading {
+  color: var(--syntax-keyword);
+}
+
+.diff-text .tok-heading {
+  font-weight: 600;
+}
+
+.diff-text .tok-string {
+  color: var(--syntax-string);
+}
+
+.diff-text .tok-comment {
+  color: var(--syntax-comment);
+  font-style: italic;
+}
+
+.diff-text .tok-number {
+  color: var(--syntax-number);
+}
+
+.diff-text .tok-function {
+  color: var(--syntax-function);
+}
+
+.diff-text .tok-type {
+  color: var(--syntax-type);
+}
+
+.diff-text .tok-property {
+  color: var(--syntax-property);
+}
+
+.diff-text .tok-link {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: underline;
+}
+
+.diff-text .tok-invalid {
+  color: var(--vscode-errorForeground);
+}
+
+.diff-added {
+  background: var(--vscode-diffEditor-insertedLineBackground);
+}
+
+.diff-removed {
+  background: var(--vscode-diffEditor-removedLineBackground);
+}
+
+.diff-added .diff-sign {
+  color: var(--vscode-gitDecoration-addedResourceForeground);
+}
+
+.diff-removed .diff-sign {
+  color: var(--vscode-gitDecoration-deletedResourceForeground);
+}
+
+.diff-added mark,
+.diff-removed mark {
+  border-radius: 2px;
+  color: inherit;
+}
+
+.diff-added mark {
+  background: color-mix(
+    in srgb,
+    var(--vscode-gitDecoration-addedResourceForeground) 30%,
+    transparent
+  );
+}
+
+.diff-removed mark {
+  background: color-mix(
+    in srgb,
+    var(--vscode-gitDecoration-deletedResourceForeground) 28%,
+    transparent
+  );
+}
+
+.diff-hunk td {
+  padding: 4px 14px;
+  background: color-mix(in srgb, var(--vscode-charts-blue) 8%, transparent);
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+}
+
+.diff-hunk td:has(> .diff-hunk-expand) {
+  padding: 0;
+}
+
+.diff-hunk-expand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 14px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.diff-hunk-expand:hover {
+  background: color-mix(in srgb, var(--vscode-charts-blue) 16%, transparent);
+  color: var(--vscode-foreground);
+}
+
+.diff-hunk-expand:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.diff-hunk-hidden {
+  opacity: 0.75;
+}
+
+.diff-note .diff-text {
+  color: var(--vscode-descriptionForeground);
+  white-space: pre-wrap;
+}
+
+.diff-placeholder {
+  margin: 0;
+  padding: 14px 22px;
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+}
+
+/* Side by side: two columns that wrap, since one table cannot scroll them apart. */
+.diff-split {
+  table-layout: fixed;
+}
+
+.diff-split .diff-col-num {
+  width: calc(3.2em + 16px);
+}
+
+.diff-split .diff-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.diff-split td:nth-child(3) {
+  border-left: 1px solid var(--vscode-widget-border);
+}
+
+.diff-empty {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0 6px,
+    color-mix(in srgb, var(--vscode-widget-border) 35%, transparent) 6px 7px
+  );
+}
+
+.diff-file-tools {
+  margin: 0;
+  padding: 6px 22px 0;
+}
+
+.diff-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 14px 22px;
+}
+
+.diff-image {
+  display: flex;
+  flex: 1 1 200px;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+}
+
+/* A checkerboard behind the image, so transparent pixels show as such. */
+.diff-image-frame {
+  display: grid;
+  place-items: center;
+  min-height: 64px;
+  padding: 8px;
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: var(--shell-radius);
+  background: repeating-conic-gradient(
+      color-mix(in srgb, var(--vscode-foreground) 10%, transparent) 0 25%,
+      transparent 0 50%
+    )
+    0 0 / 16px 16px;
+}
+
+.diff-image-frame img {
+  max-width: 100%;
+  max-height: 480px;
+  object-fit: contain;
+}
+
+.diff-image-frame img.is-scaled {
+  image-rendering: pixelated;
+}
+
+.diff-image figcaption {
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
