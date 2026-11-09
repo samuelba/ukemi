@@ -413,6 +413,12 @@ export class JjRepo {
     ])
   }
 
+  // Moves each hunk into the closest mutable ancestor that last changed those lines. jj leaves
+  // hunks it cannot place where they are, and says "Nothing changed." when it places none.
+  absorb(fromRevision: string, paths: readonly string[] = []) {
+    return this.mutate(['absorb', '--from', fromRevision, ...paths.map(rootFileset)])
+  }
+
   moveFiles(fromCommitId: string, intoCommitId: string, paths: readonly string[]) {
     return this.mutate([
       'squash',

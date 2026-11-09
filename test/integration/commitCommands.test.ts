@@ -12,6 +12,7 @@ let fixture: Fixture
 let root: string
 let model: RepoModel
 let warnings: string[]
+let infos: string[]
 
 beforeEach(() => {
   fixture = makeTempDir()
@@ -19,6 +20,7 @@ beforeEach(() => {
   initRepo(root)
   model = new RepoModel(makeRepo(root), NULL_LOGGER, { filter: 'mine' })
   warnings = []
+  infos = []
 })
 
 afterEach(() => fixture.cleanup())
@@ -31,6 +33,10 @@ function commands(picked?: string): ReturnType<typeof commitCommands> {
     ui: {
       warn: async (text: string) => {
         warnings.push(text)
+        return undefined
+      },
+      info: async (text: string) => {
+        infos.push(text)
         return undefined
       },
       pickOrType: () => ({ choice: Promise.resolve(picked) }),
@@ -128,5 +134,36 @@ describe('request bookmark', () => {
     jj(root, 'bookmark', 'set', 'feature', '-r', '@')
     writeFile(root, 'n.txt', 'edited after the refresh\n')
     expect(await bookmarkPointsElsewhere(model.repo, 'feature', commit)).toBe(false)
+  })
+})
+
+describe('absorb', () => {
+  test('moves the lines into the ancestor that last changed them', async () => {
+    writeFile(root, 'f.txt', 'one\ntwo\n')
+    jj(root, 'commit', '-m', 'base')
+    writeFile(root, 'f.txt', 'one\nTWO\n')
+    await model.refresh()
+    const workingCopy = model.graph?.commits.find((c) => c.isWorkingCopy)
+
+    await commands()['ukemi.commit.absorb']?.({ commitId: workingCopy?.commitId })
+
+    expect(warnings).toEqual([])
+    expect(infos).toEqual([])
+    expect(jj(root, 'file', 'show', '-r', 'description(exact:"base\n")', 'f.txt')).toBe(
+      'one\nTWO\n',
+    )
+    expect(jj(root, 'diff', '-r', '@', '--summary')).toBe('')
+  })
+
+  test('says so when no ancestor takes the lines', async () => {
+    writeFile(root, 'new.txt', 'only in the working copy\n')
+    await model.refresh()
+    const workingCopy = model.graph?.commits.find((c) => c.isWorkingCopy)
+
+    await commands()['ukemi.commit.absorb']?.({ commitId: workingCopy?.commitId })
+
+    expect(infos).toHaveLength(1)
+    expect(infos[0]).toContain('nothing to absorb')
+    expect(jj(root, 'diff', '-r', '@', '--summary')).toBe('A new.txt\n')
   })
 })

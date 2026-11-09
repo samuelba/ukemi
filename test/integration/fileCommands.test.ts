@@ -29,6 +29,7 @@ function commands(): ReturnType<typeof fileCommands> {
     ui: {
       ask: async (_level: string, _text: string, _options: unknown, action: string) => action,
       warn: async () => undefined,
+      info: async () => undefined,
     },
   } as unknown as CommandEnv
   return fileCommands(env)
@@ -47,5 +48,22 @@ describe('discard', () => {
 
     expect(existsSync(join(root, 'old.txt'))).toBe(true)
     expect(existsSync(join(root, 'new.txt'))).toBe(false)
+  })
+})
+
+describe('absorb', () => {
+  test('absorbs only the chosen file', async () => {
+    writeFile(root, 'a.txt', 'a\n')
+    writeFile(root, 'b.txt', 'b\n')
+    jj(root, 'commit', '-m', 'base')
+    writeFile(root, 'a.txt', 'A\n')
+    writeFile(root, 'b.txt', 'B\n')
+    await model.refresh()
+
+    await commands()['ukemi.file.absorb']?.({ path: 'a.txt' })
+
+    expect(jj(root, 'file', 'show', '-r', '@-', 'a.txt')).toBe('A\n')
+    expect(jj(root, 'file', 'show', '-r', '@-', 'b.txt')).toBe('b\n')
+    expect(jj(root, 'diff', '-r', '@', '--summary')).toBe('M b.txt\n')
   })
 })
