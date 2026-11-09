@@ -625,6 +625,16 @@
         "category": "Ukemi"
       },
       {
+        "command": "ukemi.file.makeExecutable",
+        "title": "Make Executable",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.file.makeNonExecutable",
+        "title": "Make Non-Executable",
+        "category": "Ukemi"
+      },
+      {
         "command": "ukemi.file.discard",
         "title": "Discard Changes",
         "category": "Ukemi",
@@ -1218,6 +1228,16 @@
         {
           "command": "ukemi.file.absorb",
           "group": "2_split@3",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.file' && !isImmutable && !isRemoved"
+        },
+        {
+          "command": "ukemi.file.makeExecutable",
+          "group": "4_mode@1",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.file' && !isImmutable && !isRemoved"
+        },
+        {
+          "command": "ukemi.file.makeNonExecutable",
+          "group": "4_mode@2",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.file' && !isImmutable && !isRemoved"
         },
         {
@@ -1850,6 +1870,14 @@
         },
         {
           "command": "ukemi.file.absorb",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.file.makeExecutable",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.file.makeNonExecutable",
           "when": "false"
         },
         {
