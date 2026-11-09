@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { DesktopRendererMessage, FontSpec } from '../../../shared/desktopProtocol'
-import { postMessage } from '../shared/hostApi'
+import { desktopPathForFile, postMessage } from '../shared/hostApi'
 
 // What the whole window does with keys, the mouse wheel and the editor font.
 
@@ -74,4 +74,66 @@ export function useWheelZoom(): void {
     window.addEventListener('wheel', onWheel, { passive: false })
     return () => window.removeEventListener('wheel', onWheel)
   }, [])
+}
+
+// Only drags from outside the app carry files. The app's own drags (changes, files of a change,
+// bookmarks, tabs) use their own types, so they never reach this.
+function isOutsideFileDrag(event: DragEvent): boolean {
+  return event.dataTransfer?.types.includes('Files') === true
+}
+
+// Folders and files dragged onto the window from the desktop open as repository tabs. Returns
+// whether such a drag is over the window. An inner element that takes the drop itself (the
+// editor) calls preventDefault first, and then the window leaves it alone.
+export function useFolderDrop(): boolean {
+  const [isOver, setIsOver] = useState(false)
+  useEffect(() => {
+    // Enter and leave fire for every element crossed, so count them.
+    let depth = 0
+    const onEnter = (event: DragEvent) => {
+      if (isOutsideFileDrag(event)) {
+        depth += 1
+        setIsOver(true)
+      }
+    }
+    const onLeave = (event: DragEvent) => {
+      if (isOutsideFileDrag(event)) {
+        depth = Math.max(0, depth - 1)
+        setIsOver(depth > 0)
+      }
+    }
+    const onOver = (event: DragEvent) => {
+      if (!isOutsideFileDrag(event) || event.defaultPrevented || !event.dataTransfer) {
+        return
+      }
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'copy'
+    }
+    const onDrop = (event: DragEvent) => {
+      if (!isOutsideFileDrag(event)) {
+        return
+      }
+      depth = 0
+      setIsOver(false)
+      if (event.defaultPrevented || !event.dataTransfer) {
+        return
+      }
+      event.preventDefault()
+      const paths = [...event.dataTransfer.files].map(desktopPathForFile).filter(Boolean)
+      if (paths.length > 0) {
+        postMessage<DesktopRendererMessage>({ type: 'desktop.openPaths', paths })
+      }
+    }
+    window.addEventListener('dragenter', onEnter)
+    window.addEventListener('dragleave', onLeave)
+    window.addEventListener('dragover', onOver)
+    window.addEventListener('drop', onDrop)
+    return () => {
+      window.removeEventListener('dragenter', onEnter)
+      window.removeEventListener('dragleave', onLeave)
+      window.removeEventListener('dragover', onOver)
+      window.removeEventListener('drop', onDrop)
+    }
+  }, [])
+  return isOver
 }
