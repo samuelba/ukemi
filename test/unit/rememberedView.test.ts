@@ -34,6 +34,22 @@ describe('remembered view', () => {
     expect(readView(store, '/a', { filter: 'recent', depth: 'all' })).toBeNull()
   })
 
+  test('forgets the view once the default revset changes in the settings', async () => {
+    const store = memoryStore()
+    const withRevset: GraphView = { ...DEFAULTS, revset: 'mine()' }
+    await rememberView(store, '/a', { filter: 'stack', depth: '7d' }, withRevset)
+    expect(readView(store, '/a', withRevset)).toEqual({ filter: 'stack', depth: '7d' })
+    expect(readView(store, '/a', { ...DEFAULTS, revset: '::trunk()' })).toBeNull()
+    expect(readView(store, '/a', DEFAULTS)).toBeNull()
+  })
+
+  test('keeps a view stored before default revsets existed while none is set', () => {
+    const store = memoryStore({
+      'ukemi.view:/a': { filter: 'mine', depth: '7d', defaults: DEFAULTS },
+    })
+    expect(readView(store, '/a', DEFAULTS)).toEqual({ filter: 'mine', depth: '7d' })
+  })
+
   test('ignores a stored view it does not understand', () => {
     const store = memoryStore({
       'ukemi.view:/a': { filter: 'everything', depth: '30d', defaults: DEFAULTS },

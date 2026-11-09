@@ -36,12 +36,33 @@ function parseList(text: string): string[] {
     .filter(Boolean)
 }
 
+// The descriptions show maps as settings.json writes them, so pasted JSON reads too.
+function parseJsonMap(text: string): Record<string, string> | string {
+  const problem =
+    'Write a JSON object of strings, like { "name": "value" }, or one "name = value" per line.'
+  let value: unknown
+  try {
+    value = JSON.parse(text)
+  } catch {
+    return problem
+  }
+  const isStringMap =
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.values(value).every((item) => typeof item === 'string')
+  return isStringMap ? (value as Record<string, string>) : problem
+}
+
 function parseMap(text: string): Record<string, string> | string {
+  if (text.trim().startsWith('{')) {
+    return parseJsonMap(text)
+  }
   const entries: Array<[string, string]> = []
   for (const line of parseList(text)) {
     const at = line.indexOf('=')
     if (at <= 0) {
-      return `Write each line as "host = value": ${line}`
+      return `Write each line as "name = value": ${line}`
     }
     entries.push([line.slice(0, at).trim(), line.slice(at + 1).trim()])
   }

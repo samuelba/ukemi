@@ -6,6 +6,7 @@ import type {
   Commit,
   GraphFilter,
   HistoryDepth,
+  SavedRevset,
   Workspace,
 } from './model'
 
@@ -82,6 +83,8 @@ export interface GraphState {
   depth: HistoryDepth
   // A revset the user typed. It replaces the filter while set.
   revset: string | null
+  // With the jj log filter: the `revsets.log` it shows, or absent when jj could not tell.
+  logRevset?: string
   // The revset matches more commits than the graph loaded. Scrolling to the end loads more.
   isTruncated: boolean
   hasRemotes: boolean
@@ -119,6 +122,8 @@ export interface ViewSettings {
   previewDrops: boolean
   changedFilesView: ChangedFilesView
   ciOnlyMine: boolean
+  // The revsets the filter menu lists by name, from the `savedRevsets` setting.
+  savedRevsets: SavedRevset[]
 }
 
 export interface AutoFetchState {
@@ -167,6 +172,9 @@ export type WebviewMessage =
   | { type: 'setFilter'; filter: GraphFilter }
   | { type: 'setDepth'; depth: HistoryDepth }
   | { type: 'setRevset'; revset: string }
+  // Asks for a name and adds the revset to the `savedRevsets` setting.
+  | { type: 'saveRevset'; revset: string }
+  | { type: 'editSavedRevsets' }
   | { type: 'loadMore' }
   | { type: 'listRevsets' }
   | { type: 'loadFiles'; commitId: string }

@@ -481,6 +481,101 @@ test('filters the graph by a typed revset and reports a bad one', async () => {
   }
 })
 
+test('the jj log filter shows the revsets.log of the repository config', async () => {
+  const repo = fixtureRepo()
+  execFileSync('jj', ['config', 'set', '--repo', 'revsets.log', 'description(substring:"cart")'], {
+    cwd: repo,
+  })
+  const { app, page } = await launch(repo)
+  try {
+    const filter = page.getByRole('combobox', { name: 'Filter' })
+    await filter.selectOption('jjLog')
+    await expect(filter).toHaveAttribute('title', 'jj log: description(substring:"cart")')
+    await expect(
+      page.locator('.commit .summary', { hasText: 'docs: explain the setup' }),
+    ).toHaveCount(0)
+    await expect(
+      page.locator('.commit .summary', { hasText: 'feat: add the cart total' }),
+    ).toBeVisible()
+  } finally {
+    await app.close()
+  }
+})
+
+test('the jj log filter falls back to recent changes, in the time range, without a revsets.log', async () => {
+  const repo = fixtureRepo()
+  execFileSync('jj', ['config', 'set', '--repo', 'revsets.log', ''], { cwd: repo })
+  const { app, page } = await launch(repo)
+  try {
+    const filter = page.getByRole('combobox', { name: 'Filter' })
+    await filter.selectOption('jjLog')
+    await expect(filter).toHaveAttribute('title', /recent changes/)
+    await expect(page.getByRole('combobox', { name: 'History depth' })).toBeEnabled()
+    await expect(
+      page.locator('.commit .summary', { hasText: 'docs: explain the setup' }),
+    ).toBeVisible()
+  } finally {
+    await app.close()
+  }
+})
+
+test('picks a saved revset from the filter menu and saves a typed one by name', async () => {
+  const docs = 'description(substring:"docs")'
+  const cart = 'description(substring:"cart")'
+  const { app, page, userData } = await launch(fixtureRepo(), { savedRevsets: { Docs: docs } })
+  try {
+    const filter = page.getByRole('combobox', { name: 'Filter' })
+    await filter.selectOption({ label: 'Docs' })
+    await expect(
+      page.locator('.commit .summary', { hasText: 'feat: add the cart total' }),
+    ).toHaveCount(0)
+    await expect(
+      page.locator('.commit .summary', { hasText: 'docs: explain the setup' }),
+    ).toBeVisible()
+    await expect(page.getByLabel('Saved as Docs')).toBeVisible()
+
+    const input = page.getByRole('textbox', { name: 'Revset' })
+    await input.fill(cart)
+    await input.press('Enter')
+    await expect(filter).toHaveValue('custom')
+    await page.getByRole('button', { name: 'Save revset' }).click()
+    const name = page.getByRole('dialog', { name: 'Save Revset' }).locator('.prompt-input')
+    await name.fill('Cart')
+    await name.press('Enter')
+
+    await expect
+      .poll(() => JSON.parse(readFileSync(join(userData, 'settings.json'), 'utf8')).savedRevsets)
+      .toEqual({ Docs: docs, Cart: cart })
+    await expect(filter).toHaveValue('saved:1')
+    await expect(page.getByLabel('Saved as Cart')).toBeVisible()
+  } finally {
+    await app.close()
+  }
+})
+
+test('a saved revset jj cannot read opens the revset bar with its error', async () => {
+  const { app, page } = await launch(fixtureRepo(), { savedRevsets: { Broken: 'nosuch(' } })
+  try {
+    const filter = page.getByRole('combobox', { name: 'Filter' })
+    await filter.selectOption({ label: 'Broken' })
+    await expect(page.getByRole('textbox', { name: 'Revset' })).toHaveValue('nosuch(')
+    await expect(page.locator('.revset-error')).toContainText('parse')
+    await expect(filter).toHaveValue('recent')
+    await expect(
+      page.locator('.commit .summary', { hasText: 'docs: explain the setup' }),
+    ).toBeVisible()
+
+    const input = page.getByRole('textbox', { name: 'Revset' })
+    await input.fill('description(substring:"cart")')
+    await input.press('Enter')
+    await expect(filter).toHaveValue('custom')
+    await expect(input).toHaveValue('description(substring:"cart")')
+    await expect(page.getByRole('button', { name: 'Save revset' })).toBeVisible()
+  } finally {
+    await app.close()
+  }
+})
+
 test('search dims the changes that do not match and steps through matches', async () => {
   const { app, page } = await launch(fixtureRepo())
   try {

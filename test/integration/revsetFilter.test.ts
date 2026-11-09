@@ -115,3 +115,141 @@ describe('custom revset', () => {
     expect(model.graph?.filter).toBe('stack')
   })
 })
+
+describe('jj log filter', () => {
+  test('shows revsets.log from the repository config, with the working copy', async () => {
+    jj(root, 'config', 'set', '--repo', 'revsets.log', 'description(substring:"first")')
+
+    await model.setView('jjLog', '7d')
+
+    expect(model.graph?.filter).toBe('jjLog')
+    expect(model.graph?.logRevset).toBe('description(substring:"first")')
+    expect(descriptions()).toEqual(['third', 'first'])
+  })
+
+  test('reads the config again on each refresh', async () => {
+    jj(root, 'config', 'set', '--repo', 'revsets.log', 'description(substring:"first")')
+    await model.setView('jjLog', '7d')
+    jj(root, 'config', 'set', '--repo', 'revsets.log', 'description(substring:"second")')
+
+    await model.refresh()
+
+    expect(descriptions()).toEqual(['third', 'second'])
+  })
+
+  test('shows the recent changes when revsets.log is empty', async () => {
+    jj(root, 'config', 'set', '--repo', 'revsets.log', '')
+
+    await model.setView('jjLog', '7d')
+
+    expect(model.graph?.logRevset).toBeUndefined()
+    expect(descriptions()).toEqual(['third', 'second', 'first'])
+  })
+})
+
+describe('saved revsets', () => {
+  interface SaveEnv {
+    input?: string
+    replace?: boolean
+    failUpdate?: boolean
+    repoValue?: unknown
+    globalValue?: unknown
+  }
+
+  function saveHandler(options: SaveEnv) {
+    const calls = {
+      inputs: [] as unknown[],
+      asks: [] as string[],
+      updates: [] as unknown[][],
+      opened: [] as (string | undefined)[],
+      errors: [] as string[],
+    }
+    const env = {
+      registry: { activeModel: model },
+      ui: {
+        input: async (input: unknown) => {
+          calls.inputs.push(input)
+          return options.input
+        },
+        ask: async (_kind: string, message: string, _detail: unknown, action: string) => {
+          calls.asks.push(message)
+          return options.replace ? action : undefined
+        },
+        error: async (text: string) => {
+          calls.errors.push(text)
+          return undefined
+        },
+      },
+      settings: {
+        inspect: () => ({ globalValue: options.globalValue, repoValue: options.repoValue }),
+        update: async (...args: unknown[]) => {
+          if (options.failUpdate) {
+            throw new Error('settings.json is read-only')
+          }
+          calls.updates.push(args)
+        },
+      },
+      workbench: { openSettings: (key?: string) => calls.opened.push(key) },
+      operations: new Operations(NULL_LOGGER),
+      graphView: { post: (message: HostMessage) => posted.push(message) },
+      logger: NULL_LOGGER,
+    } as unknown as CommandEnv
+    return { handle: createMessageHandler(env, async () => {}), calls }
+  }
+
+  test('saves the revset under the name the user gives, next to the saved ones', async () => {
+    const { handle, calls } = saveHandler({ input: ' First ', globalValue: { Mine: 'mine()' } })
+
+    await handle({ type: 'saveRevset', revset: ' description(substring:"first") ' })
+
+    expect(calls.inputs).toEqual([
+      expect.objectContaining({ value: 'description(substring:"first")' }),
+    ])
+    expect(calls.updates).toEqual([
+      ['savedRevsets', { Mine: 'mine()', First: 'description(substring:"first")' }, 'default'],
+    ])
+  })
+
+  test('saves into the repository list when the repository has its own', async () => {
+    const { handle, calls } = saveHandler({ input: 'All', repoValue: {}, globalValue: { A: 'a' } })
+
+    await handle({ type: 'saveRevset', revset: 'all()' })
+
+    expect(calls.updates).toEqual([['savedRevsets', { All: 'all()' }, { root }]])
+  })
+
+  test('asks before it replaces a saved revset of the same name', async () => {
+    const declined = saveHandler({ input: 'Mine', globalValue: { Mine: 'mine()' } })
+    await declined.handle({ type: 'saveRevset', revset: 'all()' })
+    expect(declined.calls.asks).toHaveLength(1)
+    expect(declined.calls.updates).toEqual([])
+
+    const accepted = saveHandler({ input: 'Mine', replace: true, globalValue: { Mine: 'mine()' } })
+    await accepted.handle({ type: 'saveRevset', revset: 'all()' })
+    expect(accepted.calls.updates).toEqual([['savedRevsets', { Mine: 'all()' }, 'default']])
+  })
+
+  test('says so when the setting cannot be written', async () => {
+    const { handle, calls } = saveHandler({ input: 'All', failUpdate: true })
+
+    await handle({ type: 'saveRevset', revset: 'all()' })
+
+    expect(calls.errors).toEqual([expect.stringContaining('settings.json is read-only')])
+  })
+
+  test('saves nothing when the user cancels', async () => {
+    const { handle, calls } = saveHandler({ input: undefined })
+
+    await handle({ type: 'saveRevset', revset: 'all()' })
+
+    expect(calls.updates).toEqual([])
+  })
+
+  test('opens the setting to edit the saved revsets', async () => {
+    const { handle, calls } = saveHandler({})
+
+    await handle({ type: 'editSavedRevsets' })
+
+    expect(calls.opened).toEqual(['ukemi.savedRevsets'])
+  })
+})

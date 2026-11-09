@@ -4,6 +4,8 @@ export const REPOSITORY_KEYS: ReadonlySet<string> = new Set([
   'showGitTags',
   'showLineStats',
   'defaultFilter',
+  'savedRevsets',
+  'defaultRevset',
   'historyDepth',
   'autoFetch.enabled',
   'autoFetch.interval',

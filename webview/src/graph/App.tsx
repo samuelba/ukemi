@@ -78,6 +78,10 @@ export function App() {
   const [suggesters, setSuggesters] = useState<SuggesterView[]>([])
   const [suggestionReply, setSuggestionReply] = useState<SuggestionReply | null>(null)
   const [isEditingRevset, setIsEditingRevset] = useState(false)
+  // A saved revset picked in the filter menu that waits for the host's check. If jj cannot read
+  // it, the revset bar opens with it and the error, as for a typed one.
+  const pendingSaved = useRef<string | null>(null)
+  const [revsetDraft, setRevsetDraft] = useState<string | null>(null)
   const [revsetHistory, setRevsetHistory] = useState<string[]>([])
   const [revsetReply, setRevsetReply] = useState<RevsetReply | null>(null)
   const replyCount = useRef(0)
@@ -123,6 +127,13 @@ export function App() {
         case 'revsetResult':
           replyCount.current += 1
           setRevsetReply({ id: replyCount.current, revset: message.revset, error: message.error })
+          if (pendingSaved.current === message.revset) {
+            pendingSaved.current = null
+            if (message.error !== null) {
+              setRevsetDraft(message.revset)
+              setIsEditingRevset(true)
+            }
+          }
           return
         case 'describe': {
           const commit = state?.graph?.commits.find((c) => c.commitId === message.commitId)
@@ -300,12 +311,24 @@ export function App() {
     setSelection(null)
   }, [repoId])
 
-  const closeRevset = useCallback(() => setIsEditingRevset(false), [])
+  const closeRevset = useCallback(() => {
+    setIsEditingRevset(false)
+    setRevsetDraft(null)
+  }, [])
+
+  const pickSaved = useCallback((revset: string) => {
+    pendingSaved.current = revset
+    setRevsetDraft(null)
+    postMessage({ type: 'setRevset', revset })
+  }, [])
 
   // Once a revset shows, the bar stays for it. Picking a filter later then closes the bar.
   const shownRevset = graph?.revset ?? null
+  // A rejected saved revset seeds the bar only until a revset shows.
+  const draftText = shownRevset === null ? revsetDraft : null
   useEffect(() => {
     if (shownRevset !== null) {
+      setRevsetDraft(null)
       setIsEditingRevset(false)
     }
   }, [shownRevset])
@@ -446,15 +469,19 @@ export function App() {
           autoFetch={state.autoFetch}
           showGitTags={state.settings.showGitTags}
           isSearching={isSearching}
+          savedRevsets={state.settings.savedRevsets}
           onCustomRevset={() => setIsEditingRevset(true)}
+          onPickSaved={pickSaved}
           onSearch={() => (isSearching ? closeSearch() : openSearch())}
         >
           {graph && (graph.revset !== null || isEditingRevset) && (
             <RevsetBar
-              key={`${graph.repoId}\n${graph.revset ?? ''}`}
+              key={`${graph.repoId}\n${graph.revset ?? ''}\n${draftText ?? ''}`}
               graph={graph}
               history={revsetHistory}
+              savedRevsets={state.settings.savedRevsets}
               reply={revsetReply}
+              {...(draftText !== null ? { initialText: draftText } : {})}
               onClose={closeRevset}
             />
           )}

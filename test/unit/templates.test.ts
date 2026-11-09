@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'vitest'
 import { jjString, jsonObject, jsonArray } from '../../src/jj/templates'
-import { quoteRevsetString, rootFileset, graphRevset } from '../../src/jj/revsets'
+import {
+  customGraphRevset,
+  quoteRevsetString,
+  rootFileset,
+  graphRevset,
+} from '../../src/jj/revsets'
 
 describe('jjString', () => {
   test('wraps plain text in double quotes', () => {
@@ -72,6 +77,17 @@ describe('graphRevset', () => {
 
   test('uses the reachable stack of @ for the stack filter', () => {
     expect(graphRevset('stack', '7d')).toContain('reachable(@, mutable())')
+  })
+
+  test('shows the jj log revset with @ and trunk kept in view, whatever the depth', () => {
+    const revset = graphRevset('jjLog', '7d', 'mine()')
+    expect(revset).toBe(customGraphRevset('mine()'))
+    expect(revset).toBe(graphRevset('jjLog', 'all', 'mine()'))
+  })
+
+  test('falls back to recent changes when the jj log revset is unknown', () => {
+    expect(graphRevset('jjLog', '30d', null)).toBe(graphRevset('recent', '30d'))
+    expect(graphRevset('jjLog', '30d')).toBe(graphRevset('recent', '30d'))
   })
 
   test('shows @ and five first-parent ancestors for the working copy filter', () => {

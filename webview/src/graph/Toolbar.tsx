@@ -1,20 +1,9 @@
 import type { ReactNode } from 'react'
-import { DEPTHLESS_FILTERS, type GraphFilter, type HistoryDepth } from '../../../shared/model'
+import { DEPTHLESS_FILTERS, type HistoryDepth, type SavedRevset } from '../../../shared/model'
 import type { AutoFetchState, GraphState, RepoSummary } from '../../../shared/protocol'
 import { settingsCommandHref } from '../../../shared/settingsLink'
 import { isDesktop, postMessage } from '../shared/hostApi'
-
-const FILTERS: ReadonlyArray<{ id: GraphFilter; label: string; hint: string }> = [
-  { id: 'recent', label: 'Recent', hint: 'Mutable changes, bookmarks and tags' },
-  { id: 'mine', label: 'Mine', hint: 'All your open changes' },
-  {
-    id: 'myHistory',
-    label: 'My history',
-    hint: 'Your open changes, and your history in the time range',
-  },
-  { id: 'stack', label: 'Stack', hint: 'Changes connected to the working copy' },
-  { id: 'working', label: 'Working copy', hint: 'The working copy and its last 5 parents' },
-]
+import { FilterSelect } from './FilterSelect'
 
 const DEPTHS: ReadonlyArray<{ id: HistoryDepth; label: string }> = [
   { id: '7d', label: '7 days' },
@@ -32,13 +21,13 @@ interface ToolbarProps {
   autoFetch: AutoFetchState
   showGitTags: boolean
   isSearching: boolean
+  savedRevsets: readonly SavedRevset[]
   onCustomRevset: () => void
+  onPickSaved: (revset: string) => void
   onSearch: () => void
   // Bars that stay under the toolbar while the graph scrolls.
   children?: ReactNode
 }
-
-const CUSTOM = 'custom'
 
 function everyLabel(interval: string): string {
   const text = interval.trim()
@@ -170,13 +159,18 @@ export function Toolbar({
   autoFetch,
   showGitTags,
   isSearching,
+  savedRevsets,
   onCustomRevset,
+  onPickSaved,
   onSearch,
   children,
 }: ToolbarProps) {
   const repoId = graph?.repoId
   const hasRevset = graph !== null && graph.revset !== null
-  const ignoresDepth = graph !== null && (hasRevset || DEPTHLESS_FILTERS.includes(graph.filter))
+  // Without a revsets.log, the jj log filter shows the recent changes, in the time range.
+  const showsFallback = graph !== null && graph.filter === 'jjLog' && graph.logRevset === undefined
+  const ignoresDepth =
+    graph !== null && !showsFallback && (hasRevset || DEPTHLESS_FILTERS.includes(graph.filter))
   const singleLabel = repos.length === 1 ? (repos[0]?.label ?? '') : ''
   // The standalone app shows repositories as tabs and has its own settings.
   const showRepoRow = !isDesktop && (repos.length > 1 || singleLabel !== '')
@@ -291,32 +285,12 @@ export function Toolbar({
       </div>
       {graph && (
         <div className="toolbar-row filters">
-          <select
-            className="compact-select"
-            value={hasRevset ? CUSTOM : graph.filter}
-            title={
-              hasRevset
-                ? (graph.revset ?? undefined)
-                : FILTERS.find((f) => f.id === graph.filter)?.hint
-            }
-            aria-label="Filter"
-            onChange={(e) => {
-              if (e.target.value === CUSTOM) {
-                onCustomRevset()
-                return
-              }
-              postMessage({ type: 'setFilter', filter: e.target.value as GraphFilter })
-            }}
-          >
-            {FILTERS.map((f) => (
-              <option key={f.id} value={f.id} title={f.hint}>
-                {f.label}
-              </option>
-            ))}
-            <option value={CUSTOM} title="Show the changes of a revset you type">
-              Revset…
-            </option>
-          </select>
+          <FilterSelect
+            graph={graph}
+            savedRevsets={savedRevsets}
+            onCustomRevset={onCustomRevset}
+            onPickSaved={onPickSaved}
+          />
           <select
             className="compact-select"
             value={graph.depth}

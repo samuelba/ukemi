@@ -654,6 +654,14 @@ export class JjRepo {
     return this.mutate(['file', 'chmod', mode, '-r', revision, ...paths.map(rootFileset)])
   }
 
+  // The revset `jj log` shows by default, from the user's and the repository's jj config. Recent
+  // jj answers `builtin_log()`, an alias jj itself resolves. Null when the key is empty.
+  async logRevset(): Promise<string | null> {
+    const { stdout } = await this.read(['config', 'get', 'revsets.log'])
+    const revset = stdout.trim()
+    return revset === '' ? null : revset
+  }
+
   // jj only warns, on stderr, when no key matches, so empty output means no tools.
   async hasFixTools(): Promise<boolean> {
     const { stdout } = await this.read(['config', 'list', 'fix.tools'])

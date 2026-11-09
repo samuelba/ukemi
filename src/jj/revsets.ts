@@ -56,9 +56,18 @@ const TRUNK_HISTORY = `first_ancestors(present(trunk()), ${TRUNK_HISTORY_LENGTH}
 const WORKING_COPY_CHAIN = 'first_ancestors(@, 6)'
 const WORKING_COPY_REVSET = `((${WORKING_COPY_CHAIN} & mutable()) | heads(${WORKING_COPY_CHAIN} & immutable())) ~ root()`
 
-export function graphRevset(filter: GraphFilter, depth: HistoryDepth): string {
+// `logRevset` is `revsets.log` from the jj config, which the jj log filter shows. Without it, that
+// filter shows the recent changes.
+export function graphRevset(
+  filter: GraphFilter,
+  depth: HistoryDepth,
+  logRevset: string | null = null,
+): string {
   if (filter === 'working') {
     return WORKING_COPY_REVSET
+  }
+  if (filter === 'jjLog') {
+    return logRevset === null ? graphRevset('recent', depth) : customGraphRevset(logRevset)
   }
   const base = graphBase(filter, depth)
   return `(${ANCHORS} | (${base}) | (roots((${base}) & mutable())-)) ~ root()`
@@ -70,7 +79,7 @@ export function customGraphRevset(revset: string): string {
   return `(${ANCHORS} | (${revset})) ~ root()`
 }
 
-function graphBase(filter: Exclude<GraphFilter, 'working'>, depth: HistoryDepth): string {
+function graphBase(filter: Exclude<GraphFilter, 'working' | 'jjLog'>, depth: HistoryDepth): string {
   switch (filter) {
     case 'recent':
       return `((mutable() | bookmarks() | remote_bookmarks() | tags()) & ${dateFilter(depth)}) | ${TRUNK_HISTORY}`

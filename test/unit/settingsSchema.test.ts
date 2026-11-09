@@ -94,7 +94,17 @@ describe('settingFields', () => {
       isRepositoryScoped: false,
       overriddenIn: [],
     })
-    expect(scoped.filter((f) => f.isRepositoryScoped)).toHaveLength(14)
+    expect(scoped.filter((f) => f.isRepositoryScoped)).toHaveLength(16)
+  })
+
+  test('edits the saved revsets as a map a repository can override', () => {
+    expect(field('savedRevsets')).toMatchObject({
+      type: 'map',
+      group: 'Graph',
+      isRepositoryScoped: true,
+    })
+    expect(field('defaultRevset')).toMatchObject({ type: 'string', isRepositoryScoped: true })
+    expect(field('defaultFilter')?.options?.map((option) => option.value)).toContain('jjLog')
   })
 
   test('marks unset values as undefined', () => {

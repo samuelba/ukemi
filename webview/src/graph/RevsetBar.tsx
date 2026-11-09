@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import type { SavedRevset } from '../../../shared/model'
 import type { GraphState, WebviewMessage } from '../../../shared/protocol'
+import { findSavedRevset } from '../../../shared/savedRevsets'
 import { postMessage } from '../shared/hostApi'
 import {
   applyCompletion,
@@ -18,7 +20,10 @@ export interface RevsetReply {
 interface RevsetBarProps {
   graph: GraphState
   history: readonly string[]
+  savedRevsets: readonly SavedRevset[]
   reply: RevsetReply | null
+  // Text to start from instead of the graph's revset, like a saved revset jj could not read.
+  initialText?: string
   onClose: () => void
 }
 
@@ -28,10 +33,20 @@ function send(message: WebviewMessage) {
 
 // A revset to show instead of the filter. The host checks it first, so a typo shows its error
 // here and keeps the current graph.
-export function RevsetBar({ graph, history, reply, onClose }: RevsetBarProps) {
-  const [text, setText] = useState(graph.revset ?? '')
+export function RevsetBar({
+  graph,
+  history,
+  savedRevsets,
+  reply,
+  initialText,
+  onClose,
+}: RevsetBarProps) {
+  const [text, setText] = useState(initialText ?? graph.revset ?? '')
   const [cursor, setCursor] = useState(text.length)
-  const [error, setError] = useState<string | null>(null)
+  // The bar can open for an answer that already arrived: a saved revset that failed its check.
+  const [error, setError] = useState<string | null>(
+    initialText !== undefined && reply?.revset === initialText ? reply.error : null,
+  )
   const [isChecking, setIsChecking] = useState(false)
   const [isListOpen, setIsListOpen] = useState(false)
   const [active, setActive] = useState(-1)
@@ -164,6 +179,7 @@ export function RevsetBar({ graph, history, reply, onClose }: RevsetBarProps) {
         >
           <span className="codicon codicon-check" aria-hidden />
         </button>
+        <SaveButton graph={graph} text={text} savedRevsets={savedRevsets} />
         <button
           className="icon-button"
           title="Back to the filter"
@@ -199,5 +215,42 @@ export function RevsetBar({ graph, history, reply, onClose }: RevsetBarProps) {
         </pre>
       )}
     </div>
+  )
+}
+
+interface SaveButtonProps {
+  graph: GraphState
+  text: string
+  savedRevsets: readonly SavedRevset[]
+}
+
+// Saves the revset the graph shows under a name, for the filter menu. It shows only while the
+// text is the applied revset, so what gets saved is a revset jj could read.
+function SaveButton({ graph, text, savedRevsets }: SaveButtonProps) {
+  const shown = graph.revset
+  if (shown === null || text.trim() !== shown) {
+    return null
+  }
+  const saved = findSavedRevset(savedRevsets, shown)
+  if (saved) {
+    return (
+      <span
+        className="icon-button accent is-static"
+        title={`Saved as "${saved.label}"`}
+        aria-label={`Saved as ${saved.label}`}
+      >
+        <span className="codicon codicon-star-full" aria-hidden />
+      </span>
+    )
+  }
+  return (
+    <button
+      className="icon-button"
+      title="Save revset for the filter menu"
+      aria-label="Save revset"
+      onClick={() => send({ type: 'saveRevset', revset: shown })}
+    >
+      <span className="codicon codicon-star-empty" aria-hidden />
+    </button>
   )
 }
