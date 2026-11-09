@@ -2,6 +2,7 @@ import { changedPathsInDirectory } from '../../../shared/fileTree'
 import { changeRevision } from '../../jj/revsets'
 import type { ChangedFile } from '../../../shared/model'
 import { confirm } from '../ui'
+import { absorbChanges } from './commitCommands'
 import {
   contextCommit,
   parseContext,
@@ -134,6 +135,9 @@ export function fileCommands(env: CommandEnv): Record<string, Handler> {
       env.operations.run('Split', model, () =>
         model.repo.splitFiles(changeRevision(commit), [file.path], 'below'),
       ),
+    ),
+    'ukemi.file.absorb': withFile(env, ({ model, commit, file }) =>
+      absorbChanges(env, model, commit, filePaths(file)),
     ),
     'ukemi.file.discard': withFile(env, (target) => discard(env, target)),
     'ukemi.file.discardDirectory': (arg) => discardDirectory(env, arg),

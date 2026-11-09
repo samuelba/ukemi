@@ -248,6 +248,26 @@ function squashInto(env: CommandEnv): Handler {
   })
 }
 
+// With paths, only the changes to those files are absorbed.
+export async function absorbChanges(
+  env: CommandEnv,
+  model: RepoModel,
+  commit: Commit,
+  paths: readonly string[] = [],
+): Promise<void> {
+  if (!mutable(env, commit)) {
+    return
+  }
+  const result = await env.operations.run('Absorb', model, () =>
+    model.repo.absorb(changeRevision(commit), paths),
+  )
+  if (result && /^Nothing changed\./m.test(result.stderr)) {
+    void env.ui.info(
+      `Ukemi: nothing to absorb from ${shortId(commit)}. No mutable ancestor last changed those lines.`,
+    )
+  }
+}
+
 export function commitCommands(env: CommandEnv): Record<string, Handler> {
   const run = (label: string, fn: (t: Target) => Promise<unknown>, needsMutable = false): Handler =>
     withTarget(env, async (target) => {
@@ -305,6 +325,9 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
       )
     }),
     'ukemi.commit.squashInto': squashInto(env),
+    'ukemi.commit.absorb': withTarget(env, ({ model, commit }) =>
+      absorbChanges(env, model, commit),
+    ),
     'ukemi.commit.split': withTarget(env, async (target) => {
       if (mutable(env, target.commit)) {
         await env.workbench.openSplit(target)

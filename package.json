@@ -413,6 +413,11 @@
         "category": "Ukemi"
       },
       {
+        "command": "ukemi.commit.absorb",
+        "title": "Absorb into Ancestors",
+        "category": "Ukemi"
+      },
+      {
         "command": "ukemi.commit.split",
         "title": "Split…",
         "category": "Ukemi"
@@ -592,6 +597,11 @@
       {
         "command": "ukemi.file.splitBelow",
         "title": "Move to New Change Before",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.file.absorb",
+        "title": "Absorb into Ancestors",
         "category": "Ukemi"
       },
       {
@@ -1177,6 +1187,11 @@
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.file' && canSplit"
         },
         {
+          "command": "ukemi.file.absorb",
+          "group": "2_split@3",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.file' && !isImmutable && !isRemoved"
+        },
+        {
           "command": "ukemi.file.discard",
           "group": "3_discard@1",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.file' && !isImmutable"
@@ -1474,6 +1489,11 @@
         {
           "command": "ukemi.commit.squashInto",
           "group": "1_place@2"
+        },
+        {
+          "command": "ukemi.commit.absorb",
+          "group": "2_absorb@1",
+          "when": "!isEmpty"
         }
       ],
       "ukemi.duplicate": [
@@ -1626,6 +1646,10 @@
           "when": "false"
         },
         {
+          "command": "ukemi.commit.absorb",
+          "when": "false"
+        },
+        {
           "command": "ukemi.commit.split",
           "when": "false"
         },
@@ -1759,6 +1783,10 @@
         },
         {
           "command": "ukemi.file.splitBelow",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.file.absorb",
           "when": "false"
         },
         {
