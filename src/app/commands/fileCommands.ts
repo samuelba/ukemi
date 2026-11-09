@@ -112,6 +112,18 @@ async function discardDirectory(env: CommandEnv, arg: unknown): Promise<void> {
   }
 }
 
+function chmod(env: CommandEnv, mode: 'x' | 'n'): Handler {
+  return withFile(env, async ({ model, commit, file }) => {
+    if (commit.isImmutable) {
+      void env.ui.warn(`Ukemi: ${shortId(commit)} is immutable.`)
+      return
+    }
+    await env.operations.run('Change mode', model, () =>
+      model.repo.chmod(changeRevision(commit), mode, [file.path]),
+    )
+  })
+}
+
 export function fileCommands(env: CommandEnv): Record<string, Handler> {
   return {
     'ukemi.file.open': withFile(env, ({ model, commit, file }) =>
@@ -139,6 +151,8 @@ export function fileCommands(env: CommandEnv): Record<string, Handler> {
     'ukemi.file.absorb': withFile(env, ({ model, commit, file }) =>
       absorbChanges(env, model, commit, filePaths(file)),
     ),
+    'ukemi.file.makeExecutable': chmod(env, 'x'),
+    'ukemi.file.makeNonExecutable': chmod(env, 'n'),
     'ukemi.file.discard': withFile(env, (target) => discard(env, target)),
     'ukemi.file.discardDirectory': (arg) => discardDirectory(env, arg),
     'ukemi.file.copyPath': withFile(env, async ({ file }) => env.ui.copy(file.path)),

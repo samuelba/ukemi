@@ -643,6 +643,11 @@ export class JjRepo {
     return this.mutate(['restore', '--from', fromCommitId, '--into', intoCommitId])
   }
 
+  // `x` sets the executable bit and `n` clears it. jj also does this on Windows.
+  chmod(revision: string, mode: 'x' | 'n', paths: readonly string[]) {
+    return this.mutate(['file', 'chmod', mode, '-r', revision, ...paths.map(rootFileset)])
+  }
+
   trackFiles(paths: readonly string[]) {
     return this.mutate(['file', 'track', ...paths.map(rootFileset)])
   }
