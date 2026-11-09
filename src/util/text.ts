@@ -36,6 +36,13 @@ export function validateBookmarkName(name: string): string | null {
   return null
 }
 
+// jj parses `--author` as `Name <email>`.
+const AUTHOR = /^[^<>\n]*\S[^<>\n]* <[^<>\s]+>$/
+
+export function validateAuthor(value: string): string | null {
+  return AUTHOR.test(value.trim()) ? null : 'Enter the author as Name <email>'
+}
+
 const REMOTE_URL = /^(https?|ssh|file):\/\/\S+$/i
 const SCP_REMOTE = /^git@[^:\s]+:\S+$/
 

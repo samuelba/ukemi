@@ -65,6 +65,26 @@ export type SplitDirection = 'below' | 'above'
 export type RebaseMode = 'source' | 'revision' | 'branch'
 export type Placement = 'onto' | 'after' | 'before'
 
+// A change to a commit's metadata that leaves its content alone. `author` is `Name <email>`.
+export type MetaEdit =
+  | { kind: 'resetAuthor' }
+  | { kind: 'author'; author: string }
+  | { kind: 'authorNow' }
+  | { kind: 'newChangeId' }
+
+function metaEditFlag(edit: MetaEdit): string {
+  switch (edit.kind) {
+    case 'resetAuthor':
+      return '--update-author'
+    case 'author':
+      return `--author=${edit.author}`
+    case 'authorNow':
+      return '--update-author-timestamp'
+    case 'newChangeId':
+      return '--update-change-id'
+  }
+}
+
 export interface TrunkRef {
   commitId: string | null
   bookmark: string | null
@@ -396,6 +416,10 @@ export class JjRepo {
 
   describe(commitId: string, message: string) {
     return this.mutate(['describe', commitId, '--stdin'], { stdin: message })
+  }
+
+  metaedit(revision: string, edit: MetaEdit) {
+    return this.mutate(['metaedit', metaEditFlag(edit), '-r', revision])
   }
 
   squashIntoParent(commitId: string, message: string) {

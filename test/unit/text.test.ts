@@ -4,6 +4,7 @@ import {
   bookmarkSlug,
   combineDescriptions,
   firstLine,
+  validateAuthor,
   validateBookmarkName,
   validateRemoteName,
   redactUrlCredentials,
@@ -101,5 +102,18 @@ describe('validateRemoteName', () => {
 
   test.each(['', '  ', 'a..b'])('rejects %j', (name) => {
     expect(validateRemoteName(name)).not.toBeNull()
+  })
+})
+
+describe('validateAuthor', () => {
+  test('accepts Name <email>', () => {
+    expect(validateAuthor('Ada Lovelace <ada@example.com>')).toBeNull()
+    expect(validateAuthor('  bot <ci@example.com>  ')).toBeNull()
+  })
+
+  test('rejects anything else', () => {
+    for (const value of ['', 'Ada', '<ada@example.com>', 'Ada <>', 'Ada <a b@x>', 'A <a> <b>']) {
+      expect(validateAuthor(value)).not.toBeNull()
+    }
   })
 })

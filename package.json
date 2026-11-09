@@ -418,6 +418,26 @@
         "category": "Ukemi"
       },
       {
+        "command": "ukemi.commit.resetAuthor",
+        "title": "Reset Author to Me",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.setAuthor",
+        "title": "Set Author…",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.updateAuthorDate",
+        "title": "Set Author Date to Now",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.commit.newChangeId",
+        "title": "Generate New Change ID",
+        "category": "Ukemi"
+      },
+      {
         "command": "ukemi.commit.split",
         "title": "Split…",
         "category": "Ukemi"
@@ -931,6 +951,10 @@
         "label": "Rebase"
       },
       {
+        "id": "ukemi.metadata",
+        "label": "Metadata"
+      },
+      {
         "id": "ukemi.viewMode",
         "label": "View"
       }
@@ -1008,6 +1032,11 @@
           "group": "3_rewrite@6",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit' && !isImmutable",
           "alt": "ukemi.commit.abandonSubtree"
+        },
+        {
+          "submenu": "ukemi.metadata",
+          "group": "3_rewrite@7",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit' && !isImmutable"
         },
         {
           "command": "ukemi.commit.setBookmark",
@@ -1496,6 +1525,24 @@
           "when": "!isEmpty"
         }
       ],
+      "ukemi.metadata": [
+        {
+          "command": "ukemi.commit.resetAuthor",
+          "group": "1_author@1"
+        },
+        {
+          "command": "ukemi.commit.setAuthor",
+          "group": "1_author@2"
+        },
+        {
+          "command": "ukemi.commit.updateAuthorDate",
+          "group": "1_author@3"
+        },
+        {
+          "command": "ukemi.commit.newChangeId",
+          "group": "2_id@1"
+        }
+      ],
       "ukemi.duplicate": [
         {
           "command": "ukemi.commit.duplicate",
@@ -1647,6 +1694,22 @@
         },
         {
           "command": "ukemi.commit.absorb",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.resetAuthor",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.setAuthor",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.updateAuthorDate",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.newChangeId",
           "when": "false"
         },
         {
