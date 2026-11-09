@@ -1,4 +1,4 @@
-import { existsSync, renameSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, renameSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import type { CommandEnv } from '../../src/app/commands/context'
@@ -11,12 +11,14 @@ import { initRepo, jj, makeRepo, makeTempDir, writeFile, type Fixture } from '..
 let fixture: Fixture
 let root: string
 let model: RepoModel
+let declines: boolean
 
 beforeEach(() => {
   fixture = makeTempDir()
   root = join(fixture.dir, 'repo')
   initRepo(root)
   model = new RepoModel(makeRepo(root), NULL_LOGGER)
+  declines = false
 })
 
 afterEach(() => fixture.cleanup())
@@ -27,7 +29,8 @@ function commands(): ReturnType<typeof fileCommands> {
     operations: new Operations(NULL_LOGGER),
     logger: NULL_LOGGER,
     ui: {
-      ask: async (_level: string, _text: string, _options: unknown, action: string) => action,
+      ask: async (_level: string, _text: string, _options: unknown, action: string) =>
+        declines ? undefined : action,
       warn: async () => undefined,
       info: async () => undefined,
     },
@@ -97,5 +100,47 @@ describe('chmod', () => {
     await commands()['ukemi.file.makeExecutable']?.({ commitId: parent?.commitId, path: 'run.sh' })
 
     expect(executable('@-')).toBe('run.sh=true\n')
+  })
+})
+
+describe('untrack', () => {
+  function tracked(): string {
+    return jj(root, 'file', 'list', '-r', '@')
+  }
+
+  beforeEach(async () => {
+    writeFile(root, 'keep.txt', 'keep\n')
+    writeFile(root, 'secret.env', 'TOKEN=1\n')
+    jj(root, 'commit', '-m', 'oops')
+    await model.refresh()
+  })
+
+  test('untracks an ignored file and keeps it on disk', async () => {
+    writeFile(root, '.gitignore', 'secret.env\n')
+    await model.refresh()
+
+    await commands()['ukemi.file.untrack']?.({ path: 'secret.env' })
+
+    expect(tracked()).toBe('.gitignore\nkeep.txt\n')
+    expect(existsSync(join(root, 'secret.env'))).toBe(true)
+    expect(readFileSync(join(root, '.gitignore'), 'utf8')).toBe('secret.env\n')
+  })
+
+  test('adds a file that is not ignored to .gitignore first', async () => {
+    await commands()['ukemi.file.untrack']?.({ path: 'secret.env' })
+
+    expect(readFileSync(join(root, '.gitignore'), 'utf8')).toBe('/secret.env\n')
+    expect(tracked()).toBe('.gitignore\nkeep.txt\n')
+    expect(existsSync(join(root, 'secret.env'))).toBe(true)
+    expect(jj(root, 'diff', '-r', '@', '--summary')).toBe('A .gitignore\nD secret.env\n')
+  })
+
+  test('changes nothing when the user declines', async () => {
+    declines = true
+
+    await commands()['ukemi.file.untrack']?.({ path: 'secret.env' })
+
+    expect(existsSync(join(root, '.gitignore'))).toBe(false)
+    expect(tracked()).toBe('keep.txt\nsecret.env\n')
   })
 })

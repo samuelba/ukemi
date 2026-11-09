@@ -646,6 +646,11 @@
         "icon": "$(discard)"
       },
       {
+        "command": "ukemi.file.untrack",
+        "title": "Stop Tracking…",
+        "category": "Ukemi"
+      },
+      {
         "command": "ukemi.file.discardDirectory",
         "title": "Discard Changes",
         "category": "Ukemi",
@@ -1254,6 +1259,11 @@
           "command": "ukemi.file.discard",
           "group": "3_discard@1",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.file' && !isImmutable"
+        },
+        {
+          "command": "ukemi.file.untrack",
+          "group": "3_discard@2",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.file' && isWorkingCopy && !isRemoved"
         },
         {
           "command": "ukemi.file.discardDirectory",
@@ -1896,6 +1906,10 @@
         },
         {
           "command": "ukemi.file.discard",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.file.untrack",
           "when": "false"
         },
         {

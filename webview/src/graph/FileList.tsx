@@ -147,6 +147,7 @@ function FileRow({
         commitId: commit.commitId,
         path: file.path,
         isImmutable: commit.isImmutable,
+        isWorkingCopy: commit.isWorkingCopy,
         isRemoved: file.status === 'removed',
         isConflicted: file.isConflicted,
         canSplit,
