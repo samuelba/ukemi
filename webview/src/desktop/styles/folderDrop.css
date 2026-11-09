@@ -1,0 +1,43 @@
+/* Folder drop ------------------------------------------------------------------------------- */
+
+/* Shown while files from the desktop are dragged over the window. It never takes the drop. */
+.folder-drop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--vscode-focusBorder);
+  background: color-mix(in srgb, var(--vscode-editor-background) 70%, transparent);
+  pointer-events: none;
+  animation: folder-drop-in 120ms var(--shell-ease);
+}
+
+.folder-drop-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 8px;
+  background: var(--vscode-editorWidget-background);
+  box-shadow: 0 12px 32px -10px var(--vscode-widget-shadow);
+  font-size: 14px;
+}
+
+.folder-drop-hint .codicon {
+  font-size: 20px;
+  color: var(--vscode-focusBorder);
+}
+
+@keyframes folder-drop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .folder-drop {
+    animation: none;
+  }
+}

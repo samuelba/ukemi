@@ -23,6 +23,7 @@ import './styles/bottomPanel.css'
 import './styles/about.css'
 import './styles/rowActions.css'
 import './styles/statusBar.css'
+import './styles/folderDrop.css'
 import { installContextMenus } from './contextMenu'
 import { Shell } from './Shell'
 

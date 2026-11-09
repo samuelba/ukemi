@@ -35,7 +35,7 @@ import {
   workspaceColumns,
 } from './useLayout'
 import { useRightPane } from './useRightPane'
-import { applyEditorFont, run, useShortcuts, useWheelZoom } from './windowInput'
+import { applyEditorFont, run, useFolderDrop, useShortcuts, useWheelZoom } from './windowInput'
 
 const DEFAULT_SETTINGS: ViewSettings = {
   changeIdLength: 4,
@@ -168,6 +168,7 @@ export function Shell() {
   const closeAbout = useCallback(() => setAbout(null), [])
   useShortcuts(openPalette)
   useWheelZoom()
+  const isDropping = useFolderDrop()
 
   return (
     <FileIconThemeContext.Provider value={fileIcons}>
@@ -252,6 +253,14 @@ export function Shell() {
         {isPaletteOpen && <Palette commands={commands} onClose={() => setIsPaletteOpen(false)} />}
         {about && <AboutDialog info={about.info} text={about.text} onClose={closeAbout} />}
         <Dialogs />
+        {isDropping && (
+          <div className="folder-drop" aria-hidden="true">
+            <div className="folder-drop-hint">
+              <i className="codicon codicon-folder-opened" />
+              Drop a folder to open it
+            </div>
+          </div>
+        )}
       </div>
     </FileIconThemeContext.Provider>
   )

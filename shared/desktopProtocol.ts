@@ -269,6 +269,8 @@ export type DesktopRendererMessage =
   | { type: 'desktop.setSetting'; key: string; value: unknown; repoId?: string }
   | { type: 'desktop.openSettingsFile' }
   | { type: 'desktop.openRepo' }
+  // Files and folders dropped on the window from outside the app.
+  | { type: 'desktop.openPaths'; paths: string[] }
   | { type: 'desktop.zoom'; step: ZoomStep }
   // The settings form records a shortcut, so the menu must not act on the keys meanwhile.
   | { type: 'desktop.recordShortcut'; isRecording: boolean }

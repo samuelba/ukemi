@@ -51,6 +51,7 @@ import {
 } from './menus'
 import { aboutText } from './about'
 import { DetailPresenter } from './detailPresenter'
+import { droppedPaths, foldersToOpen } from './openPaths'
 import { PanelTabs } from './panelTabs'
 import { createSessionWindow } from './sessionWindow'
 import { SettingsPresenter } from './settingsPresenter'
@@ -281,6 +282,18 @@ export class DesktopSession implements Disposable {
       await this.registry.discover()
     }
     await this.showRepo(root)
+  }
+
+  // Opens what was dropped on the window as tabs, the last one active. Says what it could not open.
+  private async openDropped(paths: readonly string[]): Promise<void> {
+    const { folders, unusable } = await foldersToOpen(paths)
+    for (const folder of folders) {
+      await this.addFolder(folder)
+    }
+    if (unusable.length > 0) {
+      const names = unusable.map((path) => basename(path) || path).join(', ')
+      void this.ui.warn(`Could not open ${names}. Drop a folder, or a file inside a repository.`)
+    }
   }
 
   // Brings the window to the front with the repository at `root` as its active tab.
@@ -636,6 +649,15 @@ export class DesktopSession implements Disposable {
         const folder = await this.ui.pickFolder('Open Repository')
         if (folder) {
           await this.addFolder(folder)
+        }
+        return
+      }
+      case 'desktop.openPaths': {
+        const paths = droppedPaths(message.paths)
+        if (paths) {
+          await this.openDropped(paths)
+        } else {
+          this.context.logger.warn('ignored a drop that is not a short list of absolute paths')
         }
         return
       }

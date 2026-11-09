@@ -11,6 +11,8 @@ export interface DesktopBridge {
   postMessage(message: unknown): void
   onMessage(listener: (message: unknown) => void): void
   readonly platform: string
+  // Where a file dropped on the window lives on disk.
+  pathForFile(file: File): string
 }
 
 declare function acquireVsCodeApi(): VsCodeApi
@@ -78,6 +80,11 @@ function createApi(): VsCodeApi {
 const api: VsCodeApi = createApi()
 
 export const isDesktop = typeof window !== 'undefined' && window.ukemiHost !== undefined
+
+// Where a file dropped on the window lives, or '' outside the standalone app.
+export function desktopPathForFile(file: File): string {
+  return typeof window !== 'undefined' && window.ukemiHost ? window.ukemiHost.pathForFile(file) : ''
+}
 
 export function postMessage<T>(message: T): void {
   api.postMessage(message)

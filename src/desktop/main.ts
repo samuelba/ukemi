@@ -21,13 +21,13 @@ import type { Ui } from '../app/ui'
 import type { AboutInfo, Fonts, LogLine, ZoomStep } from '../../shared/desktopProtocol'
 import { aboutInfo } from './about'
 import { downloadJj, MIN_JJ_VERSION, PINNED_RELEASE, type ResolvedJj } from '../jj/binary'
-import { findRepoRootUpwards } from '../repo/discovery'
 import { errorMessage } from '../util/logger'
 import { KeyValueFile } from './adapters/keyValueFile'
 import { LoopbackServer } from './adapters/loopbackRedirect'
 import { adoptLoginShellPath } from './adapters/loginShellPath'
 import { SecretsFile } from './adapters/secretsFile'
 import { SettingsFile } from './adapters/settingsFile'
+import { folderToOpen } from './openPaths'
 import { TrustStore } from './adapters/trustStore'
 import { RepoTabStore } from './adapters/repoTabStore'
 import { RecentRepoStore } from './adapters/recentRepoStore'
@@ -114,7 +114,7 @@ async function foldersFromArgs(argv: readonly string[], cwd: string): Promise<st
       if (!existsSync(path) || !statSync(path).isDirectory()) {
         return null
       }
-      return (await findRepoRootUpwards(path)) ?? path
+      return folderToOpen(path)
     }),
   )
   return folders.filter((folder): folder is string => folder !== null)
