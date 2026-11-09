@@ -262,6 +262,20 @@ async function setAuthor(env: CommandEnv, { model, commit }: Target): Promise<vo
   }
 }
 
+async function runFixTools(env: CommandEnv, { model, commit }: Target): Promise<void> {
+  if (!(await model.repo.hasFixTools())) {
+    void env.ui.warn('Ukemi: no fix tools are configured. Add [fix.tools] to your jj config.')
+    return
+  }
+  const result = await env.operations.run('Fix', model, () =>
+    model.repo.fix(changeRevision(commit)),
+  )
+  const summary = result?.stderr.match(/^Fixed \d+ commits? of \d+ checked\.$/m)?.[0]
+  if (summary) {
+    void env.ui.info(`Ukemi: ${summary}`)
+  }
+}
+
 // With paths, only the changes to those files are absorbed.
 export async function absorbChanges(
   env: CommandEnv,
@@ -403,6 +417,11 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
       'before',
       'Duplicate insert before',
     ),
+    'ukemi.commit.fix': withTarget(env, async (target) => {
+      if (mutable(env, target.commit)) {
+        await runFixTools(env, target)
+      }
+    }),
     'ukemi.commit.revert': run('Revert', ({ model, commit }) =>
       model.repo.revert(changeRevision(commit)),
     ),

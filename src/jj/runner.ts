@@ -9,6 +9,8 @@ import type { JjVersion } from './parse'
 
 export const DEFAULT_TIMEOUT_MS = 60_000
 export const NETWORK_TIMEOUT_MS = 120_000
+// `jj fix` runs the user's formatters over every changed file, which can take a while.
+export const FIX_TIMEOUT_MS = 300_000
 const INDEX_LOCK_RETRIES = 3
 const INDEX_LOCK_DELAY_MS = 500
 // How long jj and its helpers get to end after SIGTERM before they are killed.

@@ -28,7 +28,13 @@ import {
   type JjVersion,
 } from './parse'
 import { bookmarkRevision, commitSetRevset, exactBookmark, rootFileset } from './revsets'
-import { JjRunner, NETWORK_TIMEOUT_MS, type RunOptions, type RunResult } from './runner'
+import {
+  FIX_TIMEOUT_MS,
+  JjRunner,
+  NETWORK_TIMEOUT_MS,
+  type RunOptions,
+  type RunResult,
+} from './runner'
 import { jjString } from './templates'
 import {
   ANNOTATE_TEMPLATE,
@@ -646,6 +652,17 @@ export class JjRepo {
   // `x` sets the executable bit and `n` clears it. jj also does this on Windows.
   chmod(revision: string, mode: 'x' | 'n', paths: readonly string[]) {
     return this.mutate(['file', 'chmod', mode, '-r', revision, ...paths.map(rootFileset)])
+  }
+
+  // jj only warns, on stderr, when no key matches, so empty output means no tools.
+  async hasFixTools(): Promise<boolean> {
+    const { stdout } = await this.read(['config', 'list', 'fix.tools'])
+    return stdout.trim().length > 0
+  }
+
+  // Runs the configured fix tools on the change's files and on the same files in its descendants.
+  fix(source: string) {
+    return this.mutate(['fix', '-s', source], { timeoutMs: FIX_TIMEOUT_MS })
   }
 
   trackFiles(paths: readonly string[]) {
