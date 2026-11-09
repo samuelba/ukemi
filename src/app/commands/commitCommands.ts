@@ -3,7 +3,7 @@ import type { CommitView } from '../../../shared/protocol'
 import { changeRevision, bookmarkRevision } from '../../jj/revsets'
 import type { Placement, RebaseMode } from '../../jj/repo'
 import type { RepoModel } from '../../repo/repoModel'
-import { combineDescriptions, validateBookmarkName } from '../../util/text'
+import { combineDescriptions, validateAuthor, validateBookmarkName } from '../../util/text'
 import { confirm, type PickItem } from '../ui'
 import {
   commitTitle,
@@ -248,6 +248,20 @@ function squashInto(env: CommandEnv): Handler {
   })
 }
 
+async function setAuthor(env: CommandEnv, { model, commit }: Target): Promise<void> {
+  const author = await env.ui.input({
+    title: `Set author of ${shortId(commit)}`,
+    prompt: 'Name <email>',
+    value: `${commit.author.name} <${commit.author.email}>`,
+    validate: validateAuthor,
+  })
+  if (author !== undefined) {
+    await env.operations.run('Set author', model, () =>
+      model.repo.metaedit(changeRevision(commit), { kind: 'author', author: author.trim() }),
+    )
+  }
+}
+
 // With paths, only the changes to those files are absorbed.
 export async function absorbChanges(
   env: CommandEnv,
@@ -406,6 +420,27 @@ export function commitCommands(env: CommandEnv): Record<string, Handler> {
     'ukemi.commit.rebaseOnto': rebaseAt(env, 'onto', 'Rebase onto'),
     'ukemi.commit.rebaseInsertAfter': rebaseAt(env, 'after', 'Rebase insert after'),
     'ukemi.commit.rebaseInsertBefore': rebaseAt(env, 'before', 'Rebase insert before'),
+    'ukemi.commit.resetAuthor': run(
+      'Reset author',
+      ({ model, commit }) => model.repo.metaedit(changeRevision(commit), { kind: 'resetAuthor' }),
+      true,
+    ),
+    'ukemi.commit.setAuthor': withTarget(env, async (target) => {
+      if (mutable(env, target.commit)) {
+        await setAuthor(env, target)
+      }
+    }),
+    'ukemi.commit.updateAuthorDate': run(
+      'Update author date',
+      ({ model, commit }) => model.repo.metaedit(changeRevision(commit), { kind: 'authorNow' }),
+      true,
+    ),
+    // Also the way out of a divergent change: give one of its commits a change id of its own.
+    'ukemi.commit.newChangeId': run(
+      'New change id',
+      ({ model, commit }) => model.repo.metaedit(changeRevision(commit), { kind: 'newChangeId' }),
+      true,
+    ),
     'ukemi.commit.setBookmark': withTarget(env, async ({ model, commit }) => {
       const name = await pickBookmarkName(env, model, commit)
       if (name) {

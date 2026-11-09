@@ -25,7 +25,7 @@ beforeEach(() => {
 
 afterEach(() => fixture.cleanup())
 
-function commands(picked?: string): ReturnType<typeof commitCommands> {
+function commands(picked?: string, typed?: string): ReturnType<typeof commitCommands> {
   const env = {
     registry: { modelFor: () => model, activeModel: model },
     operations: new Operations(NULL_LOGGER),
@@ -40,6 +40,7 @@ function commands(picked?: string): ReturnType<typeof commitCommands> {
         return undefined
       },
       pickOrType: () => ({ choice: Promise.resolve(picked) }),
+      input: async () => typed,
     },
   } as unknown as CommandEnv
   return commitCommands(env)
@@ -165,5 +166,53 @@ describe('absorb', () => {
     expect(infos).toHaveLength(1)
     expect(infos[0]).toContain('nothing to absorb')
     expect(jj(root, 'diff', '-r', '@', '--summary')).toBe('A new.txt\n')
+  })
+})
+
+describe('metadata', () => {
+  function workingCopyId(): string | undefined {
+    return model.graph?.commits.find((c) => c.isWorkingCopy)?.commitId
+  }
+
+  function show(template: string): string {
+    return jj(root, 'log', '-r', '@', '--no-graph', '-T', template)
+  }
+
+  beforeEach(async () => {
+    writeFile(root, 'f.txt', 'f\n')
+    jj(root, 'describe', '-m', 'work')
+    await model.refresh()
+  })
+
+  test('sets the author and resets it to the configured user', async () => {
+    await commands(undefined, ' Someone Else <else@ukemi.dev> ')['ukemi.commit.setAuthor']?.({
+      commitId: workingCopyId(),
+    })
+    expect(show('author.name() ++ " " ++ author.email()')).toBe('Someone Else else@ukemi.dev')
+
+    await commands()['ukemi.commit.resetAuthor']?.({ commitId: workingCopyId() })
+    expect(show('author.name() ++ " " ++ author.email()')).toBe('Ukemi Test test@ukemi.dev')
+  })
+
+  test('leaves the author when the input is cancelled', async () => {
+    await commands()['ukemi.commit.setAuthor']?.({ commitId: workingCopyId() })
+    expect(show('author.name()')).toBe('Ukemi Test')
+  })
+
+  test('moves the author date to now', async () => {
+    jj(root, 'metaedit', '--author-timestamp', '2001-02-03T04:05:06+00:00')
+    await model.refresh()
+
+    await commands()['ukemi.commit.updateAuthorDate']?.({ commitId: workingCopyId() })
+
+    expect(show('author.timestamp().utc().format("%Y")')).not.toBe('2001')
+  })
+
+  test('gives the change a new change id and keeps its content', async () => {
+    const before = show('change_id')
+    await commands()['ukemi.commit.newChangeId']?.({ commitId: workingCopyId() })
+    expect(show('change_id')).not.toBe(before)
+    expect(show('description')).toBe('work\n')
+    expect(jj(root, 'file', 'show', '-r', '@', 'f.txt')).toBe('f\n')
   })
 })
