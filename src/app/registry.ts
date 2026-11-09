@@ -17,6 +17,7 @@ import {
   type GraphView,
 } from './rememberedView'
 import type { SettingsChange } from './settings'
+import { savedRevsetByLabel } from '../../shared/savedRevsets'
 
 const ACTIVE_REFRESH_DELAY_MS = 400
 const BACKGROUND_REFRESH_DELAY_MS = 3_000
@@ -172,9 +173,12 @@ export class RepoRegistry implements Disposable {
     return rememberRevset(this.host.store, root, revset)
   }
 
+  // The defaultRevset setting names a saved revset. A name that is not saved leaves the filter.
   private defaultView(root: string): GraphView {
     const config = this.host.settings.read(root)
-    return { filter: config.defaultFilter, depth: config.historyDepth }
+    const view: GraphView = { filter: config.defaultFilter, depth: config.historyDepth }
+    const saved = savedRevsetByLabel(config.savedRevsets, config.defaultRevset)
+    return saved ? { ...view, revset: saved.revset } : view
   }
 
   private modelsAffected(key: string, change: SettingsChange | undefined): RepoModel[] {
@@ -225,11 +229,13 @@ export class RepoRegistry implements Disposable {
       return entry
     }
     const config = this.host.settings.read(root)
-    const view = readView(this.host.store, root, this.defaultView(root))
+    const defaults = this.defaultView(root)
+    // A remembered view without a revset stays on its filter, even with a default revset.
+    const view = readView(this.host.store, root, defaults) ?? defaults
     const model = new RepoModel(new JjRepo(root, this.runner), this.logger, {
-      depth: view?.depth ?? config.historyDepth,
-      filter: view?.filter ?? config.defaultFilter,
-      revset: view?.revset ?? null,
+      depth: view.depth,
+      filter: view.filter,
+      revset: view.revset ?? null,
       snapshotOtherWorkspaces: config.snapshotOnRefresh,
       showLineStats: config.showLineStats,
     })

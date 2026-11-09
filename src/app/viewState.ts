@@ -50,6 +50,7 @@ export function buildViewState(inputs: ViewStateInputs): ViewState {
       previewDrops: config.previewDrops,
       changedFilesView: config.changedFilesView,
       ciOnlyMine: config.ciOnlyMine,
+      savedRevsets: config.savedRevsets,
     },
     autoFetch: {
       enabled: config.autoFetchEnabled,

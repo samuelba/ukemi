@@ -47,7 +47,8 @@ export function onlySnapshotsSince(
 // a date window, which a rewrite can move an old commit into. A typed revset can match
 // anything, so it gets no shortcut.
 export function snapshotsKeepMembership(view: GraphView): boolean {
-  if (view.revset !== null) {
+  // A typed revset, like the user's jj log revset, can hold a date window or anything else.
+  if (view.revset !== null || view.filter === 'jjLog') {
     return false
   }
   return view.filter !== 'recent' || view.depth === 'all'

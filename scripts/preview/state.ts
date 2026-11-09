@@ -39,6 +39,7 @@ async function main(root: string, output: string): Promise<void> {
       previewDrops: true,
       changedFilesView: 'list',
       ciOnlyMine: true,
+      savedRevsets: [],
     },
     autoFetch: { enabled: false, interval: '10m', isRunning: false, lastFetch: null },
   }

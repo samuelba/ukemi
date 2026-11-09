@@ -5,6 +5,9 @@ import type { RepoModel } from '../repo/repoModel'
 import type { CommandEnv } from './commands/context'
 import { SuggestionCancelled } from './describeSuggest/suggesters'
 import { initRepo } from './commands/globalCommands'
+import { savedRevsetByLabel, savedRevsetList, withSavedRevset } from '../../shared/savedRevsets'
+import { updateWhereItLives } from './settings'
+import { confirm } from './ui'
 
 const ALLOWED_COMMAND = /^ukemi\./
 
@@ -61,6 +64,12 @@ export function createMessageHandler(env: CommandEnv, dispatch: CommandDispatche
         await applyRevset(env, model, message.revset.trim())
         return
       }
+      case 'saveRevset':
+        await saveRevset(env, model.root, message.revset)
+        return
+      case 'editSavedRevsets':
+        env.workbench.openSettings(SAVED_REVSETS_SETTING)
+        return
       case 'loadMore':
         await env.operations.track('Loading', () => model.loadMore())
         return
@@ -266,6 +275,63 @@ async function descriptionNotSaved(env: CommandEnv, text: string): Promise<void>
   )
   if (choice === copy) {
     await env.ui.copy(text)
+  }
+}
+
+const SAVED_REVSETS_KEY = 'savedRevsets'
+const SAVED_REVSETS_SETTING = `ukemi.${SAVED_REVSETS_KEY}`
+const LABEL_SUGGESTION_LENGTH = 30
+
+// A name to start from: the revset itself, cut short when it is long.
+function suggestedLabel(revset: string): string {
+  return revset.length <= LABEL_SUGGESTION_LENGTH
+    ? revset
+    : `${revset.slice(0, LABEL_SUGGESTION_LENGTH - 1)}…`
+}
+
+// Adds the revset to the saved ones under a name the user picks. It goes into the list the
+// repository sees: its own when it overrides the setting, the global one otherwise.
+async function saveRevset(env: CommandEnv, root: string, revset: string): Promise<void> {
+  const text = revset.trim()
+  if (text === '') {
+    return
+  }
+  const label = (
+    await env.ui.input({
+      title: 'Save Revset',
+      prompt: `Name for ${text} in the filter menu`,
+      value: suggestedLabel(text),
+      validate: (value) => (value.trim() === '' ? 'Enter a name.' : null),
+    })
+  )?.trim()
+  if (!label) {
+    return
+  }
+  const values = env.settings.inspect(SAVED_REVSETS_KEY, root)
+  const current = values.repoValue ?? values.globalValue
+  const existing = savedRevsetByLabel(savedRevsetList(current), label)
+  if (existing && existing.revset !== text) {
+    const replace = await confirm(
+      env.ui,
+      `A saved revset is already called "${label}". Replace it?`,
+      'Replace',
+      `It shows ${existing.revset}.`,
+    )
+    if (!replace) {
+      return
+    }
+  }
+  try {
+    await updateWhereItLives(
+      env.settings,
+      SAVED_REVSETS_KEY,
+      withSavedRevset(current, label, text),
+      root,
+    )
+  } catch (error: unknown) {
+    const reason = error instanceof Error ? error.message : String(error)
+    env.logger.error(`saving revset "${label}" failed: ${reason}`)
+    await env.ui.error(`Ukemi: could not save the revset "${label}": ${reason}`)
   }
 }
 

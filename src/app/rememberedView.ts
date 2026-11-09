@@ -32,8 +32,9 @@ function isView(value: unknown): value is GraphView {
   )
 }
 
-// `defaults` are the defaultFilter and historyDepth settings of the repository. The view was
-// stored with the defaults of its time, and a change of those in the settings wins over it.
+// `defaults` are the defaultFilter, historyDepth and defaultRevset settings of the repository. The
+// view was stored with the defaults of its time, and a change of those in the settings wins over
+// it. `defaults.revset` is the text of the default saved revset, so editing it counts as a change.
 export function readView(
   store: KeyValueStore,
   root: string,
@@ -47,7 +48,8 @@ export function readView(
   const isCurrent =
     isView(storedDefaults) &&
     storedDefaults.filter === defaults.filter &&
-    storedDefaults.depth === defaults.depth
+    storedDefaults.depth === defaults.depth &&
+    storedDefaults.revset === defaults.revset
   if (!isCurrent) {
     return null
   }

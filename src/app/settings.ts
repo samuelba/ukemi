@@ -3,7 +3,9 @@ import {
   HISTORY_DEPTHS,
   type GraphFilter,
   type HistoryDepth,
+  type SavedRevset,
 } from '../../shared/model'
+import { savedRevsetList } from '../../shared/savedRevsets'
 import type { ChangedFilesView } from '../../shared/protocol'
 import type { HostLists } from '../forge/detect'
 import { ghHosts } from '../forge/ghConfig'
@@ -24,6 +26,9 @@ export interface UkemiConfig {
   repoScanExclude: string[]
   historyDepth: HistoryDepth
   defaultFilter: GraphFilter
+  savedRevsets: SavedRevset[]
+  // The label of the saved revset the graph opens with, or empty for the default filter.
+  defaultRevset: string
   changeIdLength: number
   showFullPaths: boolean
   showLineStats: boolean
@@ -135,6 +140,8 @@ export function readSettings(c: SettingsSource): UkemiConfig {
     repoScanExclude: c.get<string[]>('repoScanExclude', DEFAULT_EXCLUDES),
     historyDepth: oneOf(c.get<string>('historyDepth', '7d'), HISTORY_DEPTHS, '7d'),
     defaultFilter: oneOf(c.get<string>('defaultFilter', 'recent'), GRAPH_FILTERS, 'recent'),
+    savedRevsets: savedRevsetList(c.get<unknown>('savedRevsets', {})),
+    defaultRevset: text(c.get<unknown>('defaultRevset', ''), '').trim(),
     changeIdLength: c.get<number>('changeIdLength', 4),
     showFullPaths: c.get<boolean>('showFullPaths', false),
     showLineStats: c.get<boolean>('showLineStats', false),

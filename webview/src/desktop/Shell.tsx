@@ -45,6 +45,7 @@ const DEFAULT_SETTINGS: ViewSettings = {
   previewDrops: true,
   changedFilesView: 'list',
   ciOnlyMine: true,
+  savedRevsets: [],
 }
 
 const DEFAULT_FONT: FontSpec = { family: 'monospace', size: 13, weight: 'normal' }

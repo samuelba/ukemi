@@ -21,7 +21,7 @@ There are two ways to use Ukemi:
 
 ## Features
 
-- **Change graph.** See your changes, bookmarks, tags, workspaces and conflicts. The working copy has a red seal. Filter by _Recent_, _Mine_, _My history_, _Stack_ or _Working copy_ (the working copy and its last 5 first parents) and choose the history depth. _Recent_ also shows the last 10 commits on the trunk. Changed files appear as a list or a tree.
+- **Change graph.** See your changes, bookmarks, tags, workspaces and conflicts. The working copy has a red seal. Filter by _Recent_, _Mine_, _My history_, _Stack_, _Working copy_ (the working copy and its last 5 first parents) or _jj log_ (the `revsets.log` of your jj config) and choose the history depth. _Recent_ also shows the last 10 commits on the trunk. **Revset…** shows any revset you type. The star in the revset bar saves it by name, so it is listed in the filter menu from then on. Changed files appear as a list or a tree.
 - **Drag and drop.** Drag a change onto another change to rebase it with its descendants. Hold Alt to move only that change. Hold Ctrl to duplicate it onto the target, and hold Ctrl and Alt to duplicate it with its descendants. Drop a change on the line between a change and its parent to move it there and reorder the stack. Hold Alt to bring its descendants along, or Ctrl to insert a duplicate. Drag a file to move its changes, or hold Ctrl to copy them. Drag a bookmark to move it.
 - **Edit history.** Use the context menu or the hover action to describe, create, edit, squash, split, abandon, duplicate and revert changes. Rebase onto the trunk, onto another change, or insert the change before or after another. **Ship to Trunk Now** moves the trunk bookmark to that change and pushes it. **New Change from Trunk** starts a working copy on the trunk. **New Change from Bookmark, Request or Revision** opens a new working copy there. When a local bookmark and a remote bookmark share a name, Ukemi asks which one to use. Click a change to show or hide its files.
 - **Suggested descriptions.** The describe dialog has a button for each AI coding tool you have installed: Claude Code, Cursor CLI or GitHub Copilot CLI, and in VS Code also Copilot Chat. It suggests a description from the change's diff. See [Suggested descriptions](#suggested-descriptions).
@@ -172,6 +172,8 @@ Select the gear in the title bar of the Ukemi view to open the Ukemi settings.
 | `ukemi.repoScanDepth`                | Folder levels to search for repositories. Default: 4.                                              |
 | `ukemi.repoScanExclude`              | Folder names to skip during the repository search.                                                 |
 | `ukemi.defaultFilter`                | Filter that the graph shows first.                                                                 |
+| `ukemi.savedRevsets`                 | Revsets the filter menu lists by name, e.g. `{ "Conflicts": "conflicts()" }`.                      |
+| `ukemi.defaultRevset`                | Name of a saved revset that the graph shows first, instead of `defaultFilter`.                     |
 | `ukemi.historyDepth`                 | Default history depth: `7d`, `14d`, `30d`, `1y` or `all`.                                          |
 | `ukemi.changeIdLength`               | Minimum number of change ID characters to show. Default: 4.                                        |
 | `ukemi.showFullPaths`                | Show full file paths in the graph. Default: off.                                                   |
@@ -197,7 +199,7 @@ Select the gear in the title bar of the Ukemi view to open the Ukemi settings.
 
 ### Settings per repository
 
-A repository can have its own value for the graph settings (`showGitTags`, `showLineStats`, `defaultFilter`, `historyDepth`), auto fetch, `workspaces.snapshotOnRefresh`, the `forge.*` settings, `describeSuggest.instructions` and `describeSuggest.maxDiffBytes`. Every other setting applies to all repositories. Each repository also reopens with the filter and history depth it was left at.
+A repository can have its own value for the graph settings (`showGitTags`, `showLineStats`, `defaultFilter`, `savedRevsets`, `defaultRevset`, `historyDepth`), auto fetch, `workspaces.snapshotOnRefresh`, the `forge.*` settings, `describeSuggest.instructions` and `describeSuggest.maxDiffBytes`. Every other setting applies to all repositories. Each repository also reopens with the filter and history depth it was left at.
 
 - **VS Code:** set them in the folder settings of the workspace folder (**Preferences: Open Folder Settings**). A repository nested inside a workspace folder uses that folder's settings.
 - **Ukemi app:** right-click a repository tab and choose **Repository Settings…**, or switch the settings view to the repository. The values are stored under `repositories` in `settings.json`:

@@ -78,6 +78,7 @@ function state(overrides: Partial<ViewState> = {}): ViewState {
       previewDrops: true,
       changedFilesView: 'list',
       ciOnlyMine: false,
+      savedRevsets: [],
     },
     autoFetch: { enabled: true, interval: '10m', isRunning: false, lastFetch: null },
     ...overrides,

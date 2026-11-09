@@ -5,6 +5,7 @@ import {
   onlySnapshotsSince,
   pageChangedOnlyByRewrites,
   snapshotPageRevset,
+  snapshotsKeepMembership,
   type SnapshotPageInput,
 } from '../../src/repo/refreshRevsets'
 
@@ -80,6 +81,19 @@ describe('snapshotPageRevset', () => {
     for (const [name, value] of cases) {
       expect(snapshotPageRevset(value, 'R'), name).toBeNull()
     }
+  })
+})
+
+describe('snapshotsKeepMembership', () => {
+  test('holds for presets without a sliding date window', () => {
+    expect(snapshotsKeepMembership({ filter: 'mine', depth: '7d', revset: null })).toBe(true)
+    expect(snapshotsKeepMembership({ filter: 'recent', depth: 'all', revset: null })).toBe(true)
+    expect(snapshotsKeepMembership({ filter: 'recent', depth: '7d', revset: null })).toBe(false)
+  })
+
+  test('does not hold for a typed revset or the jj log revset, which can hold anything', () => {
+    expect(snapshotsKeepMembership({ filter: 'mine', depth: '7d', revset: 'mine()' })).toBe(false)
+    expect(snapshotsKeepMembership({ filter: 'jjLog', depth: 'all', revset: null })).toBe(false)
   })
 })
 

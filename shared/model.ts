@@ -107,7 +107,8 @@ export interface Remote {
   url: string
 }
 
-export type GraphFilter = 'recent' | 'mine' | 'myHistory' | 'stack' | 'working'
+// `jjLog` shows the `revsets.log` of the user's jj config, the revset `jj log` shows.
+export type GraphFilter = 'recent' | 'mine' | 'myHistory' | 'stack' | 'working' | 'jjLog'
 export type HistoryDepth = '7d' | '14d' | '30d' | '1y' | 'all'
 
 export const HISTORY_DEPTHS: readonly HistoryDepth[] = ['7d', '14d', '30d', '1y', 'all']
@@ -117,5 +118,12 @@ export const GRAPH_FILTERS: readonly GraphFilter[] = [
   'myHistory',
   'stack',
   'working',
+  'jjLog',
 ]
-export const DEPTHLESS_FILTERS: readonly GraphFilter[] = ['mine', 'stack', 'working']
+export const DEPTHLESS_FILTERS: readonly GraphFilter[] = ['mine', 'stack', 'working', 'jjLog']
+
+// A revset the user saved under a name, from the `savedRevsets` setting.
+export interface SavedRevset {
+  label: string
+  revset: string
+}

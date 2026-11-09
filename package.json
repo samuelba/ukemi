@@ -2303,7 +2303,8 @@
             "mine",
             "myHistory",
             "stack",
-            "working"
+            "working",
+            "jjLog"
           ],
           "default": "recent",
           "enumDescriptions": [
@@ -2311,9 +2312,25 @@
             "All your open changes.",
             "Your open changes, and your history in the time range.",
             "The changes connected to the working copy.",
-            "The working copy and its last 5 first parents."
+            "The working copy and its last 5 first parents.",
+            "The revset `jj log` shows: `revsets.log` from your jj config."
           ],
-          "description": "Filter that the change graph shows first."
+          "description": "Filter that the change graph shows first. `ukemi.defaultRevset` wins over it when it names a saved revset."
+        },
+        "ukemi.savedRevsets": {
+          "scope": "resource",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "markdownDescription": "Revsets to pick by name in the graph's filter menu, in the order they are listed. In the app's settings, write one per line as `name = revset`, like `Conflicts = conflicts()`. In settings.json: `{ \"Conflicts\": \"conflicts()\" }`. The star in the revset bar adds the revset you are looking at."
+        },
+        "ukemi.defaultRevset": {
+          "scope": "resource",
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Name of a saved revset (`ukemi.savedRevsets`) that the change graph shows first. Empty, or a name that is not saved, uses `ukemi.defaultFilter`."
         },
         "ukemi.historyDepth": {
           "scope": "resource",

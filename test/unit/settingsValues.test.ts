@@ -50,7 +50,21 @@ describe('readText', () => {
 
   test('a map line without "=" is a problem', () => {
     const outcome = readText(field({ type: 'map', default: {} }), 'map', 'nohost')
-    expect(outcome.kind).toBe('problem')
+    expect(outcome).toEqual({ kind: 'problem', problem: expect.stringContaining('name = value') })
+  })
+
+  test('a map also reads as JSON, as the settings descriptions show it', () => {
+    const json = '{"test": "mine() & description(substring:\\"fix\\")"}'
+    expect(readText(field({ type: 'map', default: {} }), 'map', json)).toEqual({
+      kind: 'value',
+      value: { test: 'mine() & description(substring:"fix")' },
+    })
+  })
+
+  test('JSON that is not an object of strings is a problem', () => {
+    const map = field({ type: 'map', default: {} })
+    expect(readText(map, 'map', '{"a": 1}').kind).toBe('problem')
+    expect(readText(map, 'map', '{"a": "b"').kind).toBe('problem')
   })
 
   test('checks the pattern and the number range', () => {

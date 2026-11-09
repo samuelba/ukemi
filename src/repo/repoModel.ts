@@ -63,6 +63,10 @@ export class RepoModel {
   private filter: GraphFilter = 'recent'
   private depth: HistoryDepth = '7d'
   private revset: string | null = null
+  // `revsets.log` as the last refresh read it, for the jj log filter.
+  private logRevset: string | null = null
+  // The last failure to read it, so each refresh does not log the same one again.
+  private logRevsetError: string | null = null
   private readonly pageSize: number
   // How many commits the graph loads. It grows by a page each time the view asks for more, and
   // starts over when the view changes.
@@ -402,8 +406,13 @@ export class RepoModel {
     operations: readonly Operation[],
   ): Promise<void> {
     const reader = head === null ? this.repo : this.repo.atOperation(head)
+    if (this.revset === null && this.filter === 'jjLog') {
+      this.logRevset = await this.readLogRevset()
+    }
     const revset =
-      this.revset === null ? graphRevset(this.filter, this.depth) : customGraphRevset(this.revset)
+      this.revset === null
+        ? graphRevset(this.filter, this.depth, this.logRevset)
+        : customGraphRevset(this.revset)
     const before = {
       view: this.view,
       shown: this.current,
@@ -483,6 +492,23 @@ export class RepoModel {
     } catch (error: unknown) {
       this.logger.warn(`graph: finding the parents past the end failed: ${errorMessage(error)}`)
       return new Set()
+    }
+  }
+
+  // The config is read on every refresh, so an edit of it shows without reopening the repository.
+  // Unreadable, the jj log filter shows the recent changes, and the log says why.
+  private async readLogRevset(): Promise<string | null> {
+    try {
+      const revset = await this.repo.logRevset()
+      this.logRevsetError = null
+      return revset
+    } catch (error: unknown) {
+      const message = errorMessage(error)
+      if (message !== this.logRevsetError) {
+        this.logger.warn(`reading revsets.log failed, showing recent changes: ${message}`)
+      }
+      this.logRevsetError = message
+      return null
     }
   }
 
@@ -648,6 +674,9 @@ export class RepoModel {
       filter: this.filter,
       depth: this.depth,
       revset: this.revset,
+      ...(this.filter === 'jjLog' && this.revset === null && this.logRevset !== null
+        ? { logRevset: this.logRevset }
+        : {}),
       isTruncated: shared.isTruncated,
       hasRemotes: shared.hasRemotes,
       hasUnpushed: shared.hasRemotes && hasUnsyncedBookmarks(commits),
