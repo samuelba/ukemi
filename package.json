@@ -438,6 +438,11 @@
         "category": "Ukemi"
       },
       {
+        "command": "ukemi.commit.fix",
+        "title": "Run Fix Tools",
+        "category": "Ukemi"
+      },
+      {
         "command": "ukemi.commit.split",
         "title": "Split…",
         "category": "Ukemi"
@@ -1042,6 +1047,11 @@
           "group": "3_rewrite@6",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit' && !isImmutable",
           "alt": "ukemi.commit.abandonSubtree"
+        },
+        {
+          "command": "ukemi.commit.fix",
+          "group": "3_rewrite@8",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.commit' && !isImmutable"
         },
         {
           "submenu": "ukemi.metadata",
@@ -1730,6 +1740,10 @@
         },
         {
           "command": "ukemi.commit.newChangeId",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.commit.fix",
           "when": "false"
         },
         {

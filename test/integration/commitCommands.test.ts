@@ -216,3 +216,49 @@ describe('metadata', () => {
     expect(jj(root, 'file', 'show', '-r', '@', 'f.txt')).toBe('f\n')
   })
 })
+
+describe('fix', () => {
+  const UPPER_CASE =
+    "process.stdin.on('data', (d) => process.stdout.write(d.toString().toUpperCase()))"
+
+  function setup(): void {
+    writeFile(root, 'a.txt', 'parent\n')
+    jj(root, 'commit', '-m', 'parent')
+    writeFile(root, 'a.txt', 'parent\nchild\n')
+    jj(root, 'describe', '-m', 'child')
+  }
+
+  test('runs the tools on the change and its descendants', async () => {
+    jj(
+      root,
+      'config',
+      'set',
+      '--repo',
+      'fix.tools.upper.command',
+      JSON.stringify([process.execPath, '-e', UPPER_CASE]),
+    )
+    jj(root, 'config', 'set', '--repo', 'fix.tools.upper.patterns', '["glob:*.txt"]')
+    setup()
+    await model.refresh()
+    const parent = model.graph?.commits.find((c) => c.description === 'parent\n')
+
+    await commands()['ukemi.commit.fix']?.({ commitId: parent?.commitId })
+
+    expect(warnings).toEqual([])
+    expect(infos).toEqual(['Ukemi: Fixed 2 commits of 2 checked.'])
+    expect(jj(root, 'file', 'show', '-r', '@-', 'a.txt')).toBe('PARENT\n')
+    expect(jj(root, 'file', 'show', '-r', '@', 'a.txt')).toBe('PARENT\nCHILD\n')
+  })
+
+  test('warns when no tools are configured', async () => {
+    setup()
+    await model.refresh()
+    const child = model.graph?.commits.find((c) => c.isWorkingCopy)
+
+    await commands()['ukemi.commit.fix']?.({ commitId: child?.commitId })
+
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0]).toContain('no fix tools')
+    expect(jj(root, 'file', 'show', '-r', '@', 'a.txt')).toBe('parent\nchild\n')
+  })
+})
