@@ -1,5 +1,9 @@
+import { readFile, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { changedPathsInDirectory } from '../../../shared/fileTree'
 import { changeRevision } from '../../jj/revsets'
+import { JjError } from '../../jj/runner'
+import { appendIgnoreLine, ignoreLine } from '../../util/gitignore'
 import type { ChangedFile } from '../../../shared/model'
 import { confirm } from '../ui'
 import { absorbChanges } from './commitCommands'
@@ -124,6 +128,58 @@ function chmod(env: CommandEnv, mode: 'x' | 'n'): Handler {
   })
 }
 
+async function readTextOrEmpty(path: string): Promise<string> {
+  try {
+    return await readFile(path, 'utf8')
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return ''
+    }
+    throw error
+  }
+}
+
+// jj only untracks ignored files, since it would track any other file again on the next snapshot.
+function isNotIgnored(error: unknown): boolean {
+  return error instanceof JjError && /is not ignored\./.test(error.stderr)
+}
+
+// Stops tracking a working-copy file and keeps it on disk. A file that is not ignored yet is added
+// to the workspace's root .gitignore first, after the user agrees.
+async function untrack(env: CommandEnv, { model, file }: FileTarget): Promise<void> {
+  const needsIgnore = await env.operations.run('Untrack', model, async () => {
+    try {
+      await model.repo.untrackFiles([file.path])
+      return false
+    } catch (error: unknown) {
+      if (isNotIgnored(error)) {
+        return true
+      }
+      throw error
+    }
+  })
+  if (
+    !needsIgnore ||
+    !(await confirm(
+      env.ui,
+      `Add ${ignoreLine(file.path)} to .gitignore and stop tracking it?`,
+      'Add to .gitignore',
+      'jj only untracks ignored files. The file stays on disk.',
+    ))
+  ) {
+    return
+  }
+  await env.operations.run('Untrack', model, async () => {
+    const gitignore = join(model.root, '.gitignore')
+    const content = await readTextOrEmpty(gitignore)
+    const updated = appendIgnoreLine(content, file.path)
+    if (updated !== content) {
+      await writeFile(gitignore, updated)
+    }
+    await model.repo.untrackFiles([file.path])
+  })
+}
+
 export function fileCommands(env: CommandEnv): Record<string, Handler> {
   return {
     'ukemi.file.open': withFile(env, ({ model, commit, file }) =>
@@ -154,6 +210,11 @@ export function fileCommands(env: CommandEnv): Record<string, Handler> {
     'ukemi.file.makeExecutable': chmod(env, 'x'),
     'ukemi.file.makeNonExecutable': chmod(env, 'n'),
     'ukemi.file.discard': withFile(env, (target) => discard(env, target)),
+    'ukemi.file.untrack': withFile(env, async (target) => {
+      if (target.commit.isWorkingCopy) {
+        await untrack(env, target)
+      }
+    }),
     'ukemi.file.discardDirectory': (arg) => discardDirectory(env, arg),
     'ukemi.file.copyPath': withFile(env, async ({ file }) => env.ui.copy(file.path)),
   }
