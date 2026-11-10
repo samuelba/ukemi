@@ -10,7 +10,6 @@ import {
 } from 'react'
 import { previewDrop, type PreviewDrop } from '../../../shared/dropPreview'
 import type { FileIconTheme } from '../../../shared/fileIconTheme'
-import type { ChangedFile } from '../../../shared/model'
 import type {
   CommitView,
   HostMessage,
@@ -27,6 +26,7 @@ import { insertGaps } from './dropCommit'
 import { DescribeDialog, type SuggestionReply } from './DescribeDialog'
 import { DropPreviewBar } from './DropPreviewBar'
 import { EmptyState } from './EmptyState'
+import { fileKey, keepKeys, type FileLoad } from './fileLoads'
 import { FileIconFonts, FileIconThemeContext } from './FileIcon'
 import { previewMovedFile } from './FileList'
 import { LANE_WIDTH } from './GraphCell'
@@ -57,8 +57,6 @@ interface Describing {
   isWorkingCopy: boolean
 }
 
-const fileKey = (repoId: string, commitId: string) => `${repoId}\n${commitId}`
-
 // An applied drop that the host never answers must not keep the preview up.
 const APPLY_TIMEOUT_MS = 15_000
 
@@ -67,7 +65,7 @@ export function App() {
   const [fileIcons, setFileIcons] = useState<FileIconTheme | null>(null)
   // The desktop app has no host theme and provides its own bundled one around the graph.
   const bundledIcons = useContext(FileIconThemeContext)
-  const [files, setFiles] = useState<ReadonlyMap<string, ChangedFile[]>>(new Map())
+  const [files, setFiles] = useState<ReadonlyMap<string, FileLoad>>(new Map())
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const [isWorkingCopyCollapsed, setIsWorkingCopyCollapsed] = useState(false)
   const requested = useRef(new Set<string>())
@@ -108,6 +106,13 @@ export function App() {
             new Map(prev).set(fileKey(message.repoId, message.commitId), message.files),
           )
           return
+        case 'filesFailed': {
+          // Not asked for any more, so the next refresh or a new expand asks again.
+          const key = fileKey(message.repoId, message.commitId)
+          requested.current.delete(key)
+          setFiles((prev) => new Map(prev).set(key, { error: message.error }))
+          return
+        }
         case 'fileIcons':
           setFileIcons(message.theme)
           return
@@ -211,6 +216,20 @@ export function App() {
     setFiles(new Map())
   }, [showLineStats])
 
+  // Only the shown changes keep their file lists, so the map does not grow with every refresh.
+  useEffect(() => {
+    if (!graph) {
+      return
+    }
+    const shown = new Set(graph.commits.map((commit) => fileKey(graph.repoId, commit.commitId)))
+    for (const key of requested.current) {
+      if (!shown.has(key)) {
+        requested.current.delete(key)
+      }
+    }
+    setFiles((prev) => keepKeys(prev, shown))
+  }, [graph])
+
   useEffect(() => {
     for (const commit of graph?.commits ?? []) {
       const key = fileKey(repoId, commit.commitId)
@@ -220,6 +239,20 @@ export function App() {
       }
     }
   }, [graph, expanded, repoId, showLineStats])
+
+  const retryFiles = useCallback(
+    (commit: CommitView) => {
+      const key = fileKey(repoId, commit.commitId)
+      requested.current.add(key)
+      setFiles((prev) => {
+        const next = new Map(prev)
+        next.delete(key)
+        return next
+      })
+      postMessage({ type: 'loadFiles', commitId: commit.commitId })
+    },
+    [repoId],
+  )
 
   const toggle = useCallback((commit: CommitView) => {
     if (commit.isWorkingCopy) {
@@ -549,6 +582,7 @@ export function App() {
                   trunkCi={commit.isTrunk ? graph.forge?.trunkCi : undefined}
                   settings={state.settings}
                   onToggle={toggle}
+                  onRetryFiles={retryFiles}
                   onSelect={selectCommit}
                   onDescribe={startDescribe}
                   onDropCommit={dropCommit}

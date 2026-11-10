@@ -8,6 +8,7 @@ import { filePreviewMessage } from './previewFile'
 import { dragModifiers } from './dragModifiers'
 import { buildFileTree, type FileTreeNode } from '../../../shared/fileTree'
 import { FileTypeIcon } from './FileIcon'
+import { isFailed, type FileLoad } from './fileLoads'
 import { LineStats } from './LineStats'
 import { fileLabel } from './rowStatus'
 import { treeKeyAction } from './treeKeys'
@@ -21,7 +22,7 @@ const RESOURCE_URLS_MIME = 'ResourceURLs'
 
 interface FileListProps {
   commit: CommitView
-  files: ChangedFile[] | undefined
+  files: FileLoad | undefined
   repoId: string
   showFullPaths: boolean
   showLineStats: boolean
@@ -29,6 +30,8 @@ interface FileListProps {
   // The aria-level of the top rows: 2 under a commit row of the graph tree, 1 where the list is a
   // tree of its own (the desktop detail pane).
   level: number
+  // Asks the host again after it could not list the files.
+  onRetry?: () => void
 }
 
 interface FileRowProps {
@@ -385,7 +388,20 @@ export function FileList({
   showLineStats,
   changedFilesView,
   level,
+  onRetry,
 }: FileListProps) {
+  if (isFailed(files)) {
+    return (
+      <div className="files muted" role="alert">
+        Could not list the files: {files.error}
+        {onRetry && (
+          <button className="link-button" onClick={onRetry}>
+            Retry
+          </button>
+        )}
+      </div>
+    )
+  }
   if (!files) {
     return (
       <div className="files muted" role="none">

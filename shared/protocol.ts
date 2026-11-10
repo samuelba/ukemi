@@ -159,6 +159,7 @@ export type HostMessage =
   | { type: 'state'; state: ViewState }
   | { type: 'reveal'; commitId: string }
   | { type: 'files'; repoId: string; commitId: string; files: ChangedFile[] }
+  | { type: 'filesFailed'; repoId: string; commitId: string; error: string }
   | { type: 'fileIcons'; theme: FileIconTheme | null }
   | { type: 'describe'; commitId: string; changeId: string; description: string }
   | { type: 'suggesters'; suggesters: SuggesterView[] }

@@ -1,7 +1,6 @@
 import { memo, useEffect, useId, useSyncExternalStore, type DragEvent } from 'react'
 import type { PreviewDrop } from '../../../shared/dropPreview'
 import { parseFileDrag } from '../../../shared/fileUri'
-import type { ChangedFile } from '../../../shared/model'
 import type { CommitCi, CommitView, ViewSettings } from '../../../shared/protocol'
 import { splitId, title } from '../shared/format'
 import { isDesktop, postMessage, vscodeContext } from '../shared/hostApi'
@@ -17,6 +16,7 @@ import { dragModifiers, installDragModifiers } from './dragModifiers'
 import { setTranslucentDragImage } from './dragImage'
 import { createDropMarker } from './dropMarker'
 import { FileList, FILE_LOCKED_MIME, FILE_MIME } from './FileList'
+import type { FileLoad } from './fileLoads'
 import { LineStats, lineTotals } from './LineStats'
 import { GraphCell } from './GraphCell'
 import { RelativeTime } from './RelativeTime'
@@ -33,7 +33,7 @@ interface CommitRowProps {
   canSquash: boolean
   repoId: string
   lanes: number
-  files: ChangedFile[] | undefined
+  files: FileLoad | undefined
   isExpanded: boolean
   isSelected: boolean
   // The one row of the tree that Tab reaches (roving tabindex).
@@ -49,6 +49,7 @@ interface CommitRowProps {
   trunkCi?: CommitCi
   settings: ViewSettings
   onToggle: (commit: CommitView) => void
+  onRetryFiles: (commit: CommitView) => void
   onSelect: (commitId: string) => void
   onDescribe: (commit: CommitView) => void
   // A change was dropped on this row or next to it. The graph previews or runs it.
@@ -137,10 +138,10 @@ export const CommitRow = memo(function CommitRow(props: CommitRowProps) {
   const copyModifier = useCopyModifier()
   const change = splitId(commit.changeId, commit.changePrefix, settings.changeIdLength)
   const summary = title(commit.description)
-  const fileCount = commit.isWorkingCopy ? (props.files?.length ?? 0) : null
-  const totals =
-    commit.isWorkingCopy && settings.showLineStats ? lineTotals(props.files ?? []) : null
-  const canExpand = !commit.isWorkingCopy || (props.files?.length ?? 0) > 0
+  const listed = Array.isArray(props.files) ? props.files : []
+  const fileCount = commit.isWorkingCopy ? listed.length : null
+  const totals = commit.isWorkingCopy && settings.showLineStats ? lineTotals(listed) : null
+  const canExpand = !commit.isWorkingCopy || listed.length > 0
   const placeholder = commit.isEmpty ? (commit.isWorkingCopy ? '' : '(empty)') : '(no description)'
   // GraphCell is aria-hidden, so the states its node shape shows are said in words.
   const statusText = statusWords(commit).join(', ')
@@ -429,6 +430,7 @@ export const CommitRow = memo(function CommitRow(props: CommitRowProps) {
           <FileList
             commit={commit}
             files={props.files}
+            onRetry={() => props.onRetryFiles(commit)}
             repoId={repoId}
             showFullPaths={settings.showFullPaths}
             showLineStats={settings.showLineStats}
