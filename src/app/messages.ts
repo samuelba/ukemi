@@ -2,6 +2,7 @@ import type { WebviewMessage } from '../../shared/protocol'
 import { isAllowedForgeUrl } from '../forge/hostName'
 import { changeRevision } from '../jj/revsets'
 import type { RepoModel } from '../repo/repoModel'
+import { errorMessage } from '../util/logger'
 import type { CommandEnv } from './commands/context'
 import { SuggestionCancelled } from './describeSuggest/suggesters'
 import { initRepo } from './commands/globalCommands'
@@ -80,11 +81,9 @@ export function createMessageHandler(env: CommandEnv, dispatch: CommandDispatche
           history: env.registry.revsetHistory(model.root),
         })
         return
-      case 'loadFiles': {
-        const files = await model.filesFor(message.commitId)
-        env.graphView.post({ type: 'files', repoId: model.root, commitId: message.commitId, files })
+      case 'loadFiles':
+        await loadFiles(env, model, message.commitId)
         return
-      }
       case 'selectCommit': {
         const commit = model.findCommit(message.commitId)
         if (commit) {
@@ -227,6 +226,19 @@ export function createMessageHandler(env: CommandEnv, dispatch: CommandDispatche
         return
       }
     }
+  }
+}
+
+// The graph shows "Loading files…" until an answer comes, so a failure is answered too.
+async function loadFiles(env: CommandEnv, model: RepoModel, commitId: string): Promise<void> {
+  const repoId = model.root
+  try {
+    const files = await model.filesFor(commitId)
+    env.graphView.post({ type: 'files', repoId, commitId, files })
+  } catch (error: unknown) {
+    const reason = errorMessage(error)
+    env.logger.warn(`listing the files of ${commitId} failed: ${reason}`)
+    env.graphView.post({ type: 'filesFailed', repoId, commitId, error: reason })
   }
 }
 
