@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import type { SuggesterView } from '../../../shared/protocol'
 import { postMessage } from '../shared/hostApi'
 import { useModalFocus } from '../shared/useModalFocus'
@@ -119,8 +119,16 @@ export function DescribeDialog({
     }
   }
 
+  // A click is sent to the backdrop when a text selection ends outside the dialog, so only a press
+  // on the backdrop itself counts, and only while there is no typed text to lose.
+  const onBackdropMouseDown = (event: MouseEvent) => {
+    if (event.target === event.currentTarget && message === initial) {
+      onCancel()
+    }
+  }
+
   return (
-    <div className="dialog-backdrop" onClick={onCancel}>
+    <div className="dialog-backdrop" onMouseDown={onBackdropMouseDown}>
       <div
         ref={dialog}
         className="dialog"
@@ -128,7 +136,6 @@ export function DescribeDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
         onKeyDown={onDialogKeyDown}
       >
         <div id={titleId} className="dialog-title">
