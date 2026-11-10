@@ -123,7 +123,13 @@
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "In Restricted Mode Ukemi does not sign in to GitHub or GitLab and does not hand stored credentials to git."
+      "description": "In Restricted Mode Ukemi does not sign in to GitHub or GitLab, does not hand stored credentials to git, and does not fetch in the background. The workspace cannot set the auto-fetch or describe-suggestion settings.",
+      "restrictedConfigurations": [
+        "ukemi.autoFetch.enabled",
+        "ukemi.autoFetch.interval",
+        "ukemi.describeSuggest.instructions",
+        "ukemi.describeSuggest.maxDiffBytes"
+      ]
     }
   },
   "contributes": {

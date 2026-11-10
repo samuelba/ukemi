@@ -14,7 +14,9 @@ const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
     >
     configuration: { properties: Record<string, { scope?: string }> }
   }
-  capabilities?: { untrustedWorkspaces?: { supported?: unknown } }
+  capabilities?: {
+    untrustedWorkspaces?: { supported?: unknown; restrictedConfigurations?: string[] }
+  }
 }
 
 function sources(dir: string): string[] {
@@ -108,6 +110,15 @@ describe('package.json manifest', () => {
 
   test('declares limited support for untrusted workspaces', () => {
     expect(pkg.capabilities?.untrustedWorkspaces?.supported).toBe('limited')
+  })
+
+  test('ignores workspace values of the settings a hostile repository could abuse', () => {
+    const restricted = pkg.capabilities?.untrustedWorkspaces?.restrictedConfigurations ?? []
+    expect(restricted).toEqual(
+      expect.arrayContaining(['ukemi.autoFetch.enabled', 'ukemi.describeSuggest.instructions']),
+    )
+    const properties = pkg.contributes.configuration.properties
+    expect(restricted.filter((key) => properties[key]?.scope !== 'resource')).toEqual([])
   })
 
   test('declares every setting the host reads', () => {

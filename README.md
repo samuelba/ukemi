@@ -243,7 +243,7 @@ Hosts that the `glab` config file lists, and the `GITLAB_HOST` of a token variab
 ### Storage and safety
 
 - OAuth sessions and personal access tokens are stored in VS Code secret storage. On Linux that is the OS keyring (libsecret), not a clear-text file. **Sign Out** removes both, revokes the GitLab OAuth token, and stops using `gh` or `glab` for that host until the next sign-in. The `gh` and `glab` logins themselves stay in those tools. The editor's own GitHub account is signed out from the Accounts menu.
-- The three host and OAuth settings above apply to your user and machine only, not to a workspace. In Restricted Mode (untrusted workspace) Ukemi does not sign in and does not give stored credentials to git.
+- The three host and OAuth settings above apply to your user and machine only, not to a workspace. In Restricted Mode (untrusted workspace) Ukemi does not sign in, does not give stored credentials to git, and does not fetch in the background, because git follows the repository's own config when it fetches. The workspace's values for the auto-fetch settings and for `describeSuggest.instructions` and `describeSuggest.maxDiffBytes` are ignored.
 - Do not put a password or token in a remote URL. Ukemi rejects such URLs in the new repository prompt and hides URL passwords in its log.
 
 ### GitLab OAuth application
