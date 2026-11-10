@@ -45,6 +45,7 @@ import {
   type PendingDrop,
 } from './pendingDrop'
 import { PreviewRow } from './PreviewRow'
+import { revealStep, type PendingReveal } from './reveal'
 import { RevsetBar, type RevsetReply } from './RevsetBar'
 import { selectedRow, type Selection } from './selection'
 import { Toolbar } from './Toolbar'
@@ -71,7 +72,7 @@ export function App() {
   const requested = useRef(new Set<string>())
   const [selection, setSelection] = useState<Selection | null>(null)
   const announced = useRef<string | null>(null)
-  const [revealId, setRevealId] = useState<string | null>(null)
+  const [reveal, setReveal] = useState<PendingReveal<ViewState['graph'] | null> | null>(null)
   const [describing, setDescribing] = useState<Describing | null>(null)
   const [suggesters, setSuggesters] = useState<SuggesterView[]>([])
   const [suggestionReply, setSuggestionReply] = useState<SuggestionReply | null>(null)
@@ -97,7 +98,7 @@ export function App() {
         case 'reveal': {
           const commit = state?.graph?.commits.find((c) => c.commitId === message.commitId)
           setSelection({ commitId: message.commitId, changeId: commit?.changeId ?? '' })
-          setRevealId(message.commitId)
+          setReveal({ commitId: message.commitId, shownIn: state?.graph ?? null })
           postMessage({ type: 'selectCommit', commitId: message.commitId })
           return
         }
@@ -167,16 +168,17 @@ export function App() {
   const repoId = graph?.repoId ?? ''
 
   useEffect(() => {
-    if (!revealId) {
+    if (!reveal) {
       return
     }
-    const row = document.querySelector(`[data-commit-id="${CSS.escape(revealId)}"]`)
-    if (!row) {
+    const row = document.querySelector(`[data-commit-id="${CSS.escape(reveal.commitId)}"]`)
+    const step = revealStep(reveal, graph, row !== null)
+    if (step === 'wait') {
       return
     }
-    row.scrollIntoView({ block: 'nearest' })
-    setRevealId(null)
-  }, [revealId, graph])
+    row?.scrollIntoView({ block: 'nearest' })
+    setReveal(null)
+  }, [reveal, graph])
 
   const preview = useMemo(() => {
     const drop = pending && graph ? resolvePending(pending, graph.commits) : null
@@ -377,7 +379,7 @@ export function App() {
     const next = matches ? stepMatch(matches, selected, direction) : null
     if (next) {
       selectCommit(next)
-      setRevealId(next)
+      setReveal({ commitId: next, shownIn: graph })
     }
   }
 
