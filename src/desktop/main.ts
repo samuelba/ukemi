@@ -13,6 +13,7 @@ import {
   protocol,
   safeStorage,
   screen,
+  session,
   shell,
 } from 'electron'
 import { locateJj, upgradeManagedJj, versionText } from '../app/jjSetup'
@@ -27,6 +28,7 @@ import { LoopbackServer } from './adapters/loopbackRedirect'
 import { adoptLoginShellPath } from './adapters/loginShellPath'
 import { SecretsFile } from './adapters/secretsFile'
 import { SettingsFile } from './adapters/settingsFile'
+import { APP_HOST, APP_SCHEME, isAppPage } from './appPage'
 import { folderToOpen } from './openPaths'
 import { servedFile } from './servedFile'
 import { TrustStore } from './adapters/trustStore'
@@ -57,8 +59,6 @@ import {
   updateNotice,
   type Release,
 } from './updateCheck'
-const SCHEME = 'ukemi'
-const PAGE_HOST = 'app'
 const OPEN_FOLDERS_KEY = 'openFolders'
 const BOUNDS_KEY = 'windowBounds'
 const ZOOM_KEY = 'zoomFactor'
@@ -79,7 +79,7 @@ if (userDataOverride) {
 }
 
 protocol.registerSchemesAsPrivileged([
-  { scheme: SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } },
+  { scheme: APP_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } },
 ])
 
 function desktopPaths(): DesktopPaths {
@@ -189,6 +189,7 @@ class DesktopApp implements DesktopContext {
       }
     })
     this.serveFiles()
+    this.denyPermissions()
     this.routeMessages()
     this.installMenu()
     this.recentRepos.onDidChange(() => this.installMenu())
@@ -236,7 +237,7 @@ class DesktopApp implements DesktopContext {
   }
 
   pageUrl(page: Page): string {
-    return `${SCHEME}://${PAGE_HOST}/desktop/${page}.html`
+    return `${APP_SCHEME}://${APP_HOST}/desktop/${page}.html`
   }
 
   backgroundColor(): string {
@@ -270,9 +271,11 @@ class DesktopApp implements DesktopContext {
     void this.state.update(BOUNDS_KEY, placement)
   }
 
-  // Pages never navigate away or open windows. Links go to the browser.
+  // Pages never navigate away, embed other pages or open windows. Links go to the browser.
   guardNavigation(window: BrowserWindow): void {
     window.webContents.on('will-navigate', (event) => event.preventDefault())
+    window.webContents.on('will-redirect', (event) => event.preventDefault())
+    window.webContents.on('will-attach-webview', (event) => event.preventDefault())
     window.webContents.setWindowOpenHandler(({ url }) => {
       if (/^https?:/i.test(url)) {
         void shell.openExternal(url)
@@ -381,9 +384,9 @@ class DesktopApp implements DesktopContext {
   }
 
   private serveFiles(): void {
-    protocol.handle(SCHEME, (request) => {
+    protocol.handle(APP_SCHEME, (request) => {
       const url = new URL(request.url)
-      const path = url.host === PAGE_HOST ? servedFile(this.paths.dist, url, isDevelopment) : null
+      const path = url.host === APP_HOST ? servedFile(this.paths.dist, url, isDevelopment) : null
       return path
         ? net.fetch(pathToFileURL(path).toString())
         : new Response('Not found', { status: 404 })
@@ -406,8 +409,22 @@ class DesktopApp implements DesktopContext {
     }, 100)
   }
 
+  // The pages use no camera, microphone, notifications or other browser permissions.
+  private denyPermissions(): void {
+    session.defaultSession.setPermissionRequestHandler((_contents, _permission, answer) =>
+      answer(false),
+    )
+    session.defaultSession.setPermissionCheckHandler(() => false)
+  }
+
+  // Only the main frame of an app page may talk to main, not a frame it embeds.
   private routeMessages(): void {
     ipcMain.on(TO_MAIN, (event, message: unknown) => {
+      const frame = event.senderFrame
+      if (!frame || frame !== event.sender.mainFrame || !isAppPage(frame.url)) {
+        this.logger.warn(`ignored a message from ${frame?.url ?? 'a closed frame'}`)
+        return
+      }
       const id = event.sender.id
       const session = [...this.sessions].find((s) => s.webContentsId === id)
       void session?.receive(message)
