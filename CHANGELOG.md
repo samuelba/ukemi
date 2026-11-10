@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.15.0](https://github.com/samuelba/ukemi/compare/v0.14.0...v0.15.0) (2026-11-09)
+
+
+### Features
+
+* absorb a change or a file into its ancestors (@samuelba) ([400db25](https://github.com/samuelba/ukemi/commit/400db25169c8c480074bc0a512703fbc87be5268))
+* edit a change's author and change id (@samuelba) ([69c4b08](https://github.com/samuelba/ukemi/commit/69c4b080b203e6ae663d30d19055ec99609d5c62))
+* open folders and files dropped on the desktop window (@samuelba) ([5374c7d](https://github.com/samuelba/ukemi/commit/5374c7d33041a8541ff169546c67f02f80f7868c))
+* run jj fix on a change and its descendants (@samuelba) ([57168cc](https://github.com/samuelba/ukemi/commit/57168cccfdb59fd690159a3963861162edf3410f))
+* save revsets by name and add a jj log filter (@samuelba) ([d4dcc19](https://github.com/samuelba/ukemi/commit/d4dcc1994fd104ec106e03edf540556e976ebaf0))
+* set or clear a file's executable bit (@samuelba) ([af94e8f](https://github.com/samuelba/ukemi/commit/af94e8f4bd96db139ca3d552ff5095cfc44feb26))
+* stop tracking a working-copy file (@samuelba) ([ae54a97](https://github.com/samuelba/ukemi/commit/ae54a97998005b51a1985845524d5ea50a99c860))
+
 ## [0.14.0](https://github.com/samuelba/ukemi/compare/v0.13.0...v0.14.0) (2026-11-08)
 
 
