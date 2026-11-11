@@ -40,6 +40,8 @@ There are two ways to use Ukemi:
 ## Requirements
 
 - Linux (tested on Ubuntu 24.04 and Fedora 44).
+- Windows
+- macOS
 - jj 0.40 or later. Ukemi downloads jj 0.47 when you agree.
 
 ## Suggested descriptions

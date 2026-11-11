@@ -6,3 +6,4 @@ coverage/
 .vscode-test/
 scripts/preview/state.generated.js
 mise.toml
+/BACKLOG.md
