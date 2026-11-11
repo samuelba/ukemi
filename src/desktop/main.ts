@@ -1,6 +1,6 @@
 import { existsSync, statSync } from 'node:fs'
 import { homedir, release } from 'node:os'
-import { isAbsolute, join, normalize, relative, resolve, sep } from 'node:path'
+import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import {
   BrowserWindow,
@@ -28,6 +28,7 @@ import { adoptLoginShellPath } from './adapters/loginShellPath'
 import { SecretsFile } from './adapters/secretsFile'
 import { SettingsFile } from './adapters/settingsFile'
 import { folderToOpen } from './openPaths'
+import { servedFile } from './servedFile'
 import { TrustStore } from './adapters/trustStore'
 import { RepoTabStore } from './adapters/repoTabStore'
 import { RecentRepoStore } from './adapters/recentRepoStore'
@@ -93,16 +94,6 @@ function desktopPaths(): DesktopPaths {
     userData,
     log: join(app.getPath('logs'), 'ukemi.log'),
   }
-}
-
-// Serves only files inside dist, so a page cannot read anything else on disk.
-function servedFile(dist: string, url: URL): string | null {
-  const path = normalize(join(dist, decodeURIComponent(url.pathname)))
-  const inside = relative(dist, path)
-  if (inside.startsWith(`..${sep}`) || inside === '..' || isAbsolute(inside)) {
-    return null
-  }
-  return existsSync(path) && statSync(path).isFile() ? path : null
 }
 
 // Folders from the command line, like `ukemi .` or `ukemi ~/src/repo`, resolved to repo roots.
@@ -392,7 +383,7 @@ class DesktopApp implements DesktopContext {
   private serveFiles(): void {
     protocol.handle(SCHEME, (request) => {
       const url = new URL(request.url)
-      const path = url.host === PAGE_HOST ? servedFile(this.paths.dist, url) : null
+      const path = url.host === PAGE_HOST ? servedFile(this.paths.dist, url, isDevelopment) : null
       return path
         ? net.fetch(pathToFileURL(path).toString())
         : new Response('Not found', { status: 404 })
