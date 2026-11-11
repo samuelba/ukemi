@@ -68,7 +68,7 @@ const UNTRUSTED_MESSAGE =
   'Ukemi: trust this repository to sign in to a forge. Reopen it and choose Trust.'
 
 const TRUST_DETAIL =
-  'Ukemi only signs in to GitHub or GitLab, and only hands stored credentials to git, in repositories you trust. A repository chooses which servers its remotes point to.'
+  'Ukemi only signs in to GitHub or GitLab, hands stored credentials to git, and fetches in the background in repositories you trust. A repository chooses which servers its remotes point to, and its git config can run commands when git fetches.'
 
 function isMessage(value: unknown): value is { type: string } {
   return (

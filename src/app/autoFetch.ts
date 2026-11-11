@@ -46,6 +46,7 @@ export class AutoFetcher implements Disposable {
       registry.onDidChange(() => this.schedule()),
       this.operations.onDidChange(() => this.schedule()),
       host.window.onDidFocus(() => this.schedule()),
+      host.window.onDidGrantTrust(() => this.schedule()),
       host.settings.onDidChange((change) => {
         if (change.affects('autoFetch.enabled') || change.affects('autoFetch.interval')) {
           this.schedule()
@@ -97,8 +98,11 @@ export class AutoFetcher implements Disposable {
     this.timer = setTimeout(() => this.schedule(), delay)
   }
 
+  // `jj git fetch` runs git, which follows the repository's own git config, so an untrusted
+  // repository is only fetched when the user asks.
   private canFetch(model: RepoModel): boolean {
     return (
+      this.host.window.isTrusted &&
       this.host.settings.read(model.root).autoFetchEnabled &&
       this.host.window.isFocused &&
       model.graph?.hasRemotes === true
