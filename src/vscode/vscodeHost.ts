@@ -1,7 +1,7 @@
 import { join, sep } from 'node:path'
 import * as vscode from 'vscode'
 import type { Event } from '../app/events'
-import type { FolderSource, Host, WatchRepo, WindowState } from '../app/host'
+import type { FolderSource, Host, WatchFolder, WatchRepo, WindowState } from '../app/host'
 import type { Settings } from '../app/settings'
 import { repositoryStore } from '../repo/workspaceFolder'
 import type { OpenPick, PickItem, TypedPickOptions, Ui } from '../app/ui'
@@ -160,6 +160,19 @@ export const watchRepo: WatchRepo = (root, handlers) => {
   return vscode.Disposable.from(files, ops)
 }
 
+// `git init`, `jj git init` and a clone each create one of these folders.
+export const watchFolder: WatchFolder = (folder, onChange) => {
+  const markers = vscode.workspace.createFileSystemWatcher(
+    new vscode.RelativePattern(folder, '**/{.jj,.git}'),
+    false,
+    true,
+    false,
+  )
+  markers.onDidCreate(() => onChange())
+  markers.onDidDelete(() => onChange())
+  return markers
+}
+
 export function vscodeHost(context: vscode.ExtensionContext, settings: Settings): Host {
   return {
     ui: vscodeUi,
@@ -167,6 +180,7 @@ export function vscodeHost(context: vscode.ExtensionContext, settings: Settings)
     window: vscodeWindowState,
     folders: vscodeFolders,
     watchRepo,
+    watchFolder,
     store: context.workspaceState,
     secrets: context.secrets,
   }

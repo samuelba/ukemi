@@ -2,10 +2,17 @@ import { dirname } from 'node:path'
 import type { RepoSummary } from '../../shared/protocol'
 import { JjRepo } from '../jj/repo'
 import type { JjRunner } from '../jj/runner'
-import { discoverRepos, findRepoRootUpwards, type RepoKind } from '../repo/discovery'
+import {
+  discoverRepos,
+  findRepoRootUpwards,
+  isInside,
+  isJjRepo,
+  type DiscoveredRepo,
+  type RepoKind,
+} from '../repo/discovery'
 import { repoLabel } from '../repo/labels'
 import { RepoModel } from '../repo/repoModel'
-import type { Logger } from '../util/logger'
+import { errorMessage, type Logger } from '../util/logger'
 import { Debouncer } from './debouncer'
 import { Emitter, type Disposable } from './events'
 import type { Host } from './host'
@@ -25,10 +32,17 @@ const BACKGROUND_REFRESH_DELAY_MS = 3_000
 const ACTIVE_REFRESH_MAX_WAIT_MS = 2_000
 const BACKGROUND_REFRESH_MAX_WAIT_MS = 15_000
 const ACTIVE_REPO_KEY = 'ukemi.activeRepo'
+const RESCAN_DELAY_MS = 1_000
+const RESCAN_MAX_WAIT_MS = 5_000
+
+// A scanned repository goes when a scan no longer finds it. One added by hand or followed from
+// the editor lies outside the scan, so it stays until it is closed or stops being a repository.
+type EntrySource = 'scan' | 'kept'
 
 interface RepoEntry {
   root: string
   kind: RepoKind
+  source: EntrySource
   model: RepoModel | null
   disposables: Disposable[]
 }
@@ -39,6 +53,11 @@ export class RepoRegistry implements Disposable {
   private readonly changeEmitter = new Emitter<void>()
   private readonly modelEmitter = new Emitter<RepoModel>()
   private readonly disposables: Disposable[] = []
+  private readonly folderWatchers = new Map<string, Disposable>()
+  private readonly rescan = new Debouncer(() => void this.discover())
+  private running: Promise<void> | null = null
+  private queued: Promise<void> | null = null
+  private isDisposed = false
 
   readonly onDidChange = this.changeEmitter.event
   readonly onDidChangeModel = this.modelEmitter.event
@@ -51,7 +70,11 @@ export class RepoRegistry implements Disposable {
     this.disposables.push(
       host.folders.onDidChangeFolders(() => void this.discover()),
       host.folders.onDidChangeActiveFile((path) => void this.followFile(path)),
-      host.window.onDidFocus(() => void this.activeModel?.refreshWorkingCopy()),
+      host.window.onDidFocus(() => {
+        void this.activeModel?.refreshWorkingCopy()
+        this.scheduleRescan()
+      }),
+      this.rescan,
     )
   }
 
@@ -83,23 +106,53 @@ export class RepoRegistry implements Disposable {
       .sort((a, b) => a.label.localeCompare(b.label))
   }
 
-  async discover(): Promise<void> {
+  // Runs after any scan in progress, and calls made while one waits share it. Never rejects.
+  discover(): Promise<void> {
+    if (this.queued) {
+      return this.queued
+    }
+    if (!this.running) {
+      this.running = this.scan()
+        .catch((error: unknown) =>
+          this.logger.error(`finding repositories: ${errorMessage(error)}`),
+        )
+        .finally(() => {
+          this.running = null
+        })
+      return this.running
+    }
+    this.queued = this.running.then(() => {
+      this.queued = null
+      return this.discover()
+    })
+    return this.queued
+  }
+
+  private scheduleRescan(): void {
+    this.rescan.schedule(RESCAN_DELAY_MS, RESCAN_MAX_WAIT_MS)
+  }
+
+  private async scan(): Promise<void> {
     const config = this.host.settings.read()
     const folders = this.host.folders.folders()
-    const found = (
-      await Promise.all(
-        folders.map((f) =>
-          discoverRepos(f.path, {
-            maxDepth: config.repoScanDepth,
-            exclude: config.repoScanExclude,
-          }),
-        ),
-      )
-    ).flat()
+    const perFolder = await Promise.all(
+      folders.map((f) =>
+        discoverRepos(f.path, {
+          maxDepth: config.repoScanDepth,
+          exclude: config.repoScanExclude,
+        }),
+      ),
+    )
+    const found = perFolder.flat()
+    const keptRoots = await this.keptRootsStillRepos()
+    if (this.isDisposed) {
+      return
+    }
 
     const roots = new Set(found.map((r) => r.root))
     for (const [root, entry] of this.entries) {
-      if (!roots.has(root)) {
+      const stays = roots.has(root) || (entry.source === 'kept' && keptRoots.has(root))
+      if (!stays) {
         this.disposeEntry(entry)
         this.entries.delete(root)
       }
@@ -110,14 +163,42 @@ export class RepoRegistry implements Disposable {
         if (existing) {
           this.disposeEntry(existing)
         }
-        this.entries.set(repo.root, this.createEntry(repo.root, repo.kind))
+        this.entries.set(repo.root, this.createEntry(repo.root, repo.kind, 'scan'))
       }
     }
+    this.watchFolders(
+      folders.filter((f, i) => !insideJjRepo(f.path, perFolder[i] ?? [])).map((f) => f.path),
+    )
 
     const remembered = this.host.store.get<string>(ACTIVE_REPO_KEY)
     const fallback = this.preferredRoot(remembered)
     await this.setActive(fallback, { remember: false })
     await this.followFile(this.host.folders.activeFile())
+  }
+
+  private async keptRootsStillRepos(): Promise<Set<string>> {
+    const kept = [...this.entries.values()].filter((e) => e.source === 'kept').map((e) => e.root)
+    const stillRepos = await Promise.all(kept.map((root) => isJjRepo(root)))
+    return new Set(kept.filter((_, i) => stillRepos[i]))
+  }
+
+  // A folder that is a jj repository shows only that one, so nothing new can appear in it.
+  private watchFolders(paths: readonly string[]): void {
+    const wanted = new Set(paths)
+    for (const [path, watcher] of this.folderWatchers) {
+      if (!wanted.has(path)) {
+        watcher.dispose()
+        this.folderWatchers.delete(path)
+      }
+    }
+    for (const path of wanted) {
+      if (!this.folderWatchers.has(path)) {
+        this.folderWatchers.set(
+          path,
+          this.host.watchFolder(path, () => this.scheduleRescan()),
+        )
+      }
+    }
   }
 
   private preferredRoot(remembered: string | undefined): string | null {
@@ -205,7 +286,7 @@ export class RepoRegistry implements Disposable {
     if (existing) {
       this.disposeEntry(existing)
     }
-    this.entries.set(root, this.createEntry(root, 'jj'))
+    this.entries.set(root, this.createEntry(root, 'jj', 'kept'))
     await this.setActive(root)
   }
 
@@ -218,13 +299,13 @@ export class RepoRegistry implements Disposable {
       return
     }
     if (!this.entries.has(root)) {
-      this.entries.set(root, this.createEntry(root, 'jj'))
+      this.entries.set(root, this.createEntry(root, 'jj', 'kept'))
     }
     await this.setActive(root, { remember: false })
   }
 
-  private createEntry(root: string, kind: RepoKind): RepoEntry {
-    const entry: RepoEntry = { root, kind, model: null, disposables: [] }
+  private createEntry(root: string, kind: RepoKind, source: EntrySource): RepoEntry {
+    const entry: RepoEntry = { root, kind, source, model: null, disposables: [] }
     if (kind !== 'jj') {
       return entry
     }
@@ -279,10 +360,17 @@ export class RepoRegistry implements Disposable {
   }
 
   dispose(): void {
+    this.isDisposed = true
+    this.folderWatchers.forEach((w) => w.dispose())
+    this.folderWatchers.clear()
     this.entries.forEach((e) => this.disposeEntry(e))
     this.entries.clear()
     this.disposables.forEach((d) => d.dispose())
     this.changeEmitter.dispose()
     this.modelEmitter.dispose()
   }
+}
+
+function insideJjRepo(folder: string, found: readonly DiscoveredRepo[]): boolean {
+  return found.some((r) => r.kind === 'jj' && (r.root === folder || isInside(r.root, folder)))
 }

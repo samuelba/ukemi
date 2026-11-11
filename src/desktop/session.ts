@@ -37,7 +37,7 @@ import { AskpassServer } from '../askpass/server'
 import { JjRunner } from '../jj/runner'
 import { errorMessage, type Logger } from '../util/logger'
 import { RendererUi, type NativeUi } from './adapters/rendererUi'
-import { fsWatchRepo } from './adapters/watchRepo'
+import { fsWatchFolder, fsWatchRepo } from './adapters/watchRepo'
 import { windowStore } from './adapters/windowStore'
 import { arrangeTabs, move, pin, rename, unpin } from './repoTabs'
 import { TO_RENDERER, type DesktopContext } from './context'
@@ -325,6 +325,7 @@ export class DesktopSession implements Disposable {
     this.folderList.splice(0, this.folderList.length, ...next)
     this.context.foldersChanged()
     this.window.setTitle(this.title())
+    await this.registry.remove(repoId)
     await this.registry.discover()
     this.scheduleState()
   }
@@ -481,6 +482,7 @@ export class DesktopSession implements Disposable {
       window: windowState,
       folders,
       watchRepo: fsWatchRepo(context.logger),
+      watchFolder: fsWatchFolder(context.logger),
       store: windowStore(context.state.scoped('window')),
       secrets: context.secrets,
     }
