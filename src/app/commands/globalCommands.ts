@@ -435,5 +435,8 @@ export function globalCommands(env: CommandEnv): Record<string, Handler> {
     'ukemi.installJj': () => env.workbench.installJj(),
     'ukemi.view.asList': () => setChangedFilesView(env, 'list'),
     'ukemi.view.asTree': () => setChangedFilesView(env, 'tree'),
+    // The checked twins of the two above, which VS Code shows for the current mode.
+    'ukemi.view.asListChecked': () => setChangedFilesView(env, 'list'),
+    'ukemi.view.asTreeChecked': () => setChangedFilesView(env, 'tree'),
   }
 }

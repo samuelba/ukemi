@@ -1,13 +1,14 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, test } from 'vitest'
+import { evaluateWhen } from '../../shared/menus'
 import { REPOSITORY_KEYS } from '../../shared/settingsScope'
 import { manifest as desktopManifest } from '../../src/desktop/menus'
 
 const root = resolve(__dirname, '../..')
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
   contributes: {
-    commands: Array<{ command: string }>
+    commands: Array<{ command: string; title: string }>
     menus: Record<
       string,
       Array<{ command?: string; alt?: string; submenu?: string; when?: string }>
@@ -37,6 +38,8 @@ const webviewSource = read(sources(join(root, 'webview/src')))
 const registered = registeredIn(hostSource)
 // What the VS Code extension registers: everything outside the standalone app.
 const extensionRegistered = registeredIn(read(hostFiles.filter((f) => !f.startsWith(desktopDir))))
+const title = (command?: string) =>
+  pkg.contributes.commands.find((c) => c.command === command)?.title
 const declared = new Set(pkg.contributes.commands.map((c) => c.command))
 // package.json plus the commands only the standalone app has.
 const desktopDeclared = new Set(desktopManifest.commands.map((c) => c.command))
@@ -125,5 +128,36 @@ describe('package.json manifest', () => {
     const config = readFileSync(join(root, 'src/app/settings.ts'), 'utf8')
     const read = [...config.matchAll(/c\.get<[^>]+>\('([\w.]+)'/g)].map((m) => `ukemi.${m[1]}`)
     expect(read.filter((key) => !(key in pkg.contributes.configuration.properties))).toEqual([])
+  })
+  // VS Code ignores `toggled` on contributed menus and commands, so the state shows by swapping
+  // commands with `when` clauses instead.
+  test('uses no toggled key, which VS Code ignores', () => {
+    expect(JSON.stringify(pkg.contributes)).not.toContain('"toggled"')
+  })
+
+  test('the view mode menu shows a checked item for exactly the current mode', () => {
+    const items = pkg.contributes.menus['ukemi.viewMode'] ?? []
+    const shown = (mode: string) =>
+      items
+        .filter((item) => evaluateWhen(item.when, { 'config.ukemi.changedFilesView': mode }))
+        .map((item) => title(item.command))
+    expect(shown('list')).toEqual(['✓ View as List', 'View as Tree'])
+    expect(shown('tree')).toEqual(['View as List', '✓ View as Tree'])
+  })
+
+  test('the evolution view shows either Follow or Pin', () => {
+    const items = pkg.contributes.menus['view/title'] ?? []
+    const shown = (following: boolean) =>
+      items
+        .filter((item) => item.command?.startsWith('ukemi.evolution.'))
+        .filter((item) =>
+          evaluateWhen(item.when, {
+            view: 'ukemi.evolution',
+            'ukemi.evolution.following': following,
+          }),
+        )
+        .map((item) => item.command)
+    expect(shown(true)).toEqual(['ukemi.evolution.pin'])
+    expect(shown(false)).toEqual(['ukemi.evolution.follow'])
   })
 })

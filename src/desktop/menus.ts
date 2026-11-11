@@ -1,5 +1,6 @@
 import type { MenuItemConstructorOptions } from 'electron'
 import type { ShellAction, ZoomStep } from '../../shared/desktopProtocol'
+import type { ChangedFilesView } from '../../shared/protocol'
 import {
   inlineActions,
   resolveMenu,
@@ -106,8 +107,12 @@ export function treeItemActions(
 }
 
 // The graph view's title bar menu, shown as the app's toolbar overflow.
-export function graphTitleMenu(offers: (command: string) => boolean): MenuEntry[] {
-  return resolveMenu(manifest, 'view/title', { view: 'ukemi.graph' }, offers)
+export function graphTitleMenu(
+  offers: (command: string) => boolean,
+  changedFilesView: ChangedFilesView,
+): MenuEntry[] {
+  const context = { view: 'ukemi.graph', 'config.ukemi.changedFilesView': changedFilesView }
+  return resolveMenu(manifest, 'view/title', context, offers)
 }
 
 // Every command a user can run by name: what the host offers, minus the item-only commands that
@@ -209,6 +214,7 @@ export interface AppMenuActions {
   clearRecent: () => void
   // The zoom of the windows, as a percentage.
   zoom: { percent: number; step: (step: ZoomStep) => void }
+  changedFilesView: ChangedFilesView
   // The shortcut of each action in SHORTCUT_ACTIONS, by its id.
   keys: ShortcutKeys
   newWindow: () => void
@@ -316,8 +322,16 @@ export function appMenuTemplate(actions: AppMenuActions): MenuItemConstructorOpt
         { type: 'separator' },
         command('ukemi.toggleAutoFetch'),
         command('ukemi.toggleGitTags'),
-        command('ukemi.view.asList'),
-        command('ukemi.view.asTree'),
+        {
+          ...command('ukemi.view.asList'),
+          type: 'radio',
+          checked: actions.changedFilesView === 'list',
+        },
+        {
+          ...command('ukemi.view.asTree'),
+          type: 'radio',
+          checked: actions.changedFilesView === 'tree',
+        },
         { type: 'separator' },
         // Ctrl with the mouse wheel zooms too, in the window.
         item('app.zoomIn', () => zoom.step('in')),

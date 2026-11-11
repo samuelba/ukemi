@@ -19,6 +19,7 @@ function actions(overrides: Partial<AppMenuActions> = {}): AppMenuActions {
     openRecent: none,
     clearRecent: none,
     zoom: { percent: 100, step: none },
+    changedFilesView: 'list',
     keys: shortcutKeys(undefined),
     openKeyboardShortcuts: none,
     newWindow: none,
@@ -87,6 +88,17 @@ describe('View > Zoom', () => {
   test('has nothing to reset at 100%', () => {
     const reset = zoomItems(100).at(-1)
     expect(reset).toMatchObject({ label: 'Reset Zoom', enabled: false })
+  })
+})
+
+describe('View > View as List/Tree', () => {
+  test('checks the current mode as a radio item', () => {
+    const view = menu(appMenuTemplate(actions({ changedFilesView: 'tree' })), '&View')
+    const modes = view.filter((item) => item.type === 'radio')
+    expect(modes.map((item) => [item.label, item.checked])).toEqual([
+      ['View as List', false],
+      ['View as Tree', true],
+    ])
   })
 })
 
