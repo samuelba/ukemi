@@ -173,7 +173,7 @@ class DesktopApp implements DesktopContext {
       if (affectsJj(change)) {
         void this.reloadJj()
       }
-      if (change.affects(KEYBINDINGS)) {
+      if (change.affects(KEYBINDINGS) || change.affects('changedFilesView')) {
         this.installMenu()
       }
       if (change.affects(THEME)) {
@@ -457,6 +457,7 @@ class DesktopApp implements DesktopContext {
       openRecent: (root) => void this.openRecent(root),
       clearRecent: () => void this.recentRepos.clear(),
       zoom: { percent: zoomPercent(this.zoomFactor()), step: (step) => this.zoom(step) },
+      changedFilesView: this.settings.read().changedFilesView,
       keys: shortcutKeys(this.settings.values()[KEYBINDINGS]),
       newWindow: () => this.openWindow([]),
       openSettings: () => this.focusedSession()?.showSettings(),

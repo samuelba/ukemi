@@ -871,6 +871,16 @@
         "icon": "$(list-tree)"
       },
       {
+        "command": "ukemi.view.asListChecked",
+        "title": "✓ View as List",
+        "category": "Ukemi"
+      },
+      {
+        "command": "ukemi.view.asTreeChecked",
+        "title": "✓ View as Tree",
+        "category": "Ukemi"
+      },
+      {
         "command": "ukemi.evolution.open",
         "title": "Show Changes in This Version",
         "category": "Ukemi",
@@ -893,6 +903,12 @@
         "title": "Follow the Selected Change",
         "category": "Ukemi",
         "icon": "$(target)"
+      },
+      {
+        "command": "ukemi.evolution.pin",
+        "title": "Pin the Shown Change",
+        "category": "Ukemi",
+        "icon": "$(pin)"
       },
       {
         "command": "ukemi.operation.restore",
@@ -1345,8 +1361,12 @@
         {
           "command": "ukemi.evolution.follow",
           "group": "navigation@1",
-          "when": "view == ukemi.evolution",
-          "toggled": "ukemi.evolution.following"
+          "when": "view == ukemi.evolution && !ukemi.evolution.following"
+        },
+        {
+          "command": "ukemi.evolution.pin",
+          "group": "navigation@1",
+          "when": "view == ukemi.evolution && ukemi.evolution.following"
         },
         {
           "command": "ukemi.initRepo",
@@ -1641,12 +1661,22 @@
         {
           "command": "ukemi.view.asList",
           "group": "1_mode@1",
-          "toggled": "config.ukemi.changedFilesView == list"
+          "when": "config.ukemi.changedFilesView != list"
+        },
+        {
+          "command": "ukemi.view.asListChecked",
+          "group": "1_mode@1",
+          "when": "config.ukemi.changedFilesView == list"
         },
         {
           "command": "ukemi.view.asTree",
           "group": "1_mode@2",
-          "toggled": "config.ukemi.changedFilesView == tree"
+          "when": "config.ukemi.changedFilesView != tree"
+        },
+        {
+          "command": "ukemi.view.asTreeChecked",
+          "group": "1_mode@2",
+          "when": "config.ukemi.changedFilesView == tree"
         }
       ],
       "scm/title": [
@@ -2072,6 +2102,18 @@
         },
         {
           "command": "ukemi.evolution.follow",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.evolution.pin",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.view.asListChecked",
+          "when": "false"
+        },
+        {
+          "command": "ukemi.view.asTreeChecked",
           "when": "false"
         },
         {

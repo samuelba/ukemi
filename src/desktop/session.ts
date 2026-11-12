@@ -693,7 +693,7 @@ export class DesktopSession implements Disposable {
         return
       case 'desktop.titleMenu':
         this.popup(
-          graphTitleMenu((c) => this.offers(c)),
+          graphTitleMenu((c) => this.offers(c), this.context.settings.read().changedFilesView),
           undefined,
           message,
         )
@@ -742,7 +742,7 @@ export class DesktopSession implements Disposable {
     this.post({
       type: 'desktop.commands',
       commands: paletteCommands(offers),
-      toolbar: graphTitleMenu(offers),
+      toolbar: graphTitleMenu(offers, this.context.settings.read().changedFilesView),
     })
     this.postState()
   }

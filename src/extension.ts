@@ -213,7 +213,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<UkemiA
     ...fileHistoryCommands(env),
     ...inlineBlame.commands(),
     'ukemi.evolution.follow': () => {
-      selection.toggleFollow(evolutionView.currentSelection())
+      if (!selection.isFollowing) {
+        selection.toggleFollow(evolutionView.currentSelection())
+      }
+    },
+    'ukemi.evolution.pin': () => {
+      if (selection.isFollowing) {
+        selection.toggleFollow(evolutionView.currentSelection())
+      }
     },
     'ukemi.bookmarks.filter': () => bookmarksView.promptFilter(),
     'ukemi.bookmarks.clearFilter': () => bookmarksView.clearFilter(),
