@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.15.1](https://github.com/samuelba/ukemi/compare/v0.15.0...v0.15.1) (2026-11-12)
+
+
+### Bug Fixes
+
+* **desktop:** accept IPC only from the app page's main frame (@samuelba) ([21535da](https://github.com/samuelba/ukemi/commit/21535dab70f0031c7d4e165e649c04b9384e21e6))
+* **desktop:** serve only the page bundles over the app protocol (@samuelba) ([e5d2e43](https://github.com/samuelba/ukemi/commit/e5d2e437535f15e26ac6c34d0a84b0182b0ef8a6))
+* **graph:** answer failed file-list loads instead of loading forever (@samuelba) ([d83ea0e](https://github.com/samuelba/ukemi/commit/d83ea0efcbbf10bdb7816d58db5784f8e52c033b))
+* **graph:** drop a reveal whose change does not come into the graph (@samuelba) ([e3ed488](https://github.com/samuelba/ukemi/commit/e3ed488586770e01990d8453e24f58d60af0ba9d))
+* **registry:** find new repositories and keep ones added by hand (@samuelba) ([f7c8baf](https://github.com/samuelba/ukemi/commit/f7c8baf3edf7cdb990e7ffad8f77203ce7c4d6e8))
+* **security:** stop background fetches and workspace overrides in Restricted Mode (@samuelba) ([255e70f](https://github.com/samuelba/ukemi/commit/255e70f16d763582593d1e286acb35af41129402))
+* show menu toggle state without the ignored toggled key (@samuelba) ([1edc11f](https://github.com/samuelba/ukemi/commit/1edc11fdce3ddc170fba2c471f1cbccf951ae627))
+* **webview:** keep the Describe dialog when a selection ends on the backdrop (@samuelba) ([d565682](https://github.com/samuelba/ukemi/commit/d565682b2ac8f63d46bad879dffce2c8dc54a51c))
+
 ## [0.15.0](https://github.com/samuelba/ukemi/compare/v0.14.0...v0.15.0) (2026-11-09)
 
 
