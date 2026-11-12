@@ -1,6 +1,6 @@
 import { watch, type FSWatcher } from 'node:fs'
 import { join, sep } from 'node:path'
-import type { RepoWatchHandlers, WatchRepo } from '../../app/host'
+import type { RepoWatchHandlers, WatchFolder, WatchRepo } from '../../app/host'
 import type { Logger } from '../../util/logger'
 import { errorMessage } from '../../util/logger'
 import { repositoryStore } from '../../repo/workspaceFolder'
@@ -98,5 +98,14 @@ export function fsWatchRepo(
         ops?.close()
       },
     }
+  }
+}
+
+// Watches only the folder's own entries: a repository cloned or created right inside it. Deeper
+// ones are found when the window gets focus.
+export function fsWatchFolder(logger: Logger): WatchFolder {
+  return (folder, onChange) => {
+    const watcher = tryWatch(folder, { recursive: false }, () => onChange(), logger)
+    return { dispose: () => watcher?.close() }
   }
 }

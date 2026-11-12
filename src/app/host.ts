@@ -34,6 +34,9 @@ export interface RepoWatchHandlers {
 
 export type WatchRepo = (root: string, handlers: RepoWatchHandlers) => Disposable
 
+// Reports that something in `folder` changed which might be a repository appearing or going away.
+export type WatchFolder = (folder: string, onChange: () => void) => Disposable
+
 export interface KeyValueStore {
   get<T>(key: string): T | undefined
   update(key: string, value: unknown): PromiseLike<void>
@@ -46,6 +49,7 @@ export interface Host {
   readonly window: WindowState
   readonly folders: FolderSource
   readonly watchRepo: WatchRepo
+  readonly watchFolder: WatchFolder
   readonly store: KeyValueStore
   readonly secrets: SecretStore
 }

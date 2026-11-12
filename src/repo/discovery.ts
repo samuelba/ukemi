@@ -1,6 +1,6 @@
 import type { Dirent } from 'node:fs'
 import { readdir } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { dirname, isAbsolute, join, relative } from 'node:path'
 import { isDirectory, pathExists } from '../util/fs'
 
 export type RepoKind = 'jj' | 'git'
@@ -27,6 +27,15 @@ export const DEFAULT_EXCLUDES = [
   '.venv',
   '__pycache__',
 ]
+
+export function isJjRepo(dir: string): Promise<boolean> {
+  return isDirectory(join(dir, '.jj'))
+}
+
+export function isInside(parent: string, child: string): boolean {
+  const rel = relative(parent, child)
+  return rel.length > 0 && !rel.startsWith('..') && !isAbsolute(rel)
+}
 
 async function repoKindAt(dir: string): Promise<RepoKind | null> {
   if (await isDirectory(join(dir, '.jj'))) {
