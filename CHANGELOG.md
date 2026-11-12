@@ -5,22 +5,14 @@
 
 ### Bug Fixes
 
-* **desktop:** accept IPC only from the app page's main frame ([57f7546](https://github.com/samuelba/ukemi/commit/57f75467494a6f1c6f788e5a6fa16a5c67f5f070))
-* **desktop:** accept IPC only from the app page's main frame ([21535da](https://github.com/samuelba/ukemi/commit/21535dab70f0031c7d4e165e649c04b9384e21e6))
-* **desktop:** serve only the page bundles over the app protocol ([604280e](https://github.com/samuelba/ukemi/commit/604280e4655fece626f1f1d2fb125457db26644c))
-* **desktop:** serve only the page bundles over the app protocol ([e5d2e43](https://github.com/samuelba/ukemi/commit/e5d2e437535f15e26ac6c34d0a84b0182b0ef8a6))
-* **graph:** answer failed file-list loads instead of loading forever ([c1a2564](https://github.com/samuelba/ukemi/commit/c1a25643729d4072c124d56b0345c1dd690a0bb5))
-* **graph:** answer failed file-list loads instead of loading forever ([d83ea0e](https://github.com/samuelba/ukemi/commit/d83ea0efcbbf10bdb7816d58db5784f8e52c033b))
-* **graph:** drop a reveal whose change does not come into the graph ([b679859](https://github.com/samuelba/ukemi/commit/b679859536857a512cd955df3c17f94fa6fabf89))
-* **graph:** drop a reveal whose change does not come into the graph ([e3ed488](https://github.com/samuelba/ukemi/commit/e3ed488586770e01990d8453e24f58d60af0ba9d))
-* **registry:** find new repositories and keep ones added by hand ([dbfced2](https://github.com/samuelba/ukemi/commit/dbfced24c7652ad580cbcc5982ddce087ebf3f18))
-* **registry:** find new repositories and keep ones added by hand ([f7c8baf](https://github.com/samuelba/ukemi/commit/f7c8baf3edf7cdb990e7ffad8f77203ce7c4d6e8))
-* **security:** stop background fetches and workspace overrides in Restricted Mode ([6380a9b](https://github.com/samuelba/ukemi/commit/6380a9b661981bb6beec0fd19f5ce096e8909daa))
-* **security:** stop background fetches and workspace overrides in Restricted Mode ([255e70f](https://github.com/samuelba/ukemi/commit/255e70f16d763582593d1e286acb35af41129402))
-* show menu toggle state without the ignored toggled key ([c7f03b6](https://github.com/samuelba/ukemi/commit/c7f03b6e3208159fa6e44c0a8bde912de8ade372))
-* show menu toggle state without the ignored toggled key ([1edc11f](https://github.com/samuelba/ukemi/commit/1edc11fdce3ddc170fba2c471f1cbccf951ae627))
-* **webview:** keep the Describe dialog when a selection ends on the backdrop ([b41f107](https://github.com/samuelba/ukemi/commit/b41f107ba50012826ab6d0f569d59e4b55728f45))
-* **webview:** keep the Describe dialog when a selection ends on the backdrop ([d565682](https://github.com/samuelba/ukemi/commit/d565682b2ac8f63d46bad879dffce2c8dc54a51c))
+* **desktop:** accept IPC only from the app page's main frame (@samuelba) ([21535da](https://github.com/samuelba/ukemi/commit/21535dab70f0031c7d4e165e649c04b9384e21e6))
+* **desktop:** serve only the page bundles over the app protocol (@samuelba) ([e5d2e43](https://github.com/samuelba/ukemi/commit/e5d2e437535f15e26ac6c34d0a84b0182b0ef8a6))
+* **graph:** answer failed file-list loads instead of loading forever (@samuelba) ([d83ea0e](https://github.com/samuelba/ukemi/commit/d83ea0efcbbf10bdb7816d58db5784f8e52c033b))
+* **graph:** drop a reveal whose change does not come into the graph (@samuelba) ([e3ed488](https://github.com/samuelba/ukemi/commit/e3ed488586770e01990d8453e24f58d60af0ba9d))
+* **registry:** find new repositories and keep ones added by hand (@samuelba) ([f7c8baf](https://github.com/samuelba/ukemi/commit/f7c8baf3edf7cdb990e7ffad8f77203ce7c4d6e8))
+* **security:** stop background fetches and workspace overrides in Restricted Mode (@samuelba) ([255e70f](https://github.com/samuelba/ukemi/commit/255e70f16d763582593d1e286acb35af41129402))
+* show menu toggle state without the ignored toggled key (@samuelba) ([1edc11f](https://github.com/samuelba/ukemi/commit/1edc11fdce3ddc170fba2c471f1cbccf951ae627))
+* **webview:** keep the Describe dialog when a selection ends on the backdrop (@samuelba) ([d565682](https://github.com/samuelba/ukemi/commit/d565682b2ac8f63d46bad879dffce2c8dc54a51c))
 
 ## [0.15.0](https://github.com/samuelba/ukemi/compare/v0.14.0...v0.15.0) (2026-11-09)
 
