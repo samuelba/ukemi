@@ -174,6 +174,28 @@ describe('summarizeStatus', () => {
     })
   })
 
+  test('marks the trunk bookmark in its menu context', () => {
+    for (const [name, isTrunkBookmark] of [
+      ['main', true],
+      ['feature', false],
+    ] as const) {
+      const commits = [
+        commit({
+          isWorkingCopy: true,
+          commitId: WC,
+          localBookmarks: [{ name, synced: true, conflict: false }],
+        }),
+      ]
+      const items = summarizeStatus(
+        state({ graph: graph({ commits, currentBookmarks: [name] }) }),
+        NOW,
+      )
+      expect(item(items, 'bookmark')).toMatchObject({
+        action: { kind: 'bookmarkMenu', context: { bookmark: name, isTrunkBookmark } },
+      })
+    }
+  })
+
   test('falls back to the nearest bookmarks below the working copy', () => {
     const commits = [
       commit({ isWorkingCopy: true, commitId: WC }),
