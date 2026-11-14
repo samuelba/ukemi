@@ -181,6 +181,7 @@ function bookmarkItem(graph: GraphState, bookmark: StatusBookmark | null): Statu
             bookmark: bookmark.name,
             isSynced: local?.synced ?? true,
             isTrunk: commit.isTrunk,
+            isTrunkBookmark: bookmark.name === graph.trunkName,
             hasForge: graph.forge !== null,
           },
         }

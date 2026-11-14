@@ -1133,6 +1133,11 @@
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.bookmark' && isRemoteOnly && !isTracked"
         },
         {
+          "command": "ukemi.bookmark.rename",
+          "group": "1_bookmark@4",
+          "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.bookmark' && !isRemoteOnly && !isTrunkBookmark"
+        },
+        {
           "command": "ukemi.bookmark.delete",
           "group": "2_remove@1",
           "when": "webviewId =~ /^ukemi\\.graph/ && webviewSection == 'ukemi.bookmark' && !isRemoteOnly"

@@ -360,6 +360,7 @@ export const CommitRow = memo(function CommitRow(props: CommitRowProps) {
             commit={commit}
             repoId={repoId}
             hasForge={props.hasForge}
+            trunkName={props.trunkName}
             ciOnlyMine={settings.ciOnlyMine}
             showGitTags={settings.showGitTags}
           />

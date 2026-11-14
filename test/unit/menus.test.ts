@@ -22,6 +22,11 @@ const commitContext = {
   isEmpty: false,
 }
 
+const commands = (entries: ReturnType<typeof resolveMenu>): string[] =>
+  entries.flatMap((entry) =>
+    entry.kind === 'command' ? [entry.command] : entry.kind === 'submenu' ? [entry.label] : ['-'],
+  )
+
 describe('when clauses', () => {
   test('reads a bare key as its truthiness', () => {
     expect(evaluateWhen('isEmpty', { isEmpty: true })).toBe(true)
@@ -68,11 +73,6 @@ describe('when clauses', () => {
 })
 
 describe('resolveMenu', () => {
-  const commands = (entries: ReturnType<typeof resolveMenu>): string[] =>
-    entries.flatMap((entry) =>
-      entry.kind === 'command' ? [entry.command] : entry.kind === 'submenu' ? [entry.label] : ['-'],
-    )
-
   test('builds the commit menu in group order with separators', () => {
     const entries = commands(resolveMenu(manifest, 'webview/context', commitContext))
     expect(entries.slice(0, 2)).toEqual(['ukemi.commit.new', 'ukemi.commit.newBefore'])
@@ -125,6 +125,34 @@ describe('resolveMenu', () => {
       })
       expect(entries.length, section).toBeGreaterThan(0)
     }
+  })
+})
+
+describe('graph bookmark menu', () => {
+  const bookmarkMenu = (context: Record<string, unknown>) =>
+    commands(
+      resolveMenu(manifest, 'webview/context', {
+        webviewId: 'ukemi.graph',
+        webviewSection: 'ukemi.bookmark',
+        ...context,
+      }),
+    )
+
+  test('offers rename on a local bookmark', () => {
+    expect(bookmarkMenu({ isSynced: true })).toContain('ukemi.bookmark.rename')
+  })
+
+  test('offers rename on another bookmark of the trunk commit', () => {
+    expect(bookmarkMenu({ isTrunk: true, isTrunkBookmark: false })).toContain(
+      'ukemi.bookmark.rename',
+    )
+  })
+
+  test('leaves rename out for the trunk bookmark and remote-only bookmarks', () => {
+    expect(bookmarkMenu({ isTrunk: true, isTrunkBookmark: true })).not.toContain(
+      'ukemi.bookmark.rename',
+    )
+    expect(bookmarkMenu({ isRemoteOnly: true })).not.toContain('ukemi.bookmark.rename')
   })
 })
 
