@@ -2,8 +2,9 @@ import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import type { CleanupSelection } from '../../shared/cleanup'
-import { applyCleanup, applyCleanupSteps, loadCleanup } from '../../src/repo/loadCleanup'
+import type { CleanupSelection, CleanupSnapshot } from '../../shared/cleanup'
+import { cleanupSteps } from '../../src/repo/cleanupItems'
+import { applyCleanupSteps, loadCleanup } from '../../src/repo/loadCleanup'
 import {
   JJ_BINARY,
   initRepo,
@@ -14,6 +15,14 @@ import {
   type Fixture,
 } from '../helpers/jjFixture'
 import type { JjRepo } from '../../src/jj/repo'
+
+function applyCleanup(
+  repo: JjRepo,
+  snapshot: CleanupSnapshot,
+  selection: CleanupSelection,
+): Promise<void> {
+  return applyCleanupSteps(repo, cleanupSteps(snapshot, selection))
+}
 
 let fixture: Fixture
 let root: string

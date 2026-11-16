@@ -40,6 +40,12 @@ export interface RunResult {
   stderr: string
 }
 
+interface JjExit {
+  stdout: Buffer
+  stderr: string
+  code: number | null
+}
+
 export class JjError extends Error {
   constructor(
     message: string,
@@ -176,10 +182,6 @@ export class JjRunner {
     private readonly options: { killGraceMs?: number } = {},
   ) {}
 
-  get binary(): string {
-    return this.binaryPath
-  }
-
   useBinary(path: string): void {
     this.binaryPath = path
   }
@@ -271,12 +273,41 @@ export class JjRunner {
     }
   }
 
-  private runOnce(options: RunOptions): Promise<RunResult> {
+  private async runOnce(options: RunOptions): Promise<RunResult> {
     const args = [
       ...GLOBAL_ARGS,
       ...(options.ignoreWorkingCopy ? ['--ignore-working-copy'] : []),
       ...options.args,
     ]
+    const exit = await this.exec(options, args, { log: true })
+    if (exit.code !== 0) {
+      if (exit.stderr.trim()) {
+        this.logger.error(`${repoTag(options.cwd)} ${redactUrlCredentials(exit.stderr.trim())}`)
+      }
+      throw new JjError(summarizeStderr(exit.stderr), args, exit.stderr, exit.code)
+    }
+    this.reportWarnings(options, exit.stderr)
+    return { stdout: exit.stdout.toString('utf8'), stderr: exit.stderr }
+  }
+
+  // Raw stdout, for file contents. Failures are not logged, because reading a path that a
+  // revision does not have is routine.
+  async runBytes(options: RunOptions): Promise<Buffer> {
+    const args = [...GLOBAL_ARGS, '--ignore-working-copy', ...options.args]
+    const exit = await this.exec(options, args, { log: false })
+    if (exit.code !== 0) {
+      throw new JjError(summarizeStderr(exit.stderr), args, exit.stderr, exit.code)
+    }
+    return exit.stdout
+  }
+
+  // Starts jj and collects its output. Rejects when jj does not start, times out or is stopped
+  // with its window. Any exit code is left to the caller.
+  private exec(
+    options: RunOptions,
+    args: readonly string[],
+    { log }: { log: boolean },
+  ): Promise<JjExit> {
     const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
     const started = Date.now()
     if (this.isDisposed) {
@@ -339,12 +370,13 @@ export class JjRunner {
       })
       child.on('close', (code, signal) => {
         settle()
-        const out = Buffer.concat(stdout).toString('utf8')
         const err = Buffer.concat(stderr).toString('utf8')
-        const elapsed = Date.now() - started
-        this.logger.info(
-          `${repoTag(options.cwd)} jj ${describeArgs(options.args)} (${elapsed} ms, exit ${code ?? signal})`,
-        )
+        if (log) {
+          const elapsed = Date.now() - started
+          this.logger.info(
+            `${repoTag(options.cwd)} jj ${describeArgs(options.args)} (${elapsed} ms, exit ${code ?? signal})`,
+          )
+        }
         if (hasTimedOut) {
           reject(new JjError(timeoutMessage(timeoutMs, err), args, err, code))
           return
@@ -353,15 +385,7 @@ export class JjRunner {
           reject(this.stopped(args))
           return
         }
-        if (code !== 0) {
-          if (err.trim()) {
-            this.logger.error(`${repoTag(options.cwd)} ${redactUrlCredentials(err.trim())}`)
-          }
-          reject(new JjError(summarizeStderr(err), args, err, code))
-          return
-        }
-        this.reportWarnings(options, err)
-        resolve({ stdout: out, stderr: err })
+        resolve({ stdout: Buffer.concat(stdout), stderr: err, code })
       })
 
       child.stdin.on('error', (error: NodeJS.ErrnoException) => {
@@ -381,34 +405,5 @@ export class JjRunner {
         this.warningHandler?.({ cwd: options.cwd, args: options.args, text })
       }
     }
-  }
-
-  async runBytes(options: RunOptions): Promise<Buffer> {
-    const args = [...GLOBAL_ARGS, '--ignore-working-copy', ...options.args]
-    if (this.isDisposed) {
-      throw this.stopped(args)
-    }
-    return new Promise((resolve, reject) => {
-      const host = hostSpawn(this.binaryPath, args, { cwd: options.cwd })
-      const child = spawn(host.command, host.args, {
-        cwd: options.cwd,
-        env: host.env,
-        detached: OWN_GROUP,
-      })
-      this.track(child)
-      const chunks: Buffer[] = []
-      const errors: Buffer[] = []
-      child.stdout.on('data', (chunk: Buffer) => chunks.push(chunk))
-      child.stderr.on('data', (chunk: Buffer) => errors.push(chunk))
-      child.on('error', (error) => reject(new JjError(error.message, args, '', null)))
-      child.on('close', (code) => {
-        if (code === 0) {
-          resolve(Buffer.concat(chunks))
-          return
-        }
-        const err = Buffer.concat(errors).toString('utf8')
-        reject(new JjError(summarizeStderr(err), args, err, code))
-      })
-    })
   }
 }

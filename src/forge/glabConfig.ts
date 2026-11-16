@@ -84,7 +84,3 @@ export function configHosts(text: string): string[] {
     return []
   }
 }
-
-export function configHasHost(text: string, host: string): boolean {
-  return configHosts(text).includes(host.toLowerCase())
-}

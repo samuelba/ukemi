@@ -23,7 +23,6 @@ import {
   commitDiffTitle,
   fileAtRevision,
   interdiffText,
-  looksBinary,
   revisionBytes,
   versionDiffEntries,
   versionDiffTitle,
@@ -34,6 +33,7 @@ import { splitController } from '../app/splitController'
 import type { RepoModel } from '../repo/repoModel'
 import type { SplitToolPaths } from '../split/toolRun'
 import { mapLimited } from '../util/mapLimited'
+import { looksBinary } from '../util/text'
 
 // Bigger files are left out of the diff pane. Open them in an editor instead.
 export const MAX_DIFF_BYTES = 2_000_000

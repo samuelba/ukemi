@@ -157,16 +157,6 @@ export function conflictEdits(text: string, choice: ConflictChoice): ConflictEdi
   })
 }
 
-export function applyConflicts(text: string, choice: ConflictChoice): string {
-  let cursor = 0
-  let out = ''
-  for (const edit of conflictEdits(text, choice)) {
-    out += text.slice(cursor, edit.start) + edit.text
-    cursor = edit.end
-  }
-  return out + text.slice(cursor)
-}
-
 function oneEdit(
   blocks: readonly ConflictBlock[],
   conflictIndex: number,

@@ -8,13 +8,13 @@ import type { Commit } from '../../shared/model'
 import type { RepoModel } from '../repo/repoModel'
 import { ensureWrapper, withPlanTool, type SplitToolPaths } from '../split/toolRun'
 import { errorMessage } from '../util/logger'
+import { looksBinary } from '../util/text'
 import { shortId, type CommandEnv } from './commands/context'
 import type { PanelChannel, PanelHandler } from './panel'
 import { confirm } from './ui'
 
 // Bigger files open read-only. An editor outside Ukemi handles them better.
 export const MAX_EDIT_BYTES = 2_000_000
-const BINARY_PROBE_BYTES = 8000
 
 export interface EditorTarget {
   model: RepoModel
@@ -44,7 +44,7 @@ export function decodeFile(data: Buffer): FileText {
   if (data.length > MAX_EDIT_BYTES) {
     return { text: '', readOnly: 'This file is too large to edit here.' }
   }
-  if (data.subarray(0, BINARY_PROBE_BYTES).includes(0)) {
+  if (looksBinary(data)) {
     return { text: '', readOnly: 'This is a binary file.' }
   }
   return { text: data.toString('utf8'), readOnly: null }

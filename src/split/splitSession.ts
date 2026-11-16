@@ -1,14 +1,13 @@
 import type { ChangedFile } from '../../shared/model'
 import type { SplitFile, SplitRequest, SplitSelection } from '../../shared/split'
 import type { JjRepo } from '../jj/repo'
+import { looksBinary } from '../util/text'
 import { computeSegments } from './hunks'
 import { buildPlan, type FileContents } from './plan'
 import { readLeftWithTool, withPlanTool, type ToolWrapper } from './toolRun'
 
-const BINARY_PROBE_BYTES = 8000
-
 function isBinary(data: Buffer | null): boolean {
-  return data !== null && data.subarray(0, BINARY_PROBE_BYTES).includes(0)
+  return data !== null && looksBinary(data)
 }
 
 async function readOrNull(

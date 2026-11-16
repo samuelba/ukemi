@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest'
 import {
-  applyConflicts,
   bothSidesEdit,
+  conflictEdits,
+  type ConflictChoice,
   fileSideLabel,
   fileSideTitle,
   labelName,
@@ -10,6 +11,17 @@ import {
   sideHeading,
   sideName,
 } from '../../shared/conflictMarkers'
+
+// The file's text after the edits.
+function applyConflicts(text: string, choice: ConflictChoice): string {
+  let cursor = 0
+  let out = ''
+  for (const edit of conflictEdits(text, choice)) {
+    out += text.slice(cursor, edit.start) + edit.text
+    cursor = edit.end
+  }
+  return out + text.slice(cursor)
+}
 
 function marked(char: string, label = ''): string {
   return `${char.repeat(7)}${label ? ` ${label}` : ''}`

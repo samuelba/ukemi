@@ -1,6 +1,6 @@
 import type { InlineAction, MenuEntry } from './menus'
 import type { ChangedFile } from './model'
-import type { CommitView, HostMessage, WebviewMessage } from './protocol'
+import type { CommitView, HostMessage } from './protocol'
 
 // Messages of the standalone app's window shell. They share the graph's channel with
 // `HostMessage` and `WebviewMessage`, and every type starts with `desktop.`.
@@ -288,7 +288,6 @@ export type DesktopRendererMessage =
   | { type: 'desktop.terminalClose'; id: string }
 
 export type ShellInbound = HostMessage | DesktopHostMessage
-export type ShellOutbound = WebviewMessage | DesktopRendererMessage
 
 export function isDesktopMessage(message: { type: string }): boolean {
   return message.type.startsWith('desktop.')
