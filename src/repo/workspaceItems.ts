@@ -1,4 +1,4 @@
-import { isAbsolute, relative, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { bookmarkRevision } from '../jj/revsets'
 import type { Workspace } from '../../shared/model'
 
@@ -237,6 +237,31 @@ export function workspaceBaseItems(
     })
   }
   return items
+}
+
+// The folder new workspaces go in. An empty location is the repository's parent folder, `~` is
+// the home folder, and a relative path starts at the repository root.
+export function workspaceParent(repoRoot: string, location: string, home: string): string {
+  const trimmed = location.trim()
+  if (trimmed.length === 0) {
+    return dirname(resolve(repoRoot))
+  }
+  if (trimmed === '~') {
+    return resolve(home)
+  }
+  if (trimmed.startsWith('~/') || trimmed.startsWith('~\\')) {
+    return resolve(home, trimmed.slice(2))
+  }
+  return resolve(repoRoot, trimmed)
+}
+
+export function workspaceFolder(parent: string, repoRoot: string, name: string): string {
+  return join(parent, `${basename(resolve(repoRoot))}-${name}`)
+}
+
+// A workspace in the repository's folder would have its files tracked by the outer working copy.
+export function isInsideRepository(folder: string, repoRoot: string): boolean {
+  return sameFolder(folder, repoRoot) || isInside(resolve(repoRoot), resolve(folder))
 }
 
 function isInside(parent: string, child: string): boolean {

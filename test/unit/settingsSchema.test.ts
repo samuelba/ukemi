@@ -94,7 +94,7 @@ describe('settingFields', () => {
       isRepositoryScoped: false,
       overriddenIn: [],
     })
-    expect(scoped.filter((f) => f.isRepositoryScoped)).toHaveLength(16)
+    expect(scoped.filter((f) => f.isRepositoryScoped)).toHaveLength(17)
   })
 
   test('edits the saved revsets as a map a repository can override', () => {

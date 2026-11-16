@@ -2433,6 +2433,12 @@
           "default": false,
           "description": "On each refresh, snapshot every other workspace so its file changes show up. Each snapshot is a jj operation and can race with jj running in that workspace."
         },
+        "ukemi.workspaces.location": {
+          "scope": "resource",
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Folder that new workspaces are created in, as `<repository>-<name>`. Empty creates them next to the repository. `~` is your home folder, and a relative path starts at the repository root, like `../worktrees`. Creating a workspace also offers **Choose folder…** for one workspace."
+        },
         "ukemi.changedFilesView": {
           "type": "string",
           "enum": [

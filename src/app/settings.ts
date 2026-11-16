@@ -36,6 +36,8 @@ export interface UkemiConfig {
   previewDrops: boolean
   changedFilesView: ChangedFilesView
   snapshotOnRefresh: boolean
+  // The folder new workspaces go in. Empty means next to the repository.
+  workspaceLocation: string
   addJjToTerminalPath: boolean
   gitlabHosts: string[]
   githubHosts: string[]
@@ -149,6 +151,7 @@ export function readSettings(c: SettingsSource): UkemiConfig {
     previewDrops: c.get<boolean>('previewDrops', true),
     changedFilesView: oneOf(c.get<string>('changedFilesView', 'list'), CHANGED_FILES_VIEWS, 'list'),
     snapshotOnRefresh: c.get<boolean>('workspaces.snapshotOnRefresh', false),
+    workspaceLocation: text(c.get<unknown>('workspaces.location', ''), '').trim(),
     addJjToTerminalPath: c.get<boolean>('addJjToTerminalPath', true),
     gitlabHosts: c.get<string[]>('gitlab.hosts', []),
     githubHosts: c.get<string[]>('github.hosts', []),

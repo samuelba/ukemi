@@ -59,6 +59,7 @@ function setup(folderPaths: string[]) {
         savedRevsets: [],
         defaultRevset: '',
         snapshotOnRefresh: false,
+        workspaceLocation: '',
         showLineStats: false,
       }),
     },
