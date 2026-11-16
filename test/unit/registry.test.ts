@@ -60,6 +60,7 @@ function setup(folderPaths: string[]) {
         defaultRevset: '',
         snapshotOnRefresh: false,
         workspaceLocation: '',
+        workspaceGitWorktree: 'auto',
         showLineStats: false,
       }),
     },

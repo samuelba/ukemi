@@ -16,6 +16,7 @@ import { DEFAULT_EXCLUDES } from '../repo/discovery'
 import type { Event } from './events'
 
 export type SourceControlMode = 'auto' | 'always' | 'never'
+export type GitWorktreeMode = 'auto' | 'always' | 'never'
 
 export interface UkemiConfig {
   jjPath: string
@@ -38,6 +39,8 @@ export interface UkemiConfig {
   snapshotOnRefresh: boolean
   // The folder new workspaces go in. Empty means next to the repository.
   workspaceLocation: string
+  // Whether a new workspace in a colocated repository gets a Git worktree. `auto` follows jj.
+  workspaceGitWorktree: GitWorktreeMode
   addJjToTerminalPath: boolean
   gitlabHosts: string[]
   githubHosts: string[]
@@ -99,6 +102,7 @@ export function updateWhereItLives(
 }
 
 const CHANGED_FILES_VIEWS = ['list', 'tree'] as const satisfies readonly ChangedFilesView[]
+const GIT_WORKTREE_MODES = ['auto', 'always', 'never'] as const satisfies readonly GitWorktreeMode[]
 
 // settings.json is edited by hand, so a value can have the wrong type.
 function text(value: unknown, fallback: string): string {
@@ -152,6 +156,11 @@ export function readSettings(c: SettingsSource): UkemiConfig {
     changedFilesView: oneOf(c.get<string>('changedFilesView', 'list'), CHANGED_FILES_VIEWS, 'list'),
     snapshotOnRefresh: c.get<boolean>('workspaces.snapshotOnRefresh', false),
     workspaceLocation: text(c.get<unknown>('workspaces.location', ''), '').trim(),
+    workspaceGitWorktree: oneOf(
+      text(c.get<unknown>('workspaces.gitWorktree', 'auto'), 'auto'),
+      GIT_WORKTREE_MODES,
+      'auto',
+    ),
     addJjToTerminalPath: c.get<boolean>('addJjToTerminalPath', true),
     gitlabHosts: c.get<string[]>('gitlab.hosts', []),
     githubHosts: c.get<string[]>('github.hosts', []),

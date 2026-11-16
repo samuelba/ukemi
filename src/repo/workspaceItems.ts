@@ -259,6 +259,19 @@ export function workspaceFolder(parent: string, repoRoot: string, name: string):
   return join(parent, `${basename(resolve(repoRoot))}-${name}`)
 }
 
+// The --colocate choice for `workspace add`: undefined lets jj decide. It applies only to a
+// colocated repository and a jj that has the flag.
+export function workspaceColocation(
+  mode: 'auto' | 'always' | 'never',
+  isColocated: boolean,
+  canColocate: boolean,
+): boolean | undefined {
+  if (mode === 'auto' || !isColocated || !canColocate) {
+    return undefined
+  }
+  return mode === 'always'
+}
+
 // A workspace in the repository's folder would have its files tracked by the outer working copy.
 export function isInsideRepository(folder: string, repoRoot: string): boolean {
   return sameFolder(folder, repoRoot) || isInside(resolve(repoRoot), resolve(folder))

@@ -661,6 +661,21 @@ describe('mutations', () => {
     expect(names).toEqual(['default', 'second'])
   })
 
+  test('addWorkspace creates a Git worktree or not, as asked', async (ctx) => {
+    if (!(await repo.canColocateWorkspaces())) {
+      ctx.skip()
+    }
+    const withWorktree = join(fixture.dir, 'repo-git')
+    const plain = join(fixture.dir, 'repo-plain')
+
+    await repo.addWorkspace(withWorktree, 'git', '@', true)
+    await repo.addWorkspace(plain, 'plain', '@', false)
+
+    expect(existsSync(join(withWorktree, '.git'))).toBe(true)
+    expect(existsSync(join(plain, '.git'))).toBe(false)
+    expect(existsSync(join(plain, '.jj'))).toBe(true)
+  })
+
   test('snapshotWorkspace records a file edited in another workspace', async () => {
     const wsPath = join(fixture.dir, 'repo-other')
     await repo.addWorkspace(wsPath, 'other', '@')

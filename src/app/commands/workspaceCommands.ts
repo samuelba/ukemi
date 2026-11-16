@@ -13,6 +13,7 @@ import {
   sameFolder,
   suggestedWorkspaceName,
   workspaceBaseItems,
+  workspaceColocation,
   workspaceFolder,
   workspaceNesting,
   workspaceParent,
@@ -130,8 +131,8 @@ export async function addWorkspace(
   if (!chosen) {
     return
   }
-  const location = env.settings.read(model.root).workspaceLocation
-  const parent = workspaceParent(model.root, location, homedir())
+  const config = env.settings.read(model.root)
+  const parent = workspaceParent(model.root, config.workspaceLocation, homedir())
   const name = await env.ui.input({
     title: 'Create workspace',
     prompt: `New empty change on ${chosen.shown}. That revision is not changed. The folder goes in ${parent}.`,
@@ -151,8 +152,13 @@ export async function addWorkspace(
     )
     return
   }
+  const colocate = workspaceColocation(
+    config.workspaceGitWorktree,
+    model.repo.isColocated,
+    config.workspaceGitWorktree !== 'auto' && (await model.repo.canColocateWorkspaces()),
+  )
   const created = await env.operations.run('Create workspace', model, async () => {
-    await model.repo.addWorkspace(path, name, chosen.revision)
+    await model.repo.addWorkspace(path, name, chosen.revision, colocate)
     return true
   })
   if (!created) {

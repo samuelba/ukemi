@@ -2439,6 +2439,22 @@
           "default": "",
           "markdownDescription": "Folder that new workspaces are created in, as `<repository>-<name>`. Empty creates them next to the repository. `~` is your home folder, and a relative path starts at the repository root, like `../worktrees`. Creating a workspace also offers **Choose folder…** for one workspace."
         },
+        "ukemi.workspaces.gitWorktree": {
+          "scope": "resource",
+          "type": "string",
+          "enum": [
+            "auto",
+            "always",
+            "never"
+          ],
+          "default": "auto",
+          "enumDescriptions": [
+            "Follow jj: a Git worktree is created when `git.colocate` is true.",
+            "Always create a Git worktree, so git and editor tools work in the workspace.",
+            "Never create a Git worktree. The workspace has only a `.jj` folder."
+          ],
+          "markdownDescription": "Whether a new workspace in a colocated repository gets its own Git worktree. Needs jj 0.46 or later. Has no effect in a repository that is not colocated."
+        },
         "ukemi.changedFilesView": {
           "type": "string",
           "enum": [

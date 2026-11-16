@@ -7,6 +7,7 @@ import {
   isWorkspaceOpen,
   suggestedWorkspaceName,
   workspaceBaseItems,
+  workspaceColocation,
   workspaceContextValue,
   workspaceFolder,
   workspaceItemDescription,
@@ -129,6 +130,16 @@ describe('workspace folder', () => {
     expect(isInsideRepository('/work/repo/ws/repo-agent', '/work/repo')).toBe(true)
     expect(isInsideRepository('/work/repo-agent', '/work/repo')).toBe(false)
     expect(isInsideRepository('/work', '/work/repo')).toBe(false)
+  })
+})
+
+describe('workspaceColocation', () => {
+  test('passes a flag only for a colocated repository and a jj that has it', () => {
+    expect(workspaceColocation('always', true, true)).toBe(true)
+    expect(workspaceColocation('never', true, true)).toBe(false)
+    expect(workspaceColocation('auto', true, true)).toBeUndefined()
+    expect(workspaceColocation('never', false, true)).toBeUndefined()
+    expect(workspaceColocation('always', true, false)).toBeUndefined()
   })
 })
 

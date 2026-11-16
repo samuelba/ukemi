@@ -60,6 +60,8 @@ export const GRAPH_PAGE_SIZE = 500
 export const MAX_EVOLUTION_ENTRIES = 200
 // The first jj whose templates can evaluate a revset, which elidedHeads needs.
 export const TEMPLATE_REVSET_VERSION: JjVersion = { major: 0, minor: 47, patch: 0 }
+// The first jj whose `workspace add` takes --colocate and --no-colocate.
+export const COLOCATED_WORKSPACE_VERSION: JjVersion = { major: 0, minor: 46, patch: 0 }
 
 export interface LogPage {
   commits: Commit[]
@@ -763,8 +765,17 @@ export class JjRepo {
     return this.mutate(['op', 'revert', operationId(id)])
   }
 
-  addWorkspace(path: string, name: string, revision: string) {
-    return this.mutate(['workspace', 'add', '--name', name, '-r', revision, path])
+  // Whether `workspace add` can be told to create a Git worktree or not.
+  async canColocateWorkspaces(): Promise<boolean> {
+    const version = await this.runner.version()
+    return version !== null && isVersionAtLeast(version, COLOCATED_WORKSPACE_VERSION)
+  }
+
+  // `colocate` passes --colocate or --no-colocate. Undefined leaves the choice to jj, and needs
+  // COLOCATED_WORKSPACE_VERSION otherwise.
+  addWorkspace(path: string, name: string, revision: string, colocate?: boolean) {
+    const flag = colocate === undefined ? [] : [colocate ? '--colocate' : '--no-colocate']
+    return this.mutate(['workspace', 'add', '--name', name, '-r', revision, ...flag, path])
   }
 
   forgetWorkspace(name: string) {

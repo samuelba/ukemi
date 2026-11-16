@@ -185,6 +185,7 @@ Select the gear in the title bar of the Ukemi view to open the Ukemi settings.
 | `ukemi.changedFilesView`             | Show changed files as a `list` or a `tree`.                                                        |
 | `ukemi.workspaces.snapshotOnRefresh` | Snapshot every other workspace on each refresh. Default: off. Each snapshot is a jj operation.     |
 | `ukemi.workspaces.location`          | Folder new workspaces go in. Default: next to the repository. `~` and relative paths work.         |
+| `ukemi.workspaces.gitWorktree`       | Give a new workspace in a colocated repository a Git worktree: `auto`, `always` or `never`.        |
 | `ukemi.autoFetch.enabled`            | Fetch the active repository on a timer. Default: off.                                              |
 | `ukemi.autoFetch.interval`           | How often to fetch when auto fetch is on. Example: `10m`. Minimum: 10 seconds.                     |
 | `ukemi.github.hosts`                 | GitHub Enterprise hosts, for example `github.example.com`. Hosts from `gh` are added on their own. |
