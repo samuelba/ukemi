@@ -10,6 +10,8 @@ export const REPOSITORY_KEYS: ReadonlySet<string> = new Set([
   'autoFetch.enabled',
   'autoFetch.interval',
   'workspaces.snapshotOnRefresh',
+  'workspaces.location',
+  'workspaces.gitWorktree',
   'forge.ciOnlyMine',
   'forge.trunkCi',
   'forge.requestLimit',

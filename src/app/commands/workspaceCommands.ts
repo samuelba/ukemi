@@ -1,4 +1,5 @@
-import { basename, dirname, join } from 'node:path'
+import { basename } from 'node:path'
+import { homedir } from 'node:os'
 import type { Workspace } from '../../../shared/model'
 import { bookmarkRevision } from '../../jj/revsets'
 import type { RepoModel } from '../../repo/repoModel'
@@ -6,12 +7,16 @@ import { canDeleteWorkspaceFolder, deleteWorkspaceFolder } from '../../repo/work
 import { isBookmarkTreeElement } from '../../repo/bookmarkItems'
 import {
   defaultWorkspaceName,
+  isInsideRepository,
   isWorkspaceOpen,
   isWorkspaceTreeElement,
   sameFolder,
   suggestedWorkspaceName,
   workspaceBaseItems,
+  workspaceColocation,
+  workspaceFolder,
   workspaceNesting,
+  workspaceParent,
   type WorkspaceBaseItem,
 } from '../../repo/workspaceItems'
 import { validateBookmarkName } from '../../util/text'
@@ -93,6 +98,30 @@ async function pickBase(env: CommandEnv, model: RepoModel): Promise<WorkspaceBas
   return { revision: choice.revision, suggestedName: choice.suggestedName, shown: choice.shown }
 }
 
+// Asks where the workspace goes: the default folder from `ukemi.workspaces.location`, or one
+// the user picks. Resolves to undefined when the user cancels.
+async function pickWorkspaceFolder(
+  env: CommandEnv,
+  model: RepoModel,
+  parent: string,
+  name: string,
+): Promise<string | undefined> {
+  const defaultPath = workspaceFolder(parent, model.root, name)
+  const choose = { label: '$(folder-opened) Choose Folder…', description: 'Pick another folder' }
+  const choice = await env.ui.pick([{ label: defaultPath, description: 'Default' }, choose], {
+    title: 'Workspace folder',
+    placeholder: `The workspace goes in a folder named ${basename(defaultPath)}.`,
+  })
+  if (!choice) {
+    return undefined
+  }
+  if (choice !== choose) {
+    return defaultPath
+  }
+  const picked = await env.ui.pickFolder('Create Workspace Here')
+  return picked ? workspaceFolder(picked, model.root, name) : undefined
+}
+
 export async function addWorkspace(
   env: CommandEnv,
   model: RepoModel,
@@ -102,18 +131,34 @@ export async function addWorkspace(
   if (!chosen) {
     return
   }
+  const config = env.settings.read(model.root)
+  const parent = workspaceParent(model.root, config.workspaceLocation, homedir())
   const name = await env.ui.input({
     title: 'Create workspace',
-    prompt: `New empty change on ${chosen.shown}. That revision is not changed. The folder is a sibling of ${basename(model.root)}.`,
+    prompt: `New empty change on ${chosen.shown}. That revision is not changed. The folder goes in ${parent}.`,
     value: chosen.suggestedName.length > 0 ? chosen.suggestedName : undefined,
     validate: validateBookmarkName,
   })
   if (!name) {
     return
   }
-  const path = join(dirname(model.root), `${basename(model.root)}-${name}`)
+  const path = await pickWorkspaceFolder(env, model, parent, name)
+  if (!path) {
+    return
+  }
+  if (isInsideRepository(path, model.root)) {
+    void env.ui.error(
+      `Ukemi: the workspace folder ${path} is inside the repository. Choose a folder outside ${model.root}.`,
+    )
+    return
+  }
+  const colocate = workspaceColocation(
+    config.workspaceGitWorktree,
+    model.repo.isColocated,
+    config.workspaceGitWorktree !== 'auto' && (await model.repo.canColocateWorkspaces()),
+  )
   const created = await env.operations.run('Create workspace', model, async () => {
-    await model.repo.addWorkspace(path, name, chosen.revision)
+    await model.repo.addWorkspace(path, name, chosen.revision, colocate)
     return true
   })
   if (!created) {

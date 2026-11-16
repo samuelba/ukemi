@@ -3,13 +3,17 @@ import { parseWorkspaces } from '../../src/jj/parse'
 import {
   collectBookmarks,
   defaultWorkspaceName,
+  isInsideRepository,
   isWorkspaceOpen,
   suggestedWorkspaceName,
   workspaceBaseItems,
+  workspaceColocation,
   workspaceContextValue,
+  workspaceFolder,
   workspaceItemDescription,
   workspaceItemLabel,
   workspaceNesting,
+  workspaceParent,
   type CommitBookmarks,
 } from '../../src/repo/workspaceItems'
 import type { Workspace } from '../../shared/model'
@@ -97,6 +101,45 @@ describe('workspace nesting', () => {
   test('treats only an exact folder match as already open', () => {
     expect(isWorkspaceOpen('/work/repo', ['/work/repo'])).toBe(true)
     expect(isWorkspaceOpen('/work/repo', ['/work'])).toBe(false)
+  })
+})
+
+describe('workspace folder', () => {
+  test('defaults to the folder next to the repository', () => {
+    expect(workspaceParent('/work/repo', '', '/home/me')).toBe('/work')
+    expect(workspaceParent('/work/repo', '   ', '/home/me')).toBe('/work')
+  })
+
+  test('expands the home folder', () => {
+    expect(workspaceParent('/work/repo', '~', '/home/me')).toBe('/home/me')
+    expect(workspaceParent('/work/repo', '~/jj', '/home/me')).toBe('/home/me/jj')
+  })
+
+  test('keeps an absolute path and resolves a relative one from the repository', () => {
+    expect(workspaceParent('/work/repo', '/tmp/ws', '/home/me')).toBe('/tmp/ws')
+    expect(workspaceParent('/work/repo', '../worktrees', '/home/me')).toBe('/work/worktrees')
+  })
+
+  test('names the folder after the repository and the workspace', () => {
+    expect(workspaceFolder('/home/me/jj', '/work/repo', 'agent')).toBe('/home/me/jj/repo-agent')
+    expect(workspaceFolder('/work', '/work/repo/', 'agent')).toBe('/work/repo-agent')
+  })
+
+  test('detects a folder inside the repository', () => {
+    expect(isInsideRepository('/work/repo', '/work/repo')).toBe(true)
+    expect(isInsideRepository('/work/repo/ws/repo-agent', '/work/repo')).toBe(true)
+    expect(isInsideRepository('/work/repo-agent', '/work/repo')).toBe(false)
+    expect(isInsideRepository('/work', '/work/repo')).toBe(false)
+  })
+})
+
+describe('workspaceColocation', () => {
+  test('passes a flag only for a colocated repository and a jj that has it', () => {
+    expect(workspaceColocation('always', true, true)).toBe(true)
+    expect(workspaceColocation('never', true, true)).toBe(false)
+    expect(workspaceColocation('auto', true, true)).toBeUndefined()
+    expect(workspaceColocation('never', false, true)).toBeUndefined()
+    expect(workspaceColocation('always', true, false)).toBeUndefined()
   })
 })
 
