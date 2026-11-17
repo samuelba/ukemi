@@ -46,8 +46,10 @@ export function insertEdge(offsetY: number, height: number): InsertEdge | null {
 export interface InsertGaps {
   // The row above, when it is a mutable child of this row.
   above: string | null
-  // The row below, when it is a parent of this row and this row is mutable.
+  // The parent of this mutable row: the row below when it is one, else its only parent when shown.
   below: string | null
+  // The top row, where a drop above places the change on it.
+  top: boolean
 }
 
 interface GapCommit {
@@ -56,19 +58,26 @@ interface GapCommit {
   isImmutable: boolean
 }
 
-/** A change can be dropped between two adjacent rows joined by a graph edge. */
+/** A change can be dropped between a row and its parent, or above the top row. */
 export function insertGaps(commits: readonly GapCommit[]): InsertGaps[] {
-  const joined = (upper: GapCommit | undefined, lower: GapCommit | undefined) =>
-    upper !== undefined &&
-    lower !== undefined &&
-    !upper.isImmutable &&
-    upper.parents.includes(lower.commitId)
+  const shown = new Set(commits.map((commit) => commit.commitId))
+  const joined = (upper: GapCommit, lower: GapCommit) =>
+    !upper.isImmutable && upper.parents.includes(lower.commitId)
+  const parentBelow = (commit: GapCommit, next: GapCommit | undefined): string | null => {
+    if (next && joined(commit, next)) {
+      return next.commitId
+    }
+    const [only, ...rest] = commit.parents
+    return !commit.isImmutable && only !== undefined && rest.length === 0 && shown.has(only)
+      ? only
+      : null
+  }
   return commits.map((commit, i) => {
     const prev = commits[i - 1]
-    const next = commits[i + 1]
     return {
-      above: joined(prev, commit) ? (prev?.commitId ?? null) : null,
-      below: joined(commit, next) ? (next?.commitId ?? null) : null,
+      above: prev && joined(prev, commit) ? prev.commitId : null,
+      below: parentBelow(commit, commits[i + 1]),
+      top: i === 0,
     }
   })
 }
