@@ -100,25 +100,60 @@ describe('insertGaps', () => {
     const gaps = insertGaps([row('c', ['b']), row('b', ['a']), row('a', [], true)])
 
     expect(gaps).toEqual([
-      { above: null, below: 'b' },
-      { above: 'c', below: 'a' },
-      { above: 'b', below: null },
+      { above: null, below: 'b', top: true },
+      { above: 'c', below: 'a', top: false },
+      { above: 'b', below: null, top: false },
     ])
   })
 
-  test('has no gap between rows on different branches', () => {
+  test('joins a row to its only parent when another branch sits between them', () => {
     const gaps = insertGaps([row('x', ['a']), row('b', ['a']), row('a', [])])
 
-    expect(gaps[0]).toEqual({ above: null, below: null })
-    expect(gaps[1]).toEqual({ above: null, below: 'a' })
+    expect(gaps[0]).toEqual({ above: null, below: 'a', top: true })
+    expect(gaps[1]).toEqual({ above: null, below: 'a', top: false })
+    expect(gaps[2]).toEqual({ above: 'b', below: null, top: false })
+  })
+
+  test('joins two changes on trunk to trunk', () => {
+    const gaps = insertGaps([row('a', ['trunk']), row('b', ['trunk']), row('trunk', ['old'], true)])
+
+    expect(gaps.map((gap) => gap.below)).toEqual(['trunk', 'trunk', null])
+    expect(gaps[2]?.above).toBe('b')
+  })
+
+  test('has no gap under a row whose parent is not shown', () => {
+    const gaps = insertGaps([row('b', ['hidden']), row('a', [])])
+
+    expect(gaps[0]?.below).toBeNull()
+  })
+
+  test('joins a merge only to an adjacent parent', () => {
+    const apart = insertGaps([row('m', ['a', 'b']), row('x', ['b']), row('b', []), row('a', [])])
+    const next = insertGaps([row('m', ['a', 'b']), row('b', []), row('a', [])])
+
+    expect(apart[0]?.below).toBeNull()
+    expect(next[0]?.below).toBe('b')
   })
 
   test('has no gap under an immutable child', () => {
     const gaps = insertGaps([row('b', ['a'], true), row('a', [], true)])
 
     expect(gaps).toEqual([
-      { above: null, below: null },
-      { above: null, below: null },
+      { above: null, below: null, top: true },
+      { above: null, below: null, top: false },
     ])
+  })
+
+  test('has no gap under an immutable row whose parent is further down', () => {
+    const gaps = insertGaps([row('c', ['a'], true), row('b', ['a']), row('a', [], true)])
+
+    expect(gaps[0]?.below).toBeNull()
+  })
+
+  test('marks only the top row', () => {
+    const gaps = insertGaps([row('b', ['a'], true), row('a', [], true)])
+
+    expect(gaps.map((gap) => gap.top)).toEqual([true, false])
+    expect(insertGaps([])).toEqual([])
   })
 })

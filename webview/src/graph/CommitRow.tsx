@@ -30,6 +30,7 @@ interface CommitRowProps {
   // The neighbouring rows a change can be dropped between this row and (see insertGaps).
   gapAbove: string | null
   gapBelow: string | null
+  gapTop: boolean
   canSquash: boolean
   repoId: string
   lanes: number
@@ -156,19 +157,23 @@ export const CommitRow = memo(function CommitRow(props: CommitRowProps) {
     return !commit.isImmutable || kind === 'commit'
   }
 
-  // The pair of changes a drop on the edge of this row goes between, if any.
+  // The pair of changes a drop on the edge of this row goes between, if any. Above the top row
+  // there is no upper change.
   const insertPair = (
     event: DragEvent,
-  ): { edge: InsertEdge; after: string; before: string } | null => {
+  ): { edge: InsertEdge; after: string; before: string | null } | null => {
     const rect = event.currentTarget.getBoundingClientRect()
     const edge = insertEdge(event.clientY - rect.top, rect.height)
     const pair =
-      edge === 'above' && props.gapAbove
+      edge === 'above' && (props.gapAbove || props.gapTop)
         ? { edge, after: commit.commitId, before: props.gapAbove }
         : edge === 'below' && props.gapBelow
           ? { edge, after: props.gapBelow, before: commit.commitId }
           : null
-    if (!pair || draggedCommitId === pair.after || draggedCommitId === pair.before) {
+    if (
+      !pair ||
+      (draggedCommitId !== null && [pair.after, pair.before].includes(draggedCommitId))
+    ) {
       return null
     }
     return pair
@@ -208,14 +213,12 @@ export const CommitRow = memo(function CommitRow(props: CommitRowProps) {
     dragModifiers.onDragEnd()
     if (pair) {
       const { action, mode } = insertCommitAction(modifiers.copy, modifiers.alt)
-      props.onDropCommit({
-        kind: 'between',
-        sourceId: event.dataTransfer.getData(COMMIT_MIME),
-        afterId: pair.after,
-        beforeId: pair.before,
-        action,
-        mode,
-      })
+      const sourceId = event.dataTransfer.getData(COMMIT_MIME)
+      props.onDropCommit(
+        pair.before
+          ? { kind: 'between', sourceId, afterId: pair.after, beforeId: pair.before, action, mode }
+          : { kind: 'onto', sourceId, targetId: pair.after, action, mode },
+      )
     } else if (kind === 'commit') {
       const { action, mode } = dropCommitAction(modifiers.copy, modifiers.alt)
       props.onDropCommit({

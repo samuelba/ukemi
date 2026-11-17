@@ -569,6 +569,7 @@ export function App() {
                   commit={commit}
                   gapAbove={gaps[index]?.above ?? null}
                   gapBelow={gaps[index]?.below ?? null}
+                  gapTop={gaps[index]?.top ?? false}
                   canSquash={canSquashIntoParent(commit, commitsById)}
                   repoId={repoId}
                   lanes={lanes}

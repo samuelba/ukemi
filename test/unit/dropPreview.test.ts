@@ -259,6 +259,14 @@ describe('previewDrop: between two changes', () => {
     expectTopological(result)
   })
 
+  test('inserts between a change and a parent that is not the next row', () => {
+    const result = previewDrop(GRAPH, between('y', 'a', 't', 'rebase', 'revision'))
+    expect(parents(result, 'y')).toEqual(['a'])
+    expect(parents(result, 't')).toEqual(['y'])
+    expect(parents(result, 'm')).toEqual(['x', 'o'])
+    expectTopological(result)
+  })
+
   test('refuses to insert a change between its own descendants', () => {
     expect(previewDrop(FORKED, between('x', 'y', 'm'))).toEqual({ ok: false, error: 'cycle' })
   })
