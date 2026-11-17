@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { responseFromCli } from '../../src/forge/cli'
 import { glabEndpoint, glabFetch } from '../../src/forge/glabApi'
-import { configHasHost, glabConfigFile, glabKnowsHost } from '../../src/forge/glabConfig'
+import { configHosts, glabConfigFile, glabKnowsHost } from '../../src/forge/glabConfig'
 
 const CONFIG = `
 hosts:
@@ -13,11 +13,10 @@ hosts:
 
 describe('glab config', () => {
   test('detects a configured host without reading a token', () => {
-    expect(configHasHost(CONFIG, 'git.anybotics.com')).toBe(true)
-    expect(configHasHost(CONFIG, 'GitLab.com')).toBe(true)
-    expect(configHasHost(CONFIG, 'example.com')).toBe(false)
-    expect(configHasHost('hosts: [', 'gitlab.com')).toBe(false)
-    expect(configHasHost('[]', 'gitlab.com')).toBe(false)
+    expect(configHosts(CONFIG)).toEqual(['git.anybotics.com', 'gitlab.com'])
+    expect(configHosts('hosts:\n  GitLab.com:\n    user: me\n')).toEqual(['gitlab.com'])
+    expect(configHosts('hosts: [')).toEqual([])
+    expect(configHosts('[]')).toEqual([])
   })
 
   test('uses GLAB_CONFIG_DIR and treats a missing file as signed out', () => {

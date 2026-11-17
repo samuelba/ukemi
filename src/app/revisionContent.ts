@@ -2,6 +2,7 @@ import { sameParents } from '../../shared/evolution'
 import type { ChangedFile, EvolutionEntry } from '../../shared/model'
 import type { CommitView } from '../../shared/protocol'
 import type { RepoModel } from '../repo/repoModel'
+import { looksBinary } from '../util/text'
 
 export const BINARY_PLACEHOLDER = '(binary file)'
 export const NO_DIFFERENCES = '(These versions have no differences in files or description.)'
@@ -84,10 +85,6 @@ export function fileAtRevision(commit: CommitView, path: string): FileSide {
   return commit.isWorkingCopy
     ? { kind: 'disk', path }
     : { kind: 'revision', commitId: commit.commitId, path }
-}
-
-export function looksBinary(data: Buffer): boolean {
-  return data.subarray(0, 8000).includes(0)
 }
 
 // A file that does not exist at the revision reads as empty.

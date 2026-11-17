@@ -4,7 +4,7 @@ import { GithubClient, githubCheckState, githubCi, githubState } from '../../src
 import { GitlabClient, gitlabCi, gitlabPipelineCi, gitlabState } from '../../src/forge/gitlab'
 import { isAllowedForgeUrl } from '../../src/forge/hostName'
 import { clampRequestLimit } from '../../src/forge/requestLimit'
-import { FORGE_REFRESH_PENDING_MS, forgeRefreshInterval } from '../../src/forge/refreshInterval'
+import { forgeRefreshInterval } from '../../src/forge/refreshInterval'
 import { parseRemoteUrl } from '../../src/forge/remoteUrl'
 import { ForgeError, type HttpFetch } from '../../src/forge/types'
 
@@ -721,9 +721,7 @@ describe('forge helpers', () => {
   })
 
   test('polls faster while one of my requests is pending', () => {
-    expect(forgeRefreshInterval([{ isMine: true, ci: 'pending', state: 'open' }])).toBe(
-      FORGE_REFRESH_PENDING_MS,
-    )
+    expect(forgeRefreshInterval([{ isMine: true, ci: 'pending', state: 'open' }])).toBe(15_000)
     expect(forgeRefreshInterval([{ isMine: false, ci: 'pending', state: 'open' }])).toBe(60_000)
     expect(forgeRefreshInterval([{ isMine: true, ci: 'pending', state: 'merged' }])).toBe(60_000)
   })

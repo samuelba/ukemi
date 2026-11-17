@@ -1,9 +1,15 @@
 import { isAbsolute } from 'node:path'
 
 const MAX_BOOKMARK_SLUG = 40
+// Like Git, a NUL byte near the start marks a file as binary.
+const BINARY_PROBE_BYTES = 8000
 
 export function firstLine(description: string): string {
   return description.split('\n')[0]?.trim() ?? ''
+}
+
+export function looksBinary(data: Buffer): boolean {
+  return data.subarray(0, BINARY_PROBE_BYTES).includes(0)
 }
 
 export function bodyAfterTitle(description: string): string {

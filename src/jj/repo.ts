@@ -675,10 +675,6 @@ export class JjRepo {
     return this.mutate(['fix', '-s', source], { timeoutMs: FIX_TIMEOUT_MS })
   }
 
-  trackFiles(paths: readonly string[]) {
-    return this.mutate(['file', 'track', ...paths.map(rootFileset)])
-  }
-
   untrackFiles(paths: readonly string[]) {
     return this.mutate(['file', 'untrack', ...paths.map(rootFileset)])
   }
@@ -792,19 +788,6 @@ export class JjRepo {
       await this.runner.run({ ...background, args: ['workspace', 'update-stale'] })
       await this.runner.run({ ...background, args: ['status'] })
     })
-  }
-
-  static async findRoot(runner: JjRunner, directory: string): Promise<string | null> {
-    try {
-      const { stdout } = await runner.run({
-        cwd: directory,
-        args: ['root'],
-        ignoreWorkingCopy: true,
-      })
-      return stdout.trim() || null
-    } catch {
-      return null
-    }
   }
 }
 

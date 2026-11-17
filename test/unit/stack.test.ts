@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { RequestBadge, RequestState } from '../../shared/protocol'
-import { buildStacks, stackLabel, stackOf, withStackInfo } from '../../shared/stack'
+import { buildStacks, stackLabel, withStackInfo } from '../../shared/stack'
 import { deadBranchesOf, expectedBase, withBases } from '../../src/forge/stackSync'
 
 function request(
@@ -84,15 +84,6 @@ describe('withStackInfo', () => {
     const [stale] = withStackInfo([{ ...request(1, 'a', 'main'), stack: { position: 1, size: 5 } }])
 
     expect(stale?.stack).toBeUndefined()
-  })
-})
-
-describe('stackOf', () => {
-  test('returns the chain that contains a request', () => {
-    const requests = [request(1, 'a', 'main'), request(2, 'b', 'a'), request(5, 'x', 'main')]
-
-    expect(stackOf(requests, 2).map((r) => r.number)).toEqual([1, 2])
-    expect(stackOf(requests, 404)).toEqual([])
   })
 })
 

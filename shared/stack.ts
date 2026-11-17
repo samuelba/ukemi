@@ -66,10 +66,6 @@ export function withStackInfo(requests: readonly RequestBadge[]): RequestBadge[]
   })
 }
 
-export function stackOf(requests: readonly RequestBadge[], number: number): RequestBadge[] {
-  return buildStacks(requests).find((chain) => chain.some((r) => r.number === number)) ?? []
-}
-
 export function stackLabel(stack: RequestBadge['stack']): string | null {
   return stack ? `${stack.position}/${stack.size}` : null
 }

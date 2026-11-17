@@ -1,10 +1,5 @@
 import { existsSync } from 'node:fs'
-import {
-  UNDESCRIBED_LIMIT,
-  type CleanupBookmark,
-  type CleanupSelection,
-  type CleanupSnapshot,
-} from '../../shared/cleanup'
+import { UNDESCRIBED_LIMIT, type CleanupBookmark, type CleanupSnapshot } from '../../shared/cleanup'
 import type { JjRepo } from '../jj/repo'
 import {
   bookmarkAbandonRevset,
@@ -13,7 +8,6 @@ import {
   classifyDivergent,
   classifyUndescribed,
   classifyWorkspaces,
-  cleanupSteps,
   type CleanupStep,
   type DivergentCommit,
   type UndescribedCommit,
@@ -167,12 +161,4 @@ export async function applyCleanupSteps(
         break
     }
   }
-}
-
-export async function applyCleanup(
-  repo: JjRepo,
-  snapshot: CleanupSnapshot,
-  selection: CleanupSelection,
-): Promise<void> {
-  await applyCleanupSteps(repo, cleanupSteps(snapshot, selection))
 }

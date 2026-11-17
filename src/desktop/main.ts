@@ -178,14 +178,6 @@ class DesktopApp implements DesktopContext {
       }
       if (change.affects(THEME)) {
         this.applyTheme()
-        // The native About panel of the macOS app menu. Help > About shows Ukemi's own dialog.
-        const about = this.about()
-        app.setAboutPanelOptions({
-          applicationName: about.name,
-          applicationVersion: about.version,
-          copyright: about.copyright,
-          website: about.website,
-        })
       }
     })
     this.serveFiles()

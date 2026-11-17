@@ -1,5 +1,3 @@
-type AncestorResolver = (parentId: string) => Promise<string[]>
-
 export interface ElisionHit {
   readonly ancestors: readonly string[]
   // False when the entry was resolved at another operation or on another day. Such an entry can
@@ -31,16 +29,6 @@ export class ElisionCache {
     return { ancestors: [...entry.ancestors], fresh: entry.stamp === stampFor(operationId, now) }
   }
 
-  get(
-    revset: string,
-    parentId: string,
-    operationId: string | null,
-    now = new Date(),
-  ): readonly string[] | undefined {
-    const hit = this.lookup(revset, parentId, operationId, now)
-    return hit?.fresh ? hit.ancestors : undefined
-  }
-
   remember(
     revset: string,
     parentId: string,
@@ -68,23 +56,6 @@ export class ElisionCache {
 
   clear(): void {
     this.values.clear()
-  }
-}
-
-export function cachingResolver(
-  cache: ElisionCache,
-  revset: string,
-  operationId: string | null,
-  resolve: AncestorResolver,
-): AncestorResolver {
-  return async (parentId) => {
-    const hit = cache.get(revset, parentId, operationId)
-    if (hit) {
-      return [...hit]
-    }
-    const ancestors = await resolve(parentId)
-    cache.remember(revset, parentId, operationId, ancestors)
-    return ancestors
   }
 }
 

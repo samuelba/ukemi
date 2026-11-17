@@ -10,6 +10,7 @@ import type {
   CleanupWorkspace,
 } from '../../shared/cleanup'
 import { quoteRevsetString } from '../jj/revsets'
+import { firstLine } from '../util/text'
 import { sameFolder } from './workspaceItems'
 
 const GIT_REMOTE = 'git'
@@ -68,10 +69,6 @@ export type CleanupStep =
   | { kind: 'snapshotWorkspace'; root: string }
   | { kind: 'forgetWorkspace'; name: string }
   | { kind: 'deleteWorkspaceFiles'; root: string }
-
-function firstLine(text: string): string {
-  return text.split('\n')[0]?.trim() ?? ''
-}
 
 function byName(left: { name: string }, right: { name: string }): number {
   return left.name.localeCompare(right.name)
