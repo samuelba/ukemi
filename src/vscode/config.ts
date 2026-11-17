@@ -57,6 +57,7 @@ export function vscodeSettings(): Settings & vscode.Disposable {
         repoValue: inspected?.workspaceFolderValue,
       }
     },
+    canOverride: (root) => vscode.workspace.getWorkspaceFolder(vscode.Uri.file(root)) !== undefined,
     update: (key, value, scope = 'default') => updateSetting(key, value, scope),
     onDidChange: emitter.event,
     dispose: () => {

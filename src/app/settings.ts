@@ -84,6 +84,9 @@ export interface Settings {
   read(root?: string): UkemiConfig
   // The values the user set for a key, without defaults.
   inspect(key: string, root: string): SettingValues
+  // Whether `update` can write an override for this repository. VS Code can only when the
+  // repository is inside a workspace folder.
+  canOverride(root: string): boolean
   update(key: string, value: unknown, scope?: SettingScope): Promise<void>
   readonly onDidChange: Event<SettingsChange>
 }
@@ -99,6 +102,18 @@ export function updateWhereItLives(
   const isOverridden =
     root !== null && isRepositoryKey(key) && settings.inspect(key, root).repoValue !== undefined
   return settings.update(key, value, isOverridden && root !== null ? { root } : 'default')
+}
+
+// Writes the override of the repository, so other repositories keep their value. Falls back
+// to the global value when the repository cannot have an override.
+export function updateForRepository(
+  settings: Settings,
+  key: string,
+  value: unknown,
+  root: string | null,
+): Promise<void> {
+  const canOverride = root !== null && isRepositoryKey(key) && settings.canOverride(root)
+  return settings.update(key, value, canOverride && root !== null ? { root } : 'default')
 }
 
 const CHANGED_FILES_VIEWS = ['list', 'tree'] as const satisfies readonly ChangedFilesView[]
