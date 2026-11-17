@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.16.0](https://github.com/samuelba/ukemi/compare/v0.15.1...v0.16.0) (2026-11-17)
+
+
+### Features
+
+* **graph:** drop a change between a row and a parent further down ([bbcf11b](https://github.com/samuelba/ukemi/commit/bbcf11b8be014066efa94b0dcbeb2dfdca89fc7f))
+* **graph:** drop a change between a row and a parent further down ([65399eb](https://github.com/samuelba/ukemi/commit/65399ebbabc73fae55e5827f1e5053ab1ef77dfb))
+* **graph:** rename bookmarks from the graph's bookmark menu ([1c324fe](https://github.com/samuelba/ukemi/commit/1c324fe355a1b6d261056171360d855375a984c8))
+* **graph:** rename bookmarks from the graph's bookmark menu ([40de69e](https://github.com/samuelba/ukemi/commit/40de69e1e78b69dc59870d90ad97b48db635dfce))
+* **sync:** toggle auto fetch for the active repository only ([fd304e5](https://github.com/samuelba/ukemi/commit/fd304e5c4c6680bfc8b540c2b9e10d643d6481d3))
+* **sync:** toggle auto fetch for the active repository only ([179d6ec](https://github.com/samuelba/ukemi/commit/179d6eca3606199af3da9de8d1ccde9e0b61e2f2))
+* **workspaces:** choose the folder new workspaces go in ([4111776](https://github.com/samuelba/ukemi/commit/411177607e0ad450a8516cac47bce7c70e7372ea))
+* **workspaces:** choose whether new workspaces get a Git worktree ([64f1b2d](https://github.com/samuelba/ukemi/commit/64f1b2d368eb8b03996488c5dec4a0e71c24add3))
+* **workspaces:** choose whether new workspaces get a Git worktree ([dfd8307](https://github.com/samuelba/ukemi/commit/dfd8307802e732f9a4377ace21554c08ca1eb066))
+
 ## [0.15.1](https://github.com/samuelba/ukemi/compare/v0.15.0...v0.15.1) (2026-11-12)
 
 
