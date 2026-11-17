@@ -73,7 +73,15 @@ Ukemi also runs as an app of its own, without VS Code. It has the same change gr
 | ------------------------------------------------------- | --------------------------------------------------------------------------- |
 | ![Diff and the jj command log](images/desktop-diff.png) | ![Resolving a conflict between four revisions](images/desktop-conflict.png) |
 
-Every [GitHub release](https://github.com/samuelba/ukemi/releases) has these files:
+On Linux and macOS, one command installs it for your user, without sudo:
+
+```sh
+curl -fsSL https://samuelba.dev/ukemi/install.sh | sh
+```
+
+Run it again to update. On Linux it installs the AppImage, the `ukemi` command and the app menu entry under `~/.local`. On macOS it installs Ukemi.app in `/Applications`, or `~/Applications` when that is not writable, and the `ukemi` command in `~/.local/bin`. A download by the script is not quarantined, so macOS opens the unsigned app straight away. Quit Ukemi on macOS before you update. To remove it, run `curl -fsSL https://samuelba.dev/ukemi/install.sh | sh -s -- --uninstall`; settings stay. `UKEMI_VERSION=0.17.0` installs a specific release.
+
+Or download a file from a [GitHub release](https://github.com/samuelba/ukemi/releases):
 
 | System  | File                                        | Install                                                                   |
 | ------- | ------------------------------------------- | ------------------------------------------------------------------------- |
@@ -92,7 +100,7 @@ The Windows build is not signed yet. Choose **More info** and **Run anyway**.
 
 Start it from the app menu, or with a repository: `ukemi ~/src/repo`. Settings, the window layout and the log are in `~/.config/Ukemi` on Linux and in `~/Library/Application Support/Ukemi` on macOS.
 
-When a newer release is out, Ukemi says so and offers to open its page, where you download the installer as above. It asks GitHub when it starts and once a day. Turn this off with **Check for Updates** in the settings.
+When a newer release is out, Ukemi says so and offers to open its page, where you download the installer as above. When the install script installed Ukemi, it offers to copy the command instead. It asks GitHub when it starts and once a day. Turn this off with **Check for Updates** in the settings.
 
 To build and install the app from a checkout instead, see [Install from source](#install-from-source).
 

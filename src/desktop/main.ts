@@ -6,6 +6,7 @@ import {
   BrowserWindow,
   Menu,
   app,
+  clipboard,
   dialog,
   ipcMain,
   nativeTheme,
@@ -54,7 +55,9 @@ import { readPlacement, type WindowPlacement } from './windowBounds'
 
 import {
   CHECK_FOR_UPDATES,
+  INSTALL_COMMAND,
   latestRelease,
+  runsFromInstallScript,
   SKIPPED_UPDATE,
   updateNotice,
   type Release,
@@ -516,15 +519,24 @@ class DesktopApp implements DesktopContext {
     if (!notice || !session) {
       return
     }
+    const available = `Ukemi ${notice.version} is available. You have ${app.getVersion()}.`
     const download = 'Download'
+    const copy = 'Copy Update Command'
+    const notes = 'Release Notes'
     const skip = 'Skip This Version'
-    const choice = await session.notify(
-      `Ukemi ${notice.version} is available. You have ${app.getVersion()}.`,
-      download,
-      skip,
-    )
-    if (choice === download) {
+    const fromScript = runsFromInstallScript({
+      platform: process.platform,
+      env: process.env,
+      home: homedir(),
+      exePath: app.getPath('exe'),
+    })
+    const choice = fromScript
+      ? await session.notify(`${available} To update, run: ${INSTALL_COMMAND}`, copy, notes, skip)
+      : await session.notify(available, download, skip)
+    if (choice === download || choice === notes) {
       await shell.openExternal(notice.url)
+    } else if (choice === copy) {
+      clipboard.writeText(INSTALL_COMMAND)
     } else if (choice === skip) {
       await this.state.update(SKIPPED_UPDATE, notice.version)
     }
