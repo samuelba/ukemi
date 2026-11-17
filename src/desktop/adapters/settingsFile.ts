@@ -99,6 +99,10 @@ export class SettingsFile implements Settings, Disposable {
     return { globalValue: this.stored[key], repoValue: overridesOf(this.stored, root)[key] }
   }
 
+  canOverride(): boolean {
+    return true
+  }
+
   // The values the user set, without defaults. With a root, that repository's overrides.
   values(root?: string): Readonly<Values> {
     return root === undefined

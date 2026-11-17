@@ -42,8 +42,8 @@ function fetchLabel(autoFetch: AutoFetchState): string {
 
 function autoFetchLabel(autoFetch: AutoFetchState): string {
   return autoFetch.enabled
-    ? `Auto fetch on, ${everyLabel(autoFetch.interval)} (click to turn off)`
-    : 'Auto fetch off (click to turn on)'
+    ? `Auto fetch on, ${everyLabel(autoFetch.interval)} (click to turn off for this repository)`
+    : 'Auto fetch off (click to turn on for this repository)'
 }
 
 function command(name: string, context: Record<string, unknown> = {}) {

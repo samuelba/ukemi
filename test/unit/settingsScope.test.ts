@@ -2,16 +2,18 @@ import { describe, expect, test, vi } from 'vitest'
 import { Emitter } from '../../src/app/events'
 import {
   readSettings,
+  updateForRepository,
   updateWhereItLives,
   type Settings,
   type SettingsChange,
 } from '../../src/app/settings'
 import { isRepositoryKey } from '../../shared/settingsScope'
 
-function fakeSettings(repoValue: unknown): Settings {
+function fakeSettings(repoValue: unknown, canOverride = true): Settings {
   return {
     read: () => readSettings({ get: (_key, fallback) => fallback }),
     inspect: () => ({ globalValue: undefined, repoValue }),
+    canOverride: () => canOverride,
     update: vi.fn(async () => undefined),
     onDidChange: new Emitter<SettingsChange>().event,
   }
@@ -38,5 +40,27 @@ describe('updateWhereItLives', () => {
     expect(settings.update).toHaveBeenCalledWith('showGitTags', true, 'default')
     await updateWhereItLives(settings, 'showGitTags', false, null)
     expect(settings.update).toHaveBeenLastCalledWith('showGitTags', false, 'default')
+  })
+})
+
+describe('updateForRepository', () => {
+  test('writes the repository value even when the repository has none yet', async () => {
+    const settings = fakeSettings(undefined)
+    await updateForRepository(settings, 'autoFetch.enabled', true, '/repo')
+    expect(settings.update).toHaveBeenCalledWith('autoFetch.enabled', true, { root: '/repo' })
+  })
+
+  test('writes the global value when the repository cannot have an override', async () => {
+    const settings = fakeSettings(undefined, false)
+    await updateForRepository(settings, 'autoFetch.enabled', true, '/repo')
+    expect(settings.update).toHaveBeenCalledWith('autoFetch.enabled', true, 'default')
+  })
+
+  test('writes the global value without a repository or for a global key', async () => {
+    const settings = fakeSettings(undefined)
+    await updateForRepository(settings, 'autoFetch.enabled', true, null)
+    expect(settings.update).toHaveBeenLastCalledWith('autoFetch.enabled', true, 'default')
+    await updateForRepository(settings, 'changeIdLength', 8, '/repo')
+    expect(settings.update).toHaveBeenLastCalledWith('changeIdLength', 8, 'default')
   })
 })

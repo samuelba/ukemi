@@ -18,7 +18,7 @@ import { collectBookmarks, type BookmarkRef } from '../../repo/workspaceItems'
 import { errorMessage } from '../../util/logger'
 import { validateBookmarkName, validateRemoteName, validateRemoteUrl } from '../../util/text'
 import { showForgeMissing } from '../forgeMissing'
-import { updateWhereItLives, type UkemiConfig } from '../settings'
+import { updateForRepository, updateWhereItLives, type UkemiConfig } from '../settings'
 import { confirm, type PickItem } from '../ui'
 import { contextModel, parseContext, type CommandEnv, type Handler } from './context'
 
@@ -303,14 +303,18 @@ async function goTo(env: CommandEnv, model: RepoModel): Promise<void> {
 }
 
 // Flips a switch of the active repository: its own override if it has one, else for all.
-function toggleSetting(
-  env: CommandEnv,
-  key: string,
-  field: 'autoFetchEnabled' | 'showGitTags',
-): Promise<void> {
+function toggleSetting(env: CommandEnv, key: string, field: 'showGitTags'): Promise<void> {
   const root = env.registry.activeModel?.root ?? null
   const current: UkemiConfig = env.settings.read(root ?? undefined)
   return updateWhereItLives(env.settings, key, !current[field], root)
+}
+
+// Auto fetch is turned on and off for the active repository only. The global value stays the
+// default for repositories that were never toggled.
+function toggleAutoFetch(env: CommandEnv): Promise<void> {
+  const root = env.registry.activeModel?.root ?? null
+  const current = env.settings.read(root ?? undefined).autoFetchEnabled
+  return updateForRepository(env.settings, 'autoFetch.enabled', !current, root)
 }
 
 function setChangedFilesView(env: CommandEnv, view: ChangedFilesView): Promise<void> {
@@ -364,7 +368,7 @@ export function globalCommands(env: CommandEnv): Record<string, Handler> {
       }
       await env.forge.refreshRequests(model, { force: true })
     }),
-    'ukemi.toggleAutoFetch': () => toggleSetting(env, 'autoFetch.enabled', 'autoFetchEnabled'),
+    'ukemi.toggleAutoFetch': () => toggleAutoFetch(env),
     'ukemi.toggleGitTags': () => toggleSetting(env, 'showGitTags', 'showGitTags'),
     'ukemi.push': withModel(env, (model) => pushAll(env, model)),
     'ukemi.pushCurrent': withModel(env, async (model) => {
