@@ -263,16 +263,22 @@ describe('SecretsFile', () => {
     expect(() => readFileSync(path, 'utf8')).toThrow()
   })
 
-  test('reads a value it cannot decrypt as missing', async () => {
+  test('reads a value it cannot decrypt as missing and reports it once', async () => {
     const path = join(tempDir(), 'secrets.json')
     writeFileSync(path, JSON.stringify({ token: 'garbage' }))
+    const onProblem = vi.fn()
     const broken: Encryptor = {
       ...reversible,
       decryptString: () => {
         throw new Error('bad')
       },
     }
-    expect(await new SecretsFile(path, broken).get('token')).toBeUndefined()
+    const secrets = new SecretsFile(path, broken, undefined, onProblem)
+    expect(await secrets.get('token')).toBeUndefined()
+    expect(await secrets.get('token')).toBeUndefined()
+    expect(onProblem).toHaveBeenCalledTimes(1)
+    expect(onProblem.mock.calls[0]?.[0]).toContain('token')
+    expect(onProblem.mock.calls[0]?.[0]).not.toContain('garbage')
   })
 })
 

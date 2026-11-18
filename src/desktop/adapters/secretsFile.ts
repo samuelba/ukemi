@@ -1,4 +1,5 @@
 import type { SecretStore } from '../../forge/secretStore'
+import { errorMessage } from '../../util/logger'
 import { readJsonObject, withoutKey, writeJsonObject } from './jsonFile'
 
 // The OS keychain, as Electron's safeStorage offers it.
@@ -12,11 +13,13 @@ export interface Encryptor {
 // so a token never lands on disk in plain text.
 export class SecretsFile implements SecretStore {
   private readonly session = new Map<string, string>()
+  private readonly reportedKeys = new Set<string>()
 
   constructor(
     private readonly path: string,
     private readonly encryptor: Encryptor,
     private readonly onUnavailable: () => void = () => undefined,
+    private readonly onProblem: (problem: string) => void = () => undefined,
   ) {}
 
   async get(key: string): Promise<string | undefined> {
@@ -29,7 +32,12 @@ export class SecretsFile implements SecretStore {
     }
     try {
       return this.encryptor.decryptString(Buffer.from(stored, 'base64'))
-    } catch {
+    } catch (error) {
+      // Reads repeat on every forge request, so each key is reported once.
+      if (!this.reportedKeys.has(key)) {
+        this.reportedKeys.add(key)
+        this.onProblem(`could not decrypt the secret "${key}": ${errorMessage(error)}`)
+      }
       return undefined
     }
   }
