@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
@@ -9,6 +9,7 @@ import {
   parseRelease,
   runsFromInstallScript,
   updateNotice,
+  updateRoute,
 } from '../../src/desktop/updateCheck'
 
 const release = {
@@ -148,5 +149,48 @@ describe.skipIf(process.platform === 'win32')('runsFromInstallScript', () => {
     writeMarker()
 
     expect(runsFromInstallScript(mac(mounted))).toBe(false)
+  })
+
+  describe('updateRoute', () => {
+    test('updates in the app when running the AppImage the script installed', () => {
+      touch(appImage)
+      writeMarker()
+
+      expect(updateRoute(linux(appImage))).toBe('in-app')
+    })
+
+    test('recognises the installed AppImage through a symlinked data folder', () => {
+      const real = join(home, 'real/ukemi/Ukemi.AppImage')
+      const data = join(home, 'data')
+      touch(real)
+      symlinkSync(join(home, 'real'), data)
+      touch(installMarkerPath({ XDG_DATA_HOME: data }, home), 'method=script\n')
+
+      const env = { XDG_DATA_HOME: data, APPIMAGE: realpathSync(real) }
+      expect(updateRoute({ ...linux(), env })).toBe('in-app')
+    })
+
+    test('points at the script on macOS', () => {
+      touch(macApp)
+      writeMarker()
+
+      expect(updateRoute(mac(macApp))).toBe('command')
+    })
+
+    test('points at the release page when this is not the installed copy', () => {
+      const other = join(home, 'Downloads/Ukemi.AppImage')
+      touch(appImage)
+      touch(other)
+      writeMarker()
+
+      expect(updateRoute(linux(undefined))).toBe('download')
+      expect(updateRoute(linux(other))).toBe('download')
+    })
+
+    test('points at the release page without the script marker', () => {
+      touch(appImage)
+
+      expect(updateRoute(linux(appImage))).toBe('download')
+    })
   })
 })

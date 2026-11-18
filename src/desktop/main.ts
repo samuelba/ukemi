@@ -57,11 +57,14 @@ import {
   CHECK_FOR_UPDATES,
   INSTALL_COMMAND,
   latestRelease,
-  runsFromInstallScript,
   SKIPPED_UPDATE,
   updateNotice,
+  updateRoute,
   type Release,
+  type UpdateRoute,
 } from './updateCheck'
+import { installerEnv, prepareUpdate, runInstaller } from './selfUpdate'
+import { COPY_UPDATE_COMMAND, UpdateInstaller } from './updateInstaller'
 const OPEN_FOLDERS_KEY = 'openFolders'
 const BOUNDS_KEY = 'windowBounds'
 const ZOOM_KEY = 'zoomFactor'
@@ -132,6 +135,19 @@ class DesktopApp implements DesktopContext {
   readonly secrets: SecretsFile
   private readonly sessions = new Set<DesktopSession>()
   private warnedAboutKeychain = false
+  private readonly updates = new UpdateInstaller({
+    currentWindow: () => this.focusedSession(),
+    install: async (version) => {
+      const update = await prepareUpdate(version)
+      await runInstaller(update, installerEnv(process.env, version, update.sums))
+    },
+    copyCommand: () => clipboard.writeText(INSTALL_COMMAND),
+    restart: () => {
+      app.relaunch({ execPath: process.env.APPIMAGE })
+      app.quit()
+    },
+    logFailure: (version, message) => this.logger.warn(`updating to ${version} failed: ${message}`),
+  })
   private pendingLog: LogLine[] = []
   private logTimer: ReturnType<typeof setTimeout> | null = null
   private isQuitting = false
@@ -519,23 +535,41 @@ class DesktopApp implements DesktopContext {
     if (!notice || !session) {
       return
     }
-    const available = `Ukemi ${notice.version} is available. You have ${app.getVersion()}.`
-    const download = 'Download'
-    const copy = 'Copy Update Command'
-    const notes = 'Release Notes'
-    const skip = 'Skip This Version'
-    const fromScript = runsFromInstallScript({
+    const route = updateRoute({
       platform: process.platform,
       env: process.env,
       home: homedir(),
       exePath: app.getPath('exe'),
     })
-    const choice = fromScript
-      ? await session.notify(`${available} To update, run: ${INSTALL_COMMAND}`, copy, notes, skip)
-      : await session.notify(available, download, skip)
-    if (choice === download || choice === notes) {
+    await this.offerUpdate(session, notice, route)
+  }
+
+  private async offerUpdate(
+    session: DesktopSession,
+    notice: Release,
+    route: UpdateRoute,
+  ): Promise<void> {
+    const available = `Ukemi ${notice.version} is available. You have ${app.getVersion()}.`
+    const update = 'Update Now'
+    const download = 'Download'
+    const notes = 'Release Notes'
+    const skip = 'Skip This Version'
+    const notices: Record<UpdateRoute, [string, ...string[]]> = {
+      'in-app': [available, update, notes, skip],
+      command: [
+        `${available} To update, run: ${INSTALL_COMMAND}`,
+        COPY_UPDATE_COMMAND,
+        notes,
+        skip,
+      ],
+      download: [available, download, skip],
+    }
+    const choice = await session.notify(...notices[route])
+    if (choice === update) {
+      await this.updates.run(session, notice.version)
+    } else if (choice === download || choice === notes) {
       await shell.openExternal(notice.url)
-    } else if (choice === copy) {
+    } else if (choice === COPY_UPDATE_COMMAND) {
       clipboard.writeText(INSTALL_COMMAND)
     } else if (choice === skip) {
       await this.state.update(SKIPPED_UPDATE, notice.version)

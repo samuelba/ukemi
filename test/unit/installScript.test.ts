@@ -195,8 +195,39 @@ describe.skipIf(process.platform === 'win32')('install.sh', () => {
       const result = run()
 
       expect(result.status).toBe(1)
-      expect(result.stderr).toContain('try again soon')
+      expect(result.stderr).toContain('Check your connection')
       expect(result.stderr).toContain('before 0.17.0')
+      expect(existsSync(installedAppImage())).toBe(false)
+    })
+
+    test('uses the checksums it is given instead of downloading them', () => {
+      publishLinux('1.0.0')
+      const sums = readFileSync(join(releaseDir, 'SHA256SUMS'), 'utf8')
+      rmSync(join(releaseDir, 'SHA256SUMS'))
+
+      expect(run([], { UKEMI_SHA256SUMS: sums }).status).toBe(0)
+      expect(readFileSync(installedAppImage(), 'utf8')).toBe(appImage('1.0.0'))
+    })
+
+    test('installs nothing when the given checksums do not match', () => {
+      publishLinux('1.0.0')
+
+      const result = run([], {
+        UKEMI_SHA256SUMS: `${'c'.repeat(64)}  Ukemi-1.0.0.AppImage\n`,
+      })
+
+      expect(result.status).toBe(1)
+      expect(result.stderr).toContain('does not match its checksum')
+      expect(existsSync(installedAppImage())).toBe(false)
+    })
+
+    test('installs nothing when the given checksums do not list the download', () => {
+      publishLinux('1.0.0')
+
+      const result = run([], { UKEMI_SHA256SUMS: `${'c'.repeat(64)}  other\n` })
+
+      expect(result.status).toBe(1)
+      expect(result.stderr).toContain('is missing from the release')
       expect(existsSync(installedAppImage())).toBe(false)
     })
 

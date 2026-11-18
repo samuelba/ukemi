@@ -79,7 +79,7 @@ On Linux and macOS, one command installs it for your user, without sudo:
 curl -fsSL https://samuelba.dev/ukemi/install.sh | sh
 ```
 
-Run it again to update. On Linux it installs the AppImage, the `ukemi` command and the app menu entry under `~/.local`. On macOS it installs Ukemi.app in `/Applications`, or `~/Applications` when that is not writable, and the `ukemi` command in `~/.local/bin`. A download by the script is not quarantined, so macOS opens the unsigned app straight away. Quit Ukemi on macOS before you update. To remove it, run `curl -fsSL https://samuelba.dev/ukemi/install.sh | sh -s -- --uninstall`; settings stay. `UKEMI_VERSION=0.17.0` installs a specific release.
+Run it again to update. On Linux, an app installed this way can also update itself: **Update Now** checks the release's signature first. On Linux it installs the AppImage, the `ukemi` command and the app menu entry under `~/.local`. On macOS it installs Ukemi.app in `/Applications`, or `~/Applications` when that is not writable, and the `ukemi` command in `~/.local/bin`. A download by the script is not quarantined, so macOS opens the unsigned app straight away. Quit Ukemi on macOS before you update. To remove it, run `curl -fsSL https://samuelba.dev/ukemi/install.sh | sh -s -- --uninstall`; settings stay. `UKEMI_VERSION=0.17.0` installs a specific release.
 
 Or download a file from a [GitHub release](https://github.com/samuelba/ukemi/releases):
 
@@ -333,11 +333,19 @@ Then run **Developer: Restart Extension Host** or **Developer: Reload Window**. 
 
 ## Release
 
-A push to `main` does not publish. [release-please](https://github.com/googleapis/release-please) opens a release pull request from conventional commits (`feat` bumps minor before 1.0, `fix` bumps patch, `feat!` bumps major after 1.0). Merging that pull request creates the `vX.Y.Z` tag, the GitHub Release, and attaches `ukemi-jj-X.Y.Z.vsix`. The shared [release-please action](https://github.com/samuelba/actions/tree/main/release-please) runs release-please and then removes merge commits and rebased copies of commits from those notes.
+A push to `main` does not publish. [release-please](https://github.com/googleapis/release-please) opens a release pull request from conventional commits (`feat` bumps minor before 1.0, `fix` bumps patch, `feat!` bumps major after 1.0). Merging that pull request creates the `vX.Y.Z` tag and a draft GitHub Release, and CI attaches `ukemi-jj-X.Y.Z.vsix`, the desktop installers and `install.sh` to the draft. The shared [release-please action](https://github.com/samuelba/actions/tree/main/release-please) runs release-please and then removes merge commits and rebased copies of commits from those notes.
 
 Set the repository secret `RELEASE_PLEASE_TOKEN` to a fine-grained personal access token if CI should run on that pull request. Without it, the release still works.
 
-The release publishes to the Visual Studio Marketplace and to Open VSX, which Cursor, VSCodium and Windsurf use. Both use trusted publishing, so no token is stored: the workflow proves to the store that it runs in this repository. Each store is skipped until it is set up:
+When the workflow has finished, sign and publish the release from a machine that holds the release key:
+
+```sh
+scripts/sign-release.sh vX.Y.Z
+```
+
+The script downloads the draft's files, writes `SHA256SUMS` over them, signs it with the minisign key in `~/.minisign/ukemi.key` and publishes the release. CI never sees that key, and the app's updater accepts only releases signed with it. The public key is `resources/minisign.pub`. It needs `gh` and `minisign` or `rsign`.
+
+The published release goes to the Visual Studio Marketplace and to Open VSX, which Cursor, VSCodium and Windsurf use. Both use trusted publishing, so no token is stored: the workflow proves to the store that it runs in this repository. Each store is skipped until it is set up:
 
 - **Visual Studio Marketplace.** On the publisher management page, open **Trusted Publishing > Create** and enter the owner `samuelba`, the repository `ukemi` and the workflow `release.yml`. Then set the repository variable `MARKETPLACE_TRUSTED_PUBLISHING` to `true`. See [Publishing extensions](https://code.visualstudio.com/api/working-with-extensions/publishing-extension).
 - **Open VSX.** As the owner of the `samuelba` namespace, open **Settings > Trusted Publishers** on open-vsx.org, pick GitHub Actions and enter the same owner, repository and workflow. Then set the repository variable `OPEN_VSX_TRUSTED_PUBLISHING` to `true`. See [Trusted Publishing](https://github.com/eclipse/openvsx/wiki/Trusted-Publishing).

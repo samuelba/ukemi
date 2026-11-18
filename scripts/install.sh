@@ -7,7 +7,8 @@
 #   --force      reinstall even when this version is already installed
 #   --uninstall  remove Ukemi; settings and sign-ins stay
 # Environment: UKEMI_VERSION pins a release (e.g. 0.17.0). UKEMI_FORCE=1 and UKEMI_UNINSTALL=1 do
-# the same as the options.
+# the same as the options. UKEMI_SHA256SUMS is the release's SHA256SUMS, which Ukemi's updater
+# passes after checking its signature.
 #
 # Linux: the AppImage in ~/.local/share/ukemi, the `ukemi` command in ~/.local/bin, and the app
 # menu entry and icon under ~/.local/share.
@@ -50,7 +51,7 @@ fetch() { # URL FILE
     if has curl; then
         curl -fsSL --proto '=https' --tlsv1.2 -o "$2" "$1"
     elif has wget; then
-        wget -q -O "$2" "$1"
+        wget -q --https-only -O "$2" "$1"
     else
         die "needs curl or wget"
     fi
@@ -60,7 +61,7 @@ latest_version() {
     if has curl; then
         url="$(curl -fsSLI --proto '=https' -o /dev/null -w '%{url_effective}' "$repo/releases/latest")"
     elif has wget; then
-        url="$(wget -q -S --spider --max-redirect=0 "$repo/releases/latest" 2>&1 |
+        url="$(wget -q --https-only -S --spider --max-redirect=0 "$repo/releases/latest" 2>&1 |
             sed -n 's/^ *[Ll]ocation: *//p' | tr -d '\r' | tail -n 1)" || true
     else
         die "needs curl or wget"
@@ -85,8 +86,12 @@ sha256() {
 # Downloads a release file to $tmp and checks it against the release's SHA256SUMS.
 download() { # NAME
     say "Downloading $1"
-    fetch "$repo/releases/download/v$version/SHA256SUMS" "$tmp/SHA256SUMS" ||
-        die "cannot get the checksums of v$version. A new release takes a few minutes to build, so try again soon. Releases before 0.17.0 have none and cannot be installed this way. Nothing was installed."
+    if [ -n "${UKEMI_SHA256SUMS:-}" ]; then
+        printf '%s\n' "$UKEMI_SHA256SUMS" >"$tmp/SHA256SUMS"
+    else
+        fetch "$repo/releases/download/v$version/SHA256SUMS" "$tmp/SHA256SUMS" ||
+            die "cannot download the checksums of v$version. Check your connection and that this version exists. Releases before 0.17.0 have no checksums and cannot be installed this way. Nothing was installed."
+    fi
     expected="$(awk -v name="$1" '$2 == name || $2 == "*" name { print $1 }' "$tmp/SHA256SUMS")"
     [ -n "$expected" ] || die "$1 is missing from the release v$version. Nothing was installed."
     fetch "$repo/releases/download/v$version/$1" "$tmp/$1" ||

@@ -819,6 +819,10 @@ export class DesktopSession implements Disposable {
     return this.ui.info(text, ...actions)
   }
 
+  progress<T>(title: string, task: () => Promise<T>): Promise<T> {
+    return this.ui.progress(title, task)
+  }
+
   private post(message: ShellInbound): void {
     if (!this.isClosed && this.window && !this.window.isDestroyed()) {
       this.window.webContents.send(TO_RENDERER, message)
