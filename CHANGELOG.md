@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.0](https://github.com/samuelba/ukemi/compare/v0.16.0...v0.17.0) (2026-11-18)
+
+
+### Features
+
+* **desktop:** add an install script for Linux and macOS (@samuelba) ([356a82e](https://github.com/samuelba/ukemi/commit/356a82e1af888d87bba77bcc6aef09c2af185451))
+* **desktop:** sign releases and verify in-app updates (@samuelba) ([786bd8d](https://github.com/samuelba/ukemi/commit/786bd8ddd64b400f6021b008137d027dd008dbd3))
+
 ## [0.16.0](https://github.com/samuelba/ukemi/compare/v0.15.1...v0.16.0) (2026-11-17)
 
 
