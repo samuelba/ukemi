@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.1](https://github.com/samuelba/ukemi/compare/v0.17.0...v0.17.1) (2026-11-18)
+
+
+### Bug Fixes
+
+* **desktop:** log secrets that cannot be decrypted ([42836d9](https://github.com/samuelba/ukemi/commit/42836d9760fa0879640522229d37afc58c6a2e31))
+* **desktop:** log secrets that cannot be decrypted ([a2338da](https://github.com/samuelba/ukemi/commit/a2338daeea4e28ed27c6575440c98874d9a0bad4))
+
 ## [0.17.0](https://github.com/samuelba/ukemi/compare/v0.16.0...v0.17.0) (2026-11-18)
 
 
