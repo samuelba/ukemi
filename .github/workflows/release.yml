@@ -96,6 +96,44 @@ jobs:
           fi
           gh release upload "${{ needs.release-please.outputs.tag_name }}" "${files[@]}"
 
+  # samuelba.dev/ukemi/install.sh redirects to the latest release's copy, so the script always
+  # matches the packages. It is attached first: until SHA256SUMS is there, it says to try again.
+  install-script:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Attach install.sh to the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ needs.release-please.outputs.tag_name }}" scripts/install.sh
+
+  # install.sh checks its download against this. GitHub keeps a SHA-256 of every asset, so
+  # nothing needs downloading. Runs even when a desktop build failed, so the other systems can
+  # still install. Re-running a failed build and then this job adds the missing file.
+  checksums:
+    needs: [release-please, desktop]
+    if: ${{ !cancelled() && needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Attach SHA256SUMS to the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${{ github.repository }}/releases/tags/$TAG" --jq '
+            .assets[]
+            | select(.name | test("\\.(AppImage|deb|rpm|snap|flatpak|dmg|exe)$"))
+            | "\(.digest // "" | ltrimstr("sha256:"))  \(.name)"' >SHA256SUMS
+          cat SHA256SUMS
+          if [ ! -s SHA256SUMS ] || grep -qvE '^[0-9a-f]{64}  ' SHA256SUMS; then
+            echo 'an asset has no SHA-256 digest' >&2
+            exit 1
+          fi
+          gh release upload "$TAG" SHA256SUMS --clobber --repo "${{ github.repository }}"
+
   # Points the download buttons on samuelba.dev/ukemi at the new installers. Runs only when every
   # desktop build uploaded its files, so the site never links to a missing one. Needs a write
   # deploy key of samuelba/samuelba-website in the WEBSITE_DEPLOY_KEY secret, and the
