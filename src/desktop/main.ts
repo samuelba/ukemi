@@ -154,8 +154,11 @@ class DesktopApp implements DesktopContext {
 
   constructor() {
     this.logger.onLine((line) => this.queueLog(line))
-    this.secrets = new SecretsFile(join(this.paths.userData, 'secrets.json'), safeStorage, () =>
-      this.warnKeychain(),
+    this.secrets = new SecretsFile(
+      join(this.paths.userData, 'secrets.json'),
+      safeStorage,
+      () => this.warnKeychain(),
+      (problem) => this.logger.warn(problem),
     )
   }
 
