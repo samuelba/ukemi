@@ -101,8 +101,17 @@ export function runsFromInstallScript(running: RunningApp): boolean {
   }
 }
 
-// The installers are unsigned and come in several formats, so the app does not install updates
-// itself. It points at the release page, or at the install script that installed it.
+export type UpdateRoute = 'in-app' | 'command' | 'download'
+
+// The app installs an update itself only when it runs as the AppImage install.sh put in place.
+// macOS is left to the command, because install.sh cannot replace a running app there.
+export function updateRoute(running: RunningApp): UpdateRoute {
+  if (!runsFromInstallScript(running)) {
+    return 'download'
+  }
+  return running.platform === 'linux' ? 'in-app' : 'command'
+}
+
 export async function latestRelease(): Promise<Release | null> {
   const response = await fetch(LATEST_RELEASE_URL, {
     headers: { Accept: 'application/vnd.github+json' },

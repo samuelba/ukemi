@@ -4,14 +4,28 @@ on:
   push:
     branches:
       - main
+  release:
+    types: [published]
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
+# Kept here, not read from the checkout: a job's token can change the repository's files, but not
+# its workflows. Must match resources/minisign.pub.
+env:
+  RELEASE_PUBLIC_KEY: RWRGXhU7foXWxTxyz/h4wGJIMU9HSP63yfJ3wEvd5wXuMBYO+BE6gy/i
+
+# release-please makes a draft, and a push only attaches files to it. scripts/sign-release.sh, run
+# by the maintainer, signs them with a key CI never sees and publishes the release. That starts
+# the jobs that reach users: the extension stores and the website. Both check the signature first,
+# because a compromised build job could publish a draft itself.
 jobs:
   release-please:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
@@ -27,13 +41,8 @@ jobs:
     needs: release-please
     if: needs.release-please.outputs.release_created == 'true'
     runs-on: ubuntu-latest
-    # Both stores take a short-lived OIDC token from this job (Trusted Publishing), so it needs
-    # id-token. Job permissions replace the workflow's, so contents stays writable for the release
-    # upload. Each store is skipped until it is set up, and the VSIX on the release can be uploaded
-    # by hand.
     permissions:
       contents: write
-      id-token: write
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -45,19 +54,13 @@ jobs:
       - name: Attach the VSIX to the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ needs.release-please.outputs.tag_name }}" ./*.vsix
-      # Azure DevOps retires the personal access tokens it used before on 2026-12-01. --oidc needs
-      # vsce 4.1.0 or later.
-      - name: Publish to the Visual Studio Marketplace
-        if: vars.MARKETPLACE_TRUSTED_PUBLISHING == 'true'
-        run: npx --yes @vscode/vsce@4.1.0 publish --oidc --packagePath ./*.vsix
-      - name: Publish to Open VSX
-        if: vars.OPEN_VSX_TRUSTED_PUBLISHING == 'true'
-        run: npx --yes ovsx@1.3.0 publish --trusted-publishing --packagePath ./*.vsix
+        run: gh release upload "${{ needs.release-please.outputs.tag_name }}" ./*.vsix --clobber
 
   desktop:
     needs: release-please
     if: needs.release-please.outputs.release_created == 'true'
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -94,53 +97,80 @@ jobs:
             echo 'no installers were built' >&2
             exit 1
           fi
-          gh release upload "${{ needs.release-please.outputs.tag_name }}" "${files[@]}"
+          gh release upload "${{ needs.release-please.outputs.tag_name }}" "${files[@]}" --clobber
 
   # samuelba.dev/ukemi/install.sh redirects to the latest release's copy, so the script always
-  # matches the packages. It is attached first: until SHA256SUMS is there, it says to try again.
+  # matches the packages.
   install-script:
     needs: release-please
     if: needs.release-please.outputs.release_created == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
       - name: Attach install.sh to the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ needs.release-please.outputs.tag_name }}" scripts/install.sh
+        run: gh release upload "${{ needs.release-please.outputs.tag_name }}" scripts/install.sh --clobber
 
-  # install.sh checks its download against this. GitHub keeps a SHA-256 of every asset, so
-  # nothing needs downloading. Runs even when a desktop build failed, so the other systems can
-  # still install. Re-running a failed build and then this job adds the missing file.
-  checksums:
-    needs: [release-please, desktop]
-    if: ${{ !cancelled() && needs.release-please.outputs.release_created == 'true' }}
+  ready-to-sign:
+    needs: [release-please, vsix, desktop, install-script]
     runs-on: ubuntu-latest
     steps:
-      - name: Attach SHA256SUMS to the GitHub Release
+      - run: echo "::notice::Run scripts/sign-release.sh ${{ needs.release-please.outputs.tag_name }} to sign and publish the release."
+
+  # Both stores take a short-lived OIDC token from this job (Trusted Publishing), so it needs
+  # id-token. Each store is skipped until it is set up.
+  stores:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - &verify-signed-checksums
+        name: Verify the signed checksums
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.release-please.outputs.tag_name }}
+          TAG: ${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
-          gh api "repos/${{ github.repository }}/releases/tags/$TAG" --jq '
-            .assets[]
-            | select(.name | test("\\.(AppImage|deb|rpm|snap|flatpak|dmg|exe)$"))
-            | "\(.digest // "" | ltrimstr("sha256:"))  \(.name)"' >SHA256SUMS
-          cat SHA256SUMS
-          if [ ! -s SHA256SUMS ] || grep -qvE '^[0-9a-f]{64}  ' SHA256SUMS; then
-            echo 'an asset has no SHA-256 digest' >&2
-            exit 1
-          fi
-          gh release upload "$TAG" SHA256SUMS --clobber --repo "${{ github.repository }}"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq minisign
+          gh release download "$TAG" --repo "${{ github.repository }}" \
+            --pattern SHA256SUMS --pattern SHA256SUMS.minisig
+          comment="$(minisign -V -Q -P "$RELEASE_PUBLIC_KEY" -m SHA256SUMS)"
+          [ "$comment" = "ukemi ${TAG#v}" ]
+      - name: Download the VSIX and check it against the signed checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          gh release download "$TAG" --repo "${{ github.repository }}" --pattern '*.vsix'
+          sha256sum --check --ignore-missing --strict SHA256SUMS
+          vsix=(./*.vsix)
+          [ "${#vsix[@]}" -eq 1 ]
+          grep -qF "  ${vsix[0]#./}" SHA256SUMS
+      # Azure DevOps retires the personal access tokens it used before on 2026-12-01. --oidc needs
+      # vsce 4.1.0 or later.
+      - name: Publish to the Visual Studio Marketplace
+        if: vars.MARKETPLACE_TRUSTED_PUBLISHING == 'true'
+        run: npx --yes @vscode/vsce@4.1.0 publish --oidc --packagePath ./*.vsix
+      - name: Publish to Open VSX
+        if: vars.OPEN_VSX_TRUSTED_PUBLISHING == 'true'
+        run: npx --yes ovsx@1.3.0 publish --trusted-publishing --packagePath ./*.vsix
 
-  # Points the download buttons on samuelba.dev/ukemi at the new installers. Runs only when every
-  # desktop build uploaded its files, so the site never links to a missing one. Needs a write
+  # Points the download buttons on samuelba.dev/ukemi at the new installers. sign-release.sh
+  # publishes only a complete release, so the site never links to a missing one. Needs a write
   # deploy key of samuelba/samuelba-website in the WEBSITE_DEPLOY_KEY secret, and the
   # WEBSITE_UPDATE variable set to true. Sevalla rebuilds the site on the push.
   website:
-    needs: [release-please, desktop]
-    if: needs.release-please.outputs.release_created == 'true' && vars.WEBSITE_UPDATE == 'true'
+    if: github.event_name == 'release' && vars.WEBSITE_UPDATE == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -157,16 +187,33 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+      - *verify-signed-checksums
+      # GitHub keeps a SHA-256 of every asset, so nothing else needs downloading. Any file that was
+      # swapped or added after signing stops the job.
+      - name: Check the release's files against the signed checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${{ github.repository }}/releases/tags/$TAG" --jq '
+            .assets[]
+            | select(.name | startswith("SHA256SUMS") | not)
+            | "\(.digest // "" | ltrimstr("sha256:"))  \(.name)"' | sort >release-assets
+          sort SHA256SUMS | diff - release-assets
       - name: Write the release's download links
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
         run: |
           node ukemi/scripts/updateWebsiteRelease.mjs \
             --repo "${{ github.repository }}" \
-            --tag "${{ needs.release-please.outputs.tag_name }}" \
+            --tag "$TAG" \
             --out site/src/data/ukemi-release.json
       - name: Push to the website
         working-directory: site
+        env:
+          TAG: ${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
           if git diff --quiet; then
@@ -176,5 +223,5 @@ jobs:
           git add src/data/ukemi-release.json
           git -c user.name='github-actions[bot]' \
             -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-            commit -m "chore: update Ukemi downloads to ${{ needs.release-please.outputs.tag_name }}"
+            commit -m "chore: update Ukemi downloads to $TAG"
           git push origin HEAD:main
