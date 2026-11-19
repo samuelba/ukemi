@@ -8,13 +8,19 @@ const SIGNATURE = `${SUMS}.minisig`
 // The script and the checksums are a few KiB; anything far larger is not them.
 const MAX_DOWNLOAD_BYTES = 1024 * 1024
 const DOWNLOAD_TIMEOUT_MS = 30_000
-// The installer downloads the whole AppImage.
+// The installer downloads and unpacks the whole app.
 const INSTALL_TIMEOUT_MS = 15 * 60 * 1000
 const MAX_STDERR_CHARS = 64 * 1024
 const INSTALLER_ERROR_PREFIX = 'ukemi install: '
-const INHERITED_ENV = ['HOME', 'XDG_DATA_HOME', 'XDG_BIN_HOME', 'TMPDIR', 'LANG', 'LC_ALL'] as const
-const APPIMAGE_ENV = ['APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']
-const MOUNT_LISTS = ['PATH', 'LD_LIBRARY_PATH', 'XDG_DATA_DIRS', 'GSETTINGS_SCHEMA_DIR']
+const INHERITED_ENV = [
+  'HOME',
+  'PATH',
+  'XDG_DATA_HOME',
+  'XDG_BIN_HOME',
+  'TMPDIR',
+  'LANG',
+  'LC_ALL',
+] as const
 const RELAUNCH_WAIT_STEPS = 300
 
 interface PreparedUpdate {
@@ -71,8 +77,7 @@ export async function prepareUpdate(
   return { script, sums: decoder.decode(sumsFile) }
 }
 
-// An AppImage runs with its mount on PATH and its libraries on LD_LIBRARY_PATH, which must not
-// reach the installer or the new AppImage it starts. So only what the script needs is passed.
+// Only what the script needs is passed, so no setting of the app changes what it does.
 export function installerEnv(
   env: NodeJS.ProcessEnv,
   version: string,
@@ -85,39 +90,20 @@ export function installerEnv(
       result[name] = value
     }
   }
-  const path = withoutMount(env.PATH, env.APPDIR)
-  if (path) {
-    result.PATH = path
-  }
-  return { ...result, UKEMI_VERSION: version, UKEMI_SHA256SUMS: sums }
-}
-
-function withoutMount(list: string | undefined, mount: string | undefined): string {
-  return (list ?? '')
-    .split(':')
-    .filter((entry) => !mount || (entry !== mount && !entry.startsWith(`${mount}/`)))
-    .join(':')
-}
-
-// The new AppImage sets these again from its own mount, so the old mount's values must go.
-export function relaunchEnv(env: NodeJS.ProcessEnv): Record<string, string> {
-  const result: Record<string, string> = {}
-  for (const [name, value] of Object.entries(env)) {
-    if (value === undefined || APPIMAGE_ENV.includes(name)) {
-      continue
-    }
-    const kept = MOUNT_LISTS.includes(name) ? withoutMount(value, env.APPDIR) : value
-    if (kept) {
-      result[name] = kept
-    }
-  }
+  result.UKEMI_VERSION = version
+  result.UKEMI_SHA256SUMS = sums
   return result
 }
 
-// Electron's app.relaunch() starts the new process with no_new_privs, which stops the setuid
-// fusermount from mounting the new AppImage. The new instance also has to wait for this one to
-// exit, or the single-instance lock hands its launch back to the instance that is quitting.
-export function relaunchAppImage(appImage: string, pid: number, env: Record<string, string>): void {
+// Starts the installed version once this process has exited. app.relaunch() would start this
+// process's own program, the version the update replaced. The new instance also has to wait, or
+// the single-instance lock hands its launch back to the instance that is quitting.
+export function relaunchAfterExit(
+  executable: string,
+  pid: number,
+  env: NodeJS.ProcessEnv,
+  args: readonly string[] = [],
+): void {
   const script = `
     i=0
     while kill -0 "$1" 2>/dev/null; do
@@ -125,9 +111,10 @@ export function relaunchAppImage(appImage: string, pid: number, env: Record<stri
       [ "$i" -le ${RELAUNCH_WAIT_STEPS} ] || exit 1
       sleep 0.1
     done
-    exec "$2"
+    shift
+    exec "$@"
   `
-  const child = spawn('sh', ['-c', script, 'sh', String(pid), appImage], {
+  const child = spawn('sh', ['-c', script, 'sh', String(pid), executable, ...args], {
     env,
     detached: true,
     stdio: 'ignore',

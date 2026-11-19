@@ -32,7 +32,7 @@ jobs:
           # No snap: electron-builder has a prebuilt snap template for x64 only. On arm64 it runs
           # `snapcraft snap`, which snapcraft 8 removed. Every other Linux format is built.
           - os: ubuntu-24.04-arm
-            targets: --linux AppImage deb rpm flatpak
+            targets: --linux AppImage deb rpm flatpak tar.gz
           - os: macos-latest
           - os: windows-latest
     runs-on: ${{ matrix.os }}
@@ -61,6 +61,7 @@ jobs:
           if-no-files-found: error
           path: |
             out/desktop-release/*.AppImage
+            out/desktop-release/*.tar.gz
             out/desktop-release/*.deb
             out/desktop-release/*.rpm
             out/desktop-release/*.snap
