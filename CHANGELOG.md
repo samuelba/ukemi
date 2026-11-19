@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.2](https://github.com/samuelba/ukemi/compare/v0.17.1...v0.17.2) (2026-11-19)
+
+
+### Bug Fixes
+
+* **desktop:** relaunch the AppImage after an in-app update (@samuelba) ([ea9e56f](https://github.com/samuelba/ukemi/commit/ea9e56fc37440a3c999f0b8bb04b81d11bb14b7d))
+
 ## [0.17.1](https://github.com/samuelba/ukemi/compare/v0.17.0...v0.17.1) (2026-11-18)
 
 
