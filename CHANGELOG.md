@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.0](https://github.com/samuelba/ukemi/compare/v0.17.2...v0.18.0) (2026-11-19)
+
+
+### Features
+
+* **desktop:** install the unpacked app on Linux instead of an AppImage (@samuelba) ([7224180](https://github.com/samuelba/ukemi/commit/7224180cd27fccfd1ce8fc365f71b92fb7ead44e))
+
 ## [0.17.2](https://github.com/samuelba/ukemi/compare/v0.17.1...v0.17.2) (2026-11-19)
 
 
