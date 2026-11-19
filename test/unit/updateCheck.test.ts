@@ -8,6 +8,7 @@ import {
   isNewer,
   parseRelease,
   runsFromInstallScript,
+  scriptLauncherPath,
   updateNotice,
   updateRoute,
 } from '../../src/desktop/updateCheck'
@@ -69,7 +70,7 @@ describe('install script marker', () => {
 
 describe.skipIf(process.platform === 'win32')('runsFromInstallScript', () => {
   let home: string
-  let appImage: string
+  let installed: string
   let macApp: string
 
   function touch(path: string, content = ''): void {
@@ -79,17 +80,17 @@ describe.skipIf(process.platform === 'win32')('runsFromInstallScript', () => {
 
   const writeMarker = (): void =>
     touch(installMarkerPath({}, home), 'method=script\nversion=0.17.0\n')
-  const linux = (APPIMAGE?: string) => ({
+  const linux = (exePath: string, env: NodeJS.ProcessEnv = {}) => ({
     platform: 'linux' as const,
-    env: { APPIMAGE },
+    env,
     home,
-    exePath: '/tmp/.mount_Ukemi/ukemi',
+    exePath,
   })
   const mac = (exePath: string) => ({ platform: 'darwin' as const, env: {}, home, exePath })
 
   beforeEach(() => {
     home = mkdtempSync(join(tmpdir(), 'ukemi-update-'))
-    appImage = join(home, '.local/share/ukemi/Ukemi.AppImage')
+    installed = join(home, '.local/share/ukemi/versions/0.17.0/ukemi')
     macApp = join(home, 'Applications/Ukemi.app/Contents/MacOS/Ukemi')
   })
 
@@ -97,42 +98,53 @@ describe.skipIf(process.platform === 'win32')('runsFromInstallScript', () => {
     rmSync(home, { recursive: true, force: true })
   })
 
-  test('accepts the AppImage the script installed', () => {
-    touch(appImage)
+  test('accepts a version the script installed', () => {
+    touch(installed)
     writeMarker()
 
-    expect(runsFromInstallScript(linux(appImage))).toBe(true)
+    expect(runsFromInstallScript(linux(installed))).toBe(true)
   })
 
-  test('follows symbolic links to the installed AppImage', () => {
-    touch(appImage)
+  test('follows symbolic links to the installed version', () => {
+    touch(installed)
     writeMarker()
-    const link = join(home, 'link.AppImage')
-    symlinkSync(appImage, link)
+    const current = join(home, '.local/share/ukemi/current')
+    symlinkSync('versions/0.17.0', current)
 
-    expect(runsFromInstallScript(linux(link))).toBe(true)
+    expect(runsFromInstallScript(linux(join(current, 'ukemi')))).toBe(true)
   })
 
   test('rejects a system package that left the marker behind', () => {
+    const system = join(home, 'opt/Ukemi/ukemi')
+    touch(installed)
+    touch(system)
+    writeMarker()
+
+    expect(runsFromInstallScript(linux(system))).toBe(false)
+  })
+
+  test('rejects an AppImage, also from the folder of an older install', () => {
+    const mounted = join(home, 'tmp/.mount_UkemiAbc/ukemi')
+    const appImage = join(home, '.local/share/ukemi/Ukemi.AppImage')
+    touch(mounted)
     touch(appImage)
     writeMarker()
 
-    expect(runsFromInstallScript(linux(undefined))).toBe(false)
+    expect(runsFromInstallScript(linux(mounted, { APPIMAGE: appImage }))).toBe(false)
   })
 
-  test('rejects an AppImage from another folder', () => {
-    const other = join(home, 'Downloads/Ukemi.AppImage')
-    touch(appImage)
-    touch(other)
+  test('rejects a program nested deeper in the install folder', () => {
+    const nested = join(home, '.local/share/ukemi/versions/0.17.0/resources/ukemi')
+    touch(nested)
     writeMarker()
 
-    expect(runsFromInstallScript(linux(other))).toBe(false)
+    expect(runsFromInstallScript(linux(nested))).toBe(false)
   })
 
-  test('rejects the installed AppImage without a marker', () => {
-    touch(appImage)
+  test('rejects the installed version without a marker', () => {
+    touch(installed)
 
-    expect(runsFromInstallScript(linux(appImage))).toBe(false)
+    expect(runsFromInstallScript(linux(installed))).toBe(false)
   })
 
   test('accepts the macOS app in the home Applications folder', () => {
@@ -152,22 +164,21 @@ describe.skipIf(process.platform === 'win32')('runsFromInstallScript', () => {
   })
 
   describe('updateRoute', () => {
-    test('updates in the app when running the AppImage the script installed', () => {
-      touch(appImage)
+    test('updates in the app when running a version the script installed', () => {
+      touch(installed)
       writeMarker()
 
-      expect(updateRoute(linux(appImage))).toBe('in-app')
+      expect(updateRoute(linux(installed))).toBe('in-app')
     })
 
-    test('recognises the installed AppImage through a symlinked data folder', () => {
-      const real = join(home, 'real/ukemi/Ukemi.AppImage')
+    test('recognises the installed version through a symlinked data folder', () => {
+      const real = join(home, 'real/ukemi/versions/0.17.0/ukemi')
       const data = join(home, 'data')
       touch(real)
       symlinkSync(join(home, 'real'), data)
       touch(installMarkerPath({ XDG_DATA_HOME: data }, home), 'method=script\n')
 
-      const env = { XDG_DATA_HOME: data, APPIMAGE: realpathSync(real) }
-      expect(updateRoute({ ...linux(), env })).toBe('in-app')
+      expect(updateRoute(linux(realpathSync(real), { XDG_DATA_HOME: data }))).toBe('in-app')
     })
 
     test('points at the script on macOS', () => {
@@ -178,19 +189,33 @@ describe.skipIf(process.platform === 'win32')('runsFromInstallScript', () => {
     })
 
     test('points at the release page when this is not the installed copy', () => {
-      const other = join(home, 'Downloads/Ukemi.AppImage')
-      touch(appImage)
+      const other = join(home, 'Downloads/ukemi/ukemi')
+      touch(installed)
       touch(other)
       writeMarker()
 
-      expect(updateRoute(linux(undefined))).toBe('download')
       expect(updateRoute(linux(other))).toBe('download')
     })
 
     test('points at the release page without the script marker', () => {
-      touch(appImage)
+      touch(installed)
 
-      expect(updateRoute(linux(appImage))).toBe('download')
+      expect(updateRoute(linux(installed))).toBe('download')
     })
+
+    test('points at the release page from a folder the script set aside to delete', () => {
+      writeMarker()
+      for (const hidden of ['.0.17.0.new', '.0.17.0.old.123']) {
+        const program = join(home, `.local/share/ukemi/versions/${hidden}/ukemi`)
+        touch(program)
+
+        expect(updateRoute(linux(program))).toBe('download')
+      }
+    })
+  })
+
+  test('starts the installed version through its launcher', () => {
+    expect(scriptLauncherPath({}, '/home/me')).toBe('/home/me/.local/share/ukemi/bin/ukemi')
+    expect(scriptLauncherPath({ XDG_DATA_HOME: '/data' }, '/home/me')).toBe('/data/ukemi/bin/ukemi')
   })
 })

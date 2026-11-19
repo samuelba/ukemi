@@ -69,7 +69,7 @@ jobs:
           # No snap: electron-builder has a prebuilt snap template for x64 only. On arm64 it runs
           # `snapcraft snap`, which snapcraft 8 removed. Every other Linux format is built.
           - os: ubuntu-24.04-arm
-            targets: --linux AppImage deb rpm flatpak
+            targets: --linux AppImage deb rpm flatpak tar.gz
           - os: macos-latest
           - os: windows-latest
     runs-on: ${{ matrix.os }}
@@ -90,9 +90,26 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release-please.outputs.tag_name }}
         run: |
           shopt -s nullglob
-          files=(out/desktop-release/*.{AppImage,deb,rpm,snap,flatpak,dmg,exe})
+          # install.sh downloads the unpacked app by this name. electron-builder's schema has no
+          # tar.gz artifactName, and linux.artifactName would rename the AppImage, snap and flatpak
+          # too. Each Linux runner builds one architecture, its own.
+          if [ "$RUNNER_OS" = Linux ]; then
+            archives=(out/desktop-release/*.tar.gz)
+            if [ ${#archives[@]} -ne 1 ]; then
+              echo "expected one tar.gz for install.sh, found ${#archives[@]}" >&2
+              exit 1
+            fi
+            case "$RUNNER_ARCH" in
+              X64) arch=x64 ;;
+              ARM64) arch=arm64 ;;
+              *) echo "install.sh has no build for $RUNNER_ARCH" >&2; exit 1 ;;
+            esac
+            mv -- "${archives[0]}" "out/desktop-release/Ukemi-${TAG#v}-linux-$arch.tar.gz"
+          fi
+          files=(out/desktop-release/*.{AppImage,deb,rpm,snap,flatpak,tar.gz,dmg,exe})
           if [ ${#files[@]} -eq 0 ]; then
             echo 'no installers were built' >&2
             exit 1

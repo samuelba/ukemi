@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { z } from 'zod'
 
 // Whether the app asks GitHub for a newer release, at start and once a day.
@@ -61,40 +61,46 @@ export interface RunningApp {
   exePath: string
 }
 
-function dataHome(env: NodeJS.ProcessEnv, home: string): string {
-  return env.XDG_DATA_HOME || join(home, '.local', 'share')
+// scripts/install.sh keeps its marker here and, on Linux, the app: each version unpacked in
+// versions/<version>, and `current` linking to the installed one.
+function scriptInstallFolder(env: NodeJS.ProcessEnv, home: string): string {
+  return join(env.XDG_DATA_HOME || join(home, '.local', 'share'), 'ukemi')
 }
 
 // scripts/install.sh writes this file. Running the script again updates the app.
 export function installMarkerPath(env: NodeJS.ProcessEnv, home: string): string {
-  return join(dataHome(env, home), 'ukemi', 'install-method')
+  return join(scriptInstallFolder(env, home), 'install-method')
 }
 
 export function installedByScript(marker: string): boolean {
   return /^method=script$/m.test(marker)
 }
 
-function scriptInstallPaths({ platform, env, home }: RunningApp): string[] {
+// What starts the installed version on Linux, also after an update replaced the running one. It
+// adds --no-sandbox where AppArmor would stop the sandbox.
+export function scriptLauncherPath(env: NodeJS.ProcessEnv, home: string): string {
+  return join(scriptInstallFolder(env, home), 'bin', 'ukemi')
+}
+
+function isInstalledCopy({ platform, env, home, exePath }: RunningApp): boolean {
+  const actual = realpathSync(exePath)
   if (platform === 'darwin') {
-    return ['/Applications', join(home, 'Applications')].map((folder) =>
-      join(folder, 'Ukemi.app', 'Contents', 'MacOS', 'Ukemi'),
-    )
+    return ['/Applications', join(home, 'Applications')]
+      .map((folder) => join(folder, 'Ukemi.app', 'Contents', 'MacOS', 'Ukemi'))
+      .some((path) => existsSync(path) && realpathSync(path) === actual)
   }
-  return [join(dataHome(env, home), 'ukemi', 'Ukemi.AppImage')]
+  // Throws, so the caller answers false, when there is no versions folder. Hidden folders are
+  // install.sh's staging and set-aside copies, which it deletes.
+  const versions = realpathSync(join(scriptInstallFolder(env, home), 'versions'))
+  return dirname(dirname(actual)) === versions && !basename(dirname(actual)).startsWith('.')
 }
 
 // The marker outlives a switch to a system package, so this app must also be the installed copy.
 export function runsFromInstallScript(running: RunningApp): boolean {
-  const executable = running.platform === 'darwin' ? running.exePath : running.env.APPIMAGE
-  if (!executable) {
-    return false
-  }
   try {
-    const actual = realpathSync(executable)
     return (
-      scriptInstallPaths(running).some(
-        (path) => existsSync(path) && realpathSync(path) === actual,
-      ) && installedByScript(readFileSync(installMarkerPath(running.env, running.home), 'utf8'))
+      isInstalledCopy(running) &&
+      installedByScript(readFileSync(installMarkerPath(running.env, running.home), 'utf8'))
     )
   } catch {
     return false
@@ -103,7 +109,7 @@ export function runsFromInstallScript(running: RunningApp): boolean {
 
 export type UpdateRoute = 'in-app' | 'command' | 'download'
 
-// The app installs an update itself only when it runs as the AppImage install.sh put in place.
+// The app installs an update itself only when it runs as the copy install.sh put in place.
 // macOS is left to the command, because install.sh cannot replace a running app there.
 export function updateRoute(running: RunningApp): UpdateRoute {
   if (!runsFromInstallScript(running)) {

@@ -35,9 +35,17 @@ asarUnpack:
   - node_modules/node-pty/**
 npmRebuild: false
 linux:
-  target: [AppImage, deb, rpm, snap, flatpak]
+  # install.sh installs the tar.gz, unpacked. The other formats are for manual downloads and
+  # package managers.
+  target: [AppImage, deb, rpm, snap, flatpak, tar.gz]
   category: Development
   icon: resources/icon.png
+  # install.sh copies these into the icon theme. Inside the asar it could not read them.
+  extraResources:
+    - from: resources/icon.png
+      to: icon.png
+    - from: resources/icon.svg
+      to: icon.svg
   executableName: ukemi
   # Names the .desktop file and its StartupWMClass after desktopName.
   syncDesktopName: true

@@ -73,13 +73,13 @@ Ukemi also runs as an app of its own, without VS Code. It has the same change gr
 | ------------------------------------------------------- | --------------------------------------------------------------------------- |
 | ![Diff and the jj command log](images/desktop-diff.png) | ![Resolving a conflict between four revisions](images/desktop-conflict.png) |
 
-On Linux and macOS, one command installs it for your user, without sudo:
+On Linux and macOS, one command installs it for your user, without sudo (except once on Ubuntu 23.10 and later, see below):
 
 ```sh
 curl -fsSL https://samuelba.dev/ukemi/install.sh | sh
 ```
 
-Run it again to update. On Linux, an app installed this way can also update itself: **Update Now** checks the release's signature first. On Linux it installs the AppImage, the `ukemi` command and the app menu entry under `~/.local`. On macOS it installs Ukemi.app in `/Applications`, or `~/Applications` when that is not writable, and the `ukemi` command in `~/.local/bin`. A download by the script is not quarantined, so macOS opens the unsigned app straight away. Quit Ukemi on macOS before you update. To remove it, run `curl -fsSL https://samuelba.dev/ukemi/install.sh | sh -s -- --uninstall`; settings stay. `UKEMI_VERSION=0.17.0` installs a specific release.
+Run it again to update. On Linux, an app installed this way can also update itself: **Update Now** checks the release's signature first. On Linux it unpacks the app into `~/.local/share/ukemi` and adds the `ukemi` command and the app menu entry under `~/.local`, so it needs neither FUSE nor AppImageLauncher. Ubuntu 23.10 and later let only programs with an AppArmor profile use the sandbox Ukemi's windows run in, so there the script offers to install one with sudo, once; it covers later updates too. Without it, Ukemi starts without the sandbox. An AppImage that an earlier version of the script installed is replaced. On macOS it installs Ukemi.app in `/Applications`, or `~/Applications` when that is not writable, and the `ukemi` command in `~/.local/bin`. A download by the script is not quarantined, so macOS opens the unsigned app straight away. Quit Ukemi on macOS before you update. To remove it, run `curl -fsSL https://samuelba.dev/ukemi/install.sh | sh -s -- --uninstall`; settings stay. `UKEMI_VERSION=<version>` installs a specific release; on Linux that release needs the `.tar.gz` files, which earlier releases lack.
 
 Or download a file from a [GitHub release](https://github.com/samuelba/ukemi/releases):
 
@@ -90,6 +90,7 @@ Or download a file from a [GitHub release](https://github.com/samuelba/ukemi/rel
 | Linux   | `Ukemi-<version>-<x86_64\|aarch64>.flatpak` | `flatpak install --user ./Ukemi-<version>-x86_64.flatpak`                 |
 | Linux   | `ukemi-jj_<version>_amd64.snap`             | `sudo snap install --dangerous --classic ./ukemi-jj_<version>_amd64.snap` |
 | Linux   | `Ukemi-<version>[-arm64].AppImage`          | See [AppImage](#appimage) below                                           |
+| Linux   | `Ukemi-<version>-linux-<x64\|arm64>.tar.gz` | Unpack it and run `ukemi`. The install script uses this file              |
 | macOS   | `Ukemi-<version>-arm64.dmg`                 | Apple silicon. See [macOS](#macos) below                                  |
 | macOS   | `Ukemi-<version>-x64.dmg`                   | Intel. See [macOS](#macos) below                                          |
 | Windows | `Ukemi Setup <version>.exe`                 | Run the installer                                                         |

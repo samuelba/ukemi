@@ -57,19 +57,22 @@ import {
   CHECK_FOR_UPDATES,
   INSTALL_COMMAND,
   latestRelease,
+  scriptLauncherPath,
   SKIPPED_UPDATE,
   updateNotice,
   updateRoute,
   type Release,
   type UpdateRoute,
 } from './updateCheck'
+import { installerEnv, prepareUpdate, relaunchAfterExit, runInstaller } from './selfUpdate'
+import { readJson } from './adapters/jsonFile'
 import {
-  installerEnv,
-  prepareUpdate,
-  relaunchAppImage,
-  relaunchEnv,
-  runInstaller,
-} from './selfUpdate'
+  canFallBackToX11,
+  FIRST_PAINT_TIMEOUT_MS,
+  relaunchExecutable,
+  X11_FALLBACK_KEY,
+  x11Args,
+} from './windowSystem'
 import { COPY_UPDATE_COMMAND, UpdateInstaller } from './updateInstaller'
 const OPEN_FOLDERS_KEY = 'openFolders'
 const BOUNDS_KEY = 'windowBounds'
@@ -148,13 +151,10 @@ class DesktopApp implements DesktopContext {
       await runInstaller(update, installerEnv(process.env, version, update.sums))
     },
     copyCommand: () => clipboard.writeText(INSTALL_COMMAND),
+    // Only the Linux install of install.sh updates itself (see updateRoute), into a new version
+    // folder that `current` now links to.
     restart: () => {
-      const appImage = process.env.APPIMAGE
-      if (appImage) {
-        relaunchAppImage(appImage, process.pid, relaunchEnv(process.env))
-      } else {
-        app.relaunch()
-      }
+      relaunchAfterExit(scriptLauncherPath(process.env, homedir()), process.pid, process.env)
       app.quit()
     },
     logFailure: (version, message) => this.logger.warn(`updating to ${version} failed: ${message}`),
@@ -229,6 +229,7 @@ class DesktopApp implements DesktopContext {
     for (const folders of windows) {
       this.openWindow(folders)
     }
+    this.watchFirstPaint()
     isStarted = true
     for (const { argv, cwd } of early.splice(0)) {
       void this.openFromSecondInstance(argv, cwd)
@@ -245,6 +246,29 @@ class DesktopApp implements DesktopContext {
       this.rememberOpenFolders()
       this.loopback.dispose()
     })
+  }
+
+  // Hidden windows and a running process would look like Ukemi never started, and would keep
+  // every later launch out through the single-instance lock.
+  private watchFirstPaint(): void {
+    app.on('child-process-gone', (_event, details) => {
+      if (details.reason !== 'clean-exit') {
+        this.logger.warn(`the ${details.type} process is gone: ${details.reason}`)
+      }
+    })
+    const args = launchArgs()
+    if (!canFallBackToX11(process.platform, process.env, args)) {
+      return
+    }
+    setTimeout(() => {
+      const windows = BrowserWindow.getAllWindows()
+      if (windows.length === 0 || windows.some((window) => window.isVisible())) {
+        return
+      }
+      this.logger.warn(`Wayland showed no window in ${FIRST_PAINT_TIMEOUT_MS / 1000} s, using X11`)
+      void this.state.update(X11_FALLBACK_KEY, true)
+      relaunchInX11(args)
+    }, FIRST_PAINT_TIMEOUT_MS).unref()
   }
 
   about(): AboutInfo {
@@ -608,7 +632,27 @@ function failStartup(error: unknown, desktop: DesktopApp | null): void {
   app.exit(1)
 }
 
-if (!app.requestSingleInstanceLock()) {
+function launchArgs(): string[] {
+  return process.argv.slice(1)
+}
+
+function relaunchInX11(args: readonly string[]): void {
+  const executable = relaunchExecutable(process.env, process.execPath)
+  relaunchAfterExit(executable, process.pid, process.env, x11Args(args))
+  app.exit(0)
+}
+
+function remembersX11Fallback(): boolean {
+  const state = readJson(join(app.getPath('userData'), 'state.json')).values
+  return (
+    state[X11_FALLBACK_KEY] === true &&
+    canFallBackToX11(process.platform, process.env, launchArgs())
+  )
+}
+
+if (remembersX11Fallback()) {
+  relaunchInX11(launchArgs())
+} else if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   void app.whenReady().then(async () => {

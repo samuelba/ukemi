@@ -2,23 +2,22 @@ import { createHash, generateKeyPairSync, sign } from 'node:crypto'
 import { blake2b } from '@noble/hashes/blake2.js'
 import { describe, expect, test, vi } from 'vitest'
 import { spawn } from 'node:child_process'
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   installerEnv,
   prepareUpdate,
-  relaunchAppImage,
-  relaunchEnv,
+  relaunchAfterExit,
   runInstaller,
 } from '../../src/desktop/selfUpdate'
 
 const VERSION = '1.2.3'
 const BASE = `https://github.com/samuelba/ukemi/releases/download/v${VERSION}`
 const SCRIPT = 'echo installed\n'
-const APPIMAGE_HASH = 'b'.repeat(64)
+const APP_HASH = 'b'.repeat(64)
 const scriptHash = createHash('sha256').update(SCRIPT).digest('hex')
-const SUMS = `${scriptHash}  install.sh\n${APPIMAGE_HASH}  Ukemi-${VERSION}.AppImage\n`
+const SUMS = `${scriptHash}  install.sh\n${APP_HASH}  Ukemi-${VERSION}-linux-x64.tar.gz\n`
 
 const { publicKey, privateKey } = generateKeyPairSync('ed25519')
 const keyId = Buffer.from('0102030405060708', 'hex')
@@ -64,7 +63,7 @@ describe('prepareUpdate', () => {
   })
 
   test('rejects checksums that are not signed', async () => {
-    const forged = SUMS.replace(APPIMAGE_HASH, 'c'.repeat(64))
+    const forged = SUMS.replace(APP_HASH, 'c'.repeat(64))
     await expect(prepare(server({ SHA256SUMS: forged }))).rejects.toThrow(/not signed/)
   })
 
@@ -87,27 +86,23 @@ describe('prepareUpdate', () => {
 })
 
 describe('installerEnv', () => {
-  const env = installerEnv(
-    {
-      HOME: '/home/me',
-      PATH: '/tmp/.mount_Ukemi/usr/bin:/usr/bin:/tmp/.mount_Ukemi:/bin',
-      APPDIR: '/tmp/.mount_Ukemi',
-      APPIMAGE: '/home/me/.local/share/ukemi/Ukemi.AppImage',
-      LD_LIBRARY_PATH: '/tmp/.mount_Ukemi/usr/lib',
-      ELECTRON_RUN_AS_NODE: '1',
-      XDG_DATA_HOME: '/data',
-      XDG_BIN_HOME: '/bin-home',
-      XDG_DATA_DIRS: '/tmp/.mount_Ukemi/usr/share',
-      TMPDIR: '/var/tmp',
-      LANG: 'C.UTF-8',
-      UKEMI_FORCE: '1',
-      SECRET_TOKEN: 'nope',
-    },
-    VERSION,
-    SUMS,
-  )
-
   test('passes only what the installer needs', () => {
+    const env = installerEnv(
+      {
+        HOME: '/home/me',
+        PATH: '/usr/bin:/bin',
+        ELECTRON_RUN_AS_NODE: '1',
+        XDG_DATA_HOME: '/data',
+        XDG_BIN_HOME: '/bin-home',
+        TMPDIR: '/var/tmp',
+        LANG: 'C.UTF-8',
+        UKEMI_FORCE: '1',
+        SECRET_TOKEN: 'nope',
+      },
+      VERSION,
+      SUMS,
+    )
+
     expect(env).toEqual({
       HOME: '/home/me',
       PATH: '/usr/bin:/bin',
@@ -119,53 +114,38 @@ describe('installerEnv', () => {
       UKEMI_SHA256SUMS: SUMS,
     })
   })
-
-  test('keeps a directory that only shares its prefix with the AppImage mount', () => {
-    const result = installerEnv({ PATH: '/app-other/bin:/app/bin', APPDIR: '/app' }, VERSION, 'x')
-    expect(result.PATH).toBe('/app-other/bin')
-  })
 })
 
-describe('relaunchEnv', () => {
-  test('drops what the AppImage mount added and keeps the session', () => {
-    const env = relaunchEnv({
-      HOME: '/home/me',
-      DISPLAY: ':0',
-      WAYLAND_DISPLAY: 'wayland-0',
-      PATH: '/tmp/.mount_Ukemi:/tmp/.mount_Ukemi/usr/sbin:/usr/bin',
-      LD_LIBRARY_PATH: '/tmp/.mount_Ukemi/usr/lib',
-      XDG_DATA_DIRS: '/tmp/.mount_Ukemi/usr/share/:/usr/local/share/:/usr/share/',
-      GSETTINGS_SCHEMA_DIR: '/tmp/.mount_Ukemi/usr/share/glib-2.0/schemas',
-      APPDIR: '/tmp/.mount_Ukemi',
-      APPIMAGE: '/home/me/.local/share/ukemi/Ukemi.AppImage',
-      ARGV0: 'Ukemi.AppImage',
-      OWD: '/home/me',
-    })
-    expect(env).toEqual({
-      HOME: '/home/me',
-      DISPLAY: ':0',
-      WAYLAND_DISPLAY: 'wayland-0',
-      PATH: '/usr/bin',
-      XDG_DATA_DIRS: '/usr/local/share/:/usr/share/',
-    })
-  })
-})
-
-describe('relaunchAppImage', () => {
-  test('starts the new AppImage only after the old process has exited', async () => {
+describe('relaunchAfterExit', () => {
+  test('starts the installed version only after the old process has exited', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'ukemi-relaunch-'))
     const marker = join(dir, 'started')
-    const appImage = join(dir, 'Ukemi.AppImage')
-    writeFileSync(appImage, `#!/bin/sh\ntouch "${marker}"\n`, { mode: 0o755 })
+    const launcher = join(dir, 'ukemi')
+    writeFileSync(launcher, `#!/bin/sh\ntouch "${marker}"\n`, { mode: 0o755 })
     const old = spawn('sleep', ['0.5'])
     try {
-      relaunchAppImage(appImage, old.pid!, { PATH: process.env.PATH! })
+      relaunchAfterExit(launcher, old.pid!, { PATH: process.env.PATH! })
       await new Promise((done) => setTimeout(done, 200))
       expect(existsSync(marker)).toBe(false)
       await new Promise((done) => old.on('exit', done))
       await vi.waitFor(() => expect(existsSync(marker)).toBe(true), { timeout: 3000 })
     } finally {
       old.kill()
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('passes the arguments on to the new process', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ukemi-relaunch-'))
+    const marker = join(dir, 'args')
+    const launcher = join(dir, 'ukemi')
+    writeFileSync(launcher, `#!/bin/sh\nprintf '%s\\n' "$@" >"${marker}"\n`, { mode: 0o755 })
+    try {
+      relaunchAfterExit(launcher, 2 ** 22 + 1, { PATH: process.env.PATH! }, ['my repo', '-x'])
+      await vi.waitFor(() => expect(readFileSync(marker, 'utf8')).toBe('my repo\n-x\n'), {
+        timeout: 3000,
+      })
+    } finally {
       rmSync(dir, { recursive: true, force: true })
     }
   })

@@ -47,7 +47,8 @@ gh release download "$tag" --repo "$repo" --dir "$work"
 rm -f -- "$work/SHA256SUMS" "$work/SHA256SUMS.minisig"
 
 for name in install.sh "ukemi-jj-$version.vsix" "Ukemi-$version.AppImage" \
-    "Ukemi-$version-arm64.AppImage" "Ukemi-$version-arm64.dmg" "Ukemi-$version-x64.dmg"; do
+    "Ukemi-$version-arm64.AppImage" "Ukemi-$version-linux-x64.tar.gz" \
+    "Ukemi-$version-linux-arm64.tar.gz" "Ukemi-$version-arm64.dmg" "Ukemi-$version-x64.dmg"; do
     [ -f "$work/$name" ] || die "$name is missing from the draft. Has the release workflow finished?"
 done
 set -- "$work"/*.exe
