@@ -63,7 +63,13 @@ import {
   type Release,
   type UpdateRoute,
 } from './updateCheck'
-import { installerEnv, prepareUpdate, runInstaller } from './selfUpdate'
+import {
+  installerEnv,
+  prepareUpdate,
+  relaunchAppImage,
+  relaunchEnv,
+  runInstaller,
+} from './selfUpdate'
 import { COPY_UPDATE_COMMAND, UpdateInstaller } from './updateInstaller'
 const OPEN_FOLDERS_KEY = 'openFolders'
 const BOUNDS_KEY = 'windowBounds'
@@ -143,7 +149,12 @@ class DesktopApp implements DesktopContext {
     },
     copyCommand: () => clipboard.writeText(INSTALL_COMMAND),
     restart: () => {
-      app.relaunch({ execPath: process.env.APPIMAGE })
+      const appImage = process.env.APPIMAGE
+      if (appImage) {
+        relaunchAppImage(appImage, process.pid, relaunchEnv(process.env))
+      } else {
+        app.relaunch()
+      }
       app.quit()
     },
     logFailure: (version, message) => this.logger.warn(`updating to ${version} failed: ${message}`),

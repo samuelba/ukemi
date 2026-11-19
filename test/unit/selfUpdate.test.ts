@@ -1,7 +1,17 @@
 import { createHash, generateKeyPairSync, sign } from 'node:crypto'
 import { blake2b } from '@noble/hashes/blake2.js'
 import { describe, expect, test, vi } from 'vitest'
-import { installerEnv, prepareUpdate, runInstaller } from '../../src/desktop/selfUpdate'
+import { spawn } from 'node:child_process'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import {
+  installerEnv,
+  prepareUpdate,
+  relaunchAppImage,
+  relaunchEnv,
+  runInstaller,
+} from '../../src/desktop/selfUpdate'
 
 const VERSION = '1.2.3'
 const BASE = `https://github.com/samuelba/ukemi/releases/download/v${VERSION}`
@@ -113,6 +123,51 @@ describe('installerEnv', () => {
   test('keeps a directory that only shares its prefix with the AppImage mount', () => {
     const result = installerEnv({ PATH: '/app-other/bin:/app/bin', APPDIR: '/app' }, VERSION, 'x')
     expect(result.PATH).toBe('/app-other/bin')
+  })
+})
+
+describe('relaunchEnv', () => {
+  test('drops what the AppImage mount added and keeps the session', () => {
+    const env = relaunchEnv({
+      HOME: '/home/me',
+      DISPLAY: ':0',
+      WAYLAND_DISPLAY: 'wayland-0',
+      PATH: '/tmp/.mount_Ukemi:/tmp/.mount_Ukemi/usr/sbin:/usr/bin',
+      LD_LIBRARY_PATH: '/tmp/.mount_Ukemi/usr/lib',
+      XDG_DATA_DIRS: '/tmp/.mount_Ukemi/usr/share/:/usr/local/share/:/usr/share/',
+      GSETTINGS_SCHEMA_DIR: '/tmp/.mount_Ukemi/usr/share/glib-2.0/schemas',
+      APPDIR: '/tmp/.mount_Ukemi',
+      APPIMAGE: '/home/me/.local/share/ukemi/Ukemi.AppImage',
+      ARGV0: 'Ukemi.AppImage',
+      OWD: '/home/me',
+    })
+    expect(env).toEqual({
+      HOME: '/home/me',
+      DISPLAY: ':0',
+      WAYLAND_DISPLAY: 'wayland-0',
+      PATH: '/usr/bin',
+      XDG_DATA_DIRS: '/usr/local/share/:/usr/share/',
+    })
+  })
+})
+
+describe('relaunchAppImage', () => {
+  test('starts the new AppImage only after the old process has exited', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ukemi-relaunch-'))
+    const marker = join(dir, 'started')
+    const appImage = join(dir, 'Ukemi.AppImage')
+    writeFileSync(appImage, `#!/bin/sh\ntouch "${marker}"\n`, { mode: 0o755 })
+    const old = spawn('sleep', ['0.5'])
+    try {
+      relaunchAppImage(appImage, old.pid!, { PATH: process.env.PATH! })
+      await new Promise((done) => setTimeout(done, 200))
+      expect(existsSync(marker)).toBe(false)
+      await new Promise((done) => old.on('exit', done))
+      await vi.waitFor(() => expect(existsSync(marker)).toBe(true), { timeout: 3000 })
+    } finally {
+      old.kill()
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 
