@@ -1,4 +1,12 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
@@ -6,6 +14,9 @@ import {
   installedByScript,
   installMarkerPath,
   isNewer,
+  PACKAGE_EXECUTABLE,
+  packageReplaced,
+  packageUpdateCommand,
   parseRelease,
   runsFromInstallScript,
   scriptLauncherPath,
@@ -217,5 +228,70 @@ describe.skipIf(process.platform === 'win32')('runsFromInstallScript', () => {
   test('starts the installed version through its launcher', () => {
     expect(scriptLauncherPath({}, '/home/me')).toBe('/home/me/.local/share/ukemi/bin/ukemi')
     expect(scriptLauncherPath({ XDG_DATA_HOME: '/data' }, '/home/me')).toBe('/data/ukemi/bin/ukemi')
+  })
+})
+
+describe('package installs', () => {
+  const sources = readFileSync('packaging/repo/ukemi.sources', 'utf8')
+  const repo = readFileSync('packaging/repo/ukemi.repo', 'utf8')
+  const APT = '/etc/apt/sources.list.d/ukemi.sources'
+  const DNF = '/etc/yum.repos.d/ukemi.repo'
+  const packaged = {
+    platform: 'linux' as const,
+    env: {},
+    home: '/home/me',
+    exePath: PACKAGE_EXECUTABLE,
+  }
+  const files =
+    (entries: Record<string, string>) =>
+    (path: string): string | undefined =>
+      entries[path]
+
+  test('update through apt or dnf when the package added its repository', () => {
+    expect(packageUpdateCommand(packaged, files({ [APT]: sources }))).toBe(
+      'sudo apt update && sudo apt install --only-upgrade ukemi',
+    )
+    expect(packageUpdateCommand(packaged, files({ [DNF]: repo }))).toBe(
+      'sudo dnf upgrade --refresh ukemi',
+    )
+    expect(updateRoute(packaged, files({ [APT]: sources }))).toBe('package')
+    const upgraded = { ...packaged, exePath: `${PACKAGE_EXECUTABLE} (deleted)` }
+    expect(packageUpdateCommand(upgraded, files({ [DNF]: repo }))).toBe(
+      'sudo dnf upgrade --refresh ukemi',
+    )
+  })
+
+  test('point at the release page when the repository is turned off or missing', () => {
+    const aptOff = `${sources}Enabled: no\n`
+    const dnfOff = repo.replace('enabled=1', 'enabled = 0')
+
+    expect(packageUpdateCommand(packaged, files({ [APT]: aptOff }))).toBeNull()
+    expect(packageUpdateCommand(packaged, files({ [DNF]: dnfOff }))).toBeNull()
+    expect(packageUpdateCommand(packaged, files({}))).toBeNull()
+    expect(updateRoute(packaged, files({ [DNF]: dnfOff }))).toBe('download')
+  })
+
+  test('ignore the repository for a copy of the app outside the package', () => {
+    const elsewhere = { ...packaged, exePath: '/home/me/Downloads/ukemi/ukemi' }
+
+    expect(packageUpdateCommand(elsewhere, files({ [APT]: sources }))).toBeNull()
+    expect(
+      packageUpdateCommand({ ...packaged, platform: 'darwin' }, files({ [APT]: sources })),
+    ).toBeNull()
+  })
+
+  test('see that the package manager replaced the running app', () => {
+    const link = (target: string) => () => target
+
+    expect(packageReplaced(PACKAGE_EXECUTABLE, link(`${PACKAGE_EXECUTABLE} (deleted)`))).toBe(true)
+    expect(packageReplaced(PACKAGE_EXECUTABLE, link(PACKAGE_EXECUTABLE))).toBe(false)
+    expect(packageReplaced('/home/me/ukemi', link('/home/me/ukemi (deleted)'))).toBe(false)
+    const deleted = `${PACKAGE_EXECUTABLE} (deleted)`
+    expect(packageReplaced(deleted, link(deleted))).toBe(true)
+    expect(
+      packageReplaced(PACKAGE_EXECUTABLE, () => {
+        throw new Error('EACCES')
+      }),
+    ).toBe(false)
   })
 })

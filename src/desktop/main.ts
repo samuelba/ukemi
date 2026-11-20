@@ -57,6 +57,9 @@ import {
   CHECK_FOR_UPDATES,
   INSTALL_COMMAND,
   latestRelease,
+  PACKAGE_EXECUTABLE,
+  packageReplaced,
+  packageUpdateCommand,
   scriptLauncherPath,
   SKIPPED_UPDATE,
   updateNotice,
@@ -144,6 +147,7 @@ class DesktopApp implements DesktopContext {
   readonly secrets: SecretsFile
   private readonly sessions = new Set<DesktopSession>()
   private warnedAboutKeychain = false
+  private offeredPackageRestart = false
   private readonly updates = new UpdateInstaller({
     currentWindow: () => this.focusedSession(),
     install: async (version) => {
@@ -236,6 +240,7 @@ class DesktopApp implements DesktopContext {
     }
     void this.checkForUpdates()
     setInterval(() => void this.checkForUpdates(), UPDATE_CHECK_INTERVAL_MS).unref()
+    app.on('browser-window-focus', () => this.offerPackageRestart())
     app.on('activate', () => {
       if (this.sessions.size === 0) {
         this.openWindow([])
@@ -557,7 +562,33 @@ class DesktopApp implements DesktopContext {
     }
   }
 
+  // apt or dnf replaced the running app. Electron still reads its files after start, so the old
+  // version should not keep running on the new files.
+  private offerPackageRestart(): boolean {
+    if (!app.isPackaged || !packageReplaced(app.getPath('exe'))) {
+      return false
+    }
+    const session = this.focusedSession() ?? [...this.sessions][0]
+    if (this.offeredPackageRestart || !session) {
+      return true
+    }
+    this.offeredPackageRestart = true
+    const restart = 'Restart'
+    void session
+      .notify('Ukemi was updated. Restart to use the new version.', restart)
+      .then((choice) => {
+        if (choice === restart) {
+          relaunchAfterExit(PACKAGE_EXECUTABLE, process.pid, process.env)
+          app.quit()
+        }
+      })
+    return true
+  }
+
   private async checkForUpdates(): Promise<void> {
+    if (this.offerPackageRestart()) {
+      return
+    }
     if (!app.isPackaged || this.settings.values()[CHECK_FOR_UPDATES] === false) {
       return
     }
@@ -573,19 +604,22 @@ class DesktopApp implements DesktopContext {
     if (!notice || !session) {
       return
     }
-    const route = updateRoute({
+    const running = {
       platform: process.platform,
       env: process.env,
       home: homedir(),
       exePath: app.getPath('exe'),
-    })
-    await this.offerUpdate(session, notice, route)
+    }
+    const route = updateRoute(running)
+    const command = (route === 'package' && packageUpdateCommand(running)) || INSTALL_COMMAND
+    await this.offerUpdate(session, notice, route, command)
   }
 
   private async offerUpdate(
     session: DesktopSession,
     notice: Release,
     route: UpdateRoute,
+    command: string,
   ): Promise<void> {
     const available = `Ukemi ${notice.version} is available. You have ${app.getVersion()}.`
     const update = 'Update Now'
@@ -594,8 +628,9 @@ class DesktopApp implements DesktopContext {
     const skip = 'Skip This Version'
     const notices: Record<UpdateRoute, [string, ...string[]]> = {
       'in-app': [available, update, notes, skip],
-      command: [
-        `${available} To update, run: ${INSTALL_COMMAND}`,
+      command: [`${available} To update, run: ${command}`, COPY_UPDATE_COMMAND, notes, skip],
+      package: [
+        `${available} Your package manager updates it: ${command}`,
         COPY_UPDATE_COMMAND,
         notes,
         skip,
@@ -608,7 +643,7 @@ class DesktopApp implements DesktopContext {
     } else if (choice === download || choice === notes) {
       await shell.openExternal(notice.url)
     } else if (choice === COPY_UPDATE_COMMAND) {
-      clipboard.writeText(INSTALL_COMMAND)
+      clipboard.writeText(command)
     } else if (choice === skip) {
       await this.state.update(SKIPPED_UPDATE, notice.version)
     }

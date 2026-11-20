@@ -1,0 +1,7 @@
+# Updates for Ukemi, from https://github.com/samuelba/ukemi. Installed by the ukemi package; to
+# stop them, set Enabled: no rather than deleting this file.
+Types: deb
+URIs: https://samuelba.dev/ukemi/deb
+Suites: stable
+Components: main
+Signed-By: /etc/apt/keyrings/ukemi.asc
