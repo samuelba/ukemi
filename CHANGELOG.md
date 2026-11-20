@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.19.0](https://github.com/samuelba/ukemi/compare/v0.18.0...v0.19.0) (2026-11-20)
+
+
+### Features
+
+* **desktop:** update .deb and .rpm installs from apt and dnf repositories ([f47e56e](https://github.com/samuelba/ukemi/commit/f47e56e93a4e90999c32874c7d5689d1c93e3994))
+* **desktop:** update .deb and .rpm installs from apt and dnf repositories ([8ac7eb0](https://github.com/samuelba/ukemi/commit/8ac7eb06a698f17906eff661aea8c0f1e81a4312))
+
 ## [0.18.0](https://github.com/samuelba/ukemi/compare/v0.17.2...v0.18.0) (2026-11-19)
 
 
