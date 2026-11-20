@@ -30,7 +30,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # The snap is built on its own, after the rest: electron-builder's snap target deletes
+          # chrome-sandbox from the app folder the deb, rpm and tar.gz are made from.
           - os: ubuntu-latest
+            targets: --linux AppImage deb rpm flatpak tar.gz
+            snap: true
           # No snap: electron-builder has a prebuilt snap template for x64 only. On arm64 it runs
           # `snapcraft snap`, which snapcraft 8 removed. Every other Linux format is built.
           - os: ubuntu-24.04-arm
@@ -52,6 +56,10 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - if: runner.os == 'Linux'
         run: scripts/check-linux-packages.sh out/desktop-release
+      - if: matrix.snap
+        run: npx electron-builder --linux snap --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       # node-pty starts every shell through spawn-helper. Without the execute bit the terminal fails
       # with "posix_spawnp failed". scripts/stage-node-pty.mjs sets it.
       - if: runner.os == 'macOS'
