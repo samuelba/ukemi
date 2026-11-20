@@ -1,0 +1,31 @@
+name: Repository
+
+# Builds the apt and dnf repository metadata for GitHub Pages from the last published releases,
+# once a release is published (by scripts/sign-release.sh). The packages stay on the releases;
+# samuelba.dev redirects to them. Nothing is signed here: the maintainer runs
+# scripts/publish-repo.sh, which checks the metadata, signs it with a key CI never sees and starts
+# the Repository deploy workflow. Run this one by hand to rebuild the repositories.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: sudo apt-get update && sudo apt-get install -y apt-utils createrepo-c minisign rpm
+      - run: ./scripts/build-repo.sh site
+        env:
+          GH_TOKEN: ${{ github.token }}
+      # Only metadata: what publish-repo.sh checks and signs, and repo-deploy.yml deploys.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: repo
+          path: site/
+          if-no-files-found: error
+      - run: echo "::notice::Run scripts/publish-repo.sh ${{ github.run_id }} to sign and deploy the repositories."

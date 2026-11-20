@@ -59,12 +59,49 @@ linux:
   # deb and rpm need a maintainer. The GitHub noreply address keeps a private one out of packages.
   maintainer: Samuel Bachmann <samuelba@users.noreply.github.com>
   vendor: Samuel Bachmann
+# The deb and rpm add Ukemi's apt or dnf repository (packaging/repo/), so the package manager brings
+# new releases. They are files of the package, not written by afterInstall, whose default sets up
+# /usr/bin/ukemi, the sandbox and the AppArmor profile. Every file under /etc of a deb is a
+# conffile, and --config-files makes these %config(noreplace): upgrades keep the user's changes.
+# scripts/publish-repo.sh accepts exactly these dependencies, so a change here needs one there.
 deb:
   packageName: ukemi
   artifactName: ukemi_${version}_${arch}.${ext}
+  depends:
+    [
+      libgtk-3-0,
+      libnotify4,
+      libnss3,
+      libxss1,
+      libxtst6,
+      xdg-utils,
+      libatspi2.0-0,
+      libuuid1,
+      libsecret-1-0,
+    ]
+  recommends: [libappindicator3-1]
+  fpm:
+    - packaging/repo/ukemi.sources=/etc/apt/sources.list.d/ukemi.sources
+    - packaging/repo/ukemi.asc=/etc/apt/keyrings/ukemi.asc
 rpm:
   packageName: ukemi
   artifactName: ukemi-${version}.${arch}.${ext}
+  depends:
+    [
+      gtk3,
+      libnotify,
+      nss,
+      libXScrnSaver,
+      (libXtst or libXtst6),
+      xdg-utils,
+      at-spi2-core,
+      (libuuid or libuuid1),
+    ]
+  fpm:
+    - --config-files=/etc/yum.repos.d/ukemi.repo
+    - --config-files=/etc/pki/rpm-gpg/RPM-GPG-KEY-ukemi
+    - packaging/repo/ukemi.repo=/etc/yum.repos.d/ukemi.repo
+    - packaging/repo/ukemi.asc=/etc/pki/rpm-gpg/RPM-GPG-KEY-ukemi
 # Classic confinement: Ukemi runs the user's own jj, git, gh and glab, which a strict snap cannot
 # reach. A Snap Store upload needs approval for it; the release only attaches the .snap file.
 snap:

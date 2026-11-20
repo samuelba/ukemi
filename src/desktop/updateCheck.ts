@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, realpathSync } from 'node:fs'
+import { existsSync, readFileSync, readlinkSync, realpathSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { z } from 'zod'
 
@@ -107,15 +107,96 @@ export function runsFromInstallScript(running: RunningApp): boolean {
   }
 }
 
-export type UpdateRoute = 'in-app' | 'command' | 'download'
+// Where the .deb and .rpm put the app (electron-builder's /opt/<productName>).
+export const PACKAGE_EXECUTABLE = '/opt/Ukemi/ukemi'
+
+// Linux reports a program that was replaced on disk as "<path> (deleted)".
+function isPackageExecutable(exePath: string): boolean {
+  return exePath.replace(/ \(deleted\)$/, '') === PACKAGE_EXECUTABLE
+}
+
+export type ReadFile = (path: string) => string | undefined
+
+function readSystemFile(path: string): string | undefined {
+  try {
+    return readFileSync(path, 'utf8')
+  } catch {
+    return undefined
+  }
+}
+
+// The repository files the .deb and .rpm install (packaging/repo/), the separator of their
+// key/value lines, and the command that updates from them.
+const PACKAGE_REPOSITORIES = [
+  {
+    path: '/etc/apt/sources.list.d/ukemi.sources',
+    separator: ':',
+    command: 'sudo apt update && sudo apt install --only-upgrade ukemi',
+  },
+  {
+    path: '/etc/yum.repos.d/ukemi.repo',
+    separator: '=',
+    command: 'sudo dnf upgrade --refresh ukemi',
+  },
+] as const
+
+// apt's `Enabled: no` and dnf's `enabled=0` turn a repository off.
+function repositoryEnabled(text: string, separator: string): boolean {
+  return !text.split('\n').some((line) => {
+    const index = line.indexOf(separator)
+    if (line.trimStart().startsWith('#') || index < 0) {
+      return false
+    }
+    const key = line.slice(0, index).trim().toLowerCase()
+    const value = line
+      .slice(index + 1)
+      .trim()
+      .toLowerCase()
+    return key === 'enabled' && ['no', '0', 'false', 'off'].includes(value)
+  })
+}
+
+// The package manager's update command, when this is the .deb or .rpm install and the
+// repository it added is still on.
+export function packageUpdateCommand(
+  running: RunningApp,
+  read: ReadFile = readSystemFile,
+): string | null {
+  if (running.platform !== 'linux' || !isPackageExecutable(running.exePath)) {
+    return null
+  }
+  const repository = PACKAGE_REPOSITORIES.find(({ path, separator }) => {
+    const text = read(path)
+    return text !== undefined && repositoryEnabled(text, separator)
+  })
+  return repository?.command ?? null
+}
+
+// A package upgrade replaces the running program, which Linux then reports as
+// "<path> (deleted)". The new version runs only after a restart.
+export function packageReplaced(
+  exePath: string,
+  readlink: (path: string) => string = readlinkSync,
+): boolean {
+  if (!isPackageExecutable(exePath)) {
+    return false
+  }
+  try {
+    return readlink('/proc/self/exe').endsWith(' (deleted)')
+  } catch {
+    return false
+  }
+}
+
+export type UpdateRoute = 'in-app' | 'command' | 'package' | 'download'
 
 // The app installs an update itself only when it runs as the copy install.sh put in place.
 // macOS is left to the command, because install.sh cannot replace a running app there.
-export function updateRoute(running: RunningApp): UpdateRoute {
-  if (!runsFromInstallScript(running)) {
-    return 'download'
+export function updateRoute(running: RunningApp, read: ReadFile = readSystemFile): UpdateRoute {
+  if (runsFromInstallScript(running)) {
+    return running.platform === 'linux' ? 'in-app' : 'command'
   }
-  return running.platform === 'linux' ? 'in-app' : 'command'
+  return packageUpdateCommand(running, read) ? 'package' : 'download'
 }
 
 export async function latestRelease(): Promise<Release | null> {

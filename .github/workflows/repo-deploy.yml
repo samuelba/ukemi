@@ -1,0 +1,85 @@
+name: Repository deploy
+
+# Puts the repository metadata a Repository run built on GitHub Pages, with the signatures that
+# scripts/publish-repo.sh made for it on the maintainer's machine. Only that script starts it.
+on:
+  workflow_dispatch:
+    inputs:
+      run:
+        description: The Repository run that built the repositories
+        required: true
+      in_release:
+        description: deb/dists/stable/InRelease
+        required: true
+      release_signature:
+        description: deb/dists/stable/Release.gpg
+        required: true
+      repomd_signature:
+        description: rpm/repodata/repomd.xml.asc
+        required: true
+
+permissions:
+  actions: read
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Fetch the repositories
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ inputs.run }}
+        run: |
+          [[ "$RUN" =~ ^[0-9]+$ ]] || { echo "::error::$RUN is not a run id"; exit 1; }
+          workflow="$(gh run view "$RUN" --repo "$GITHUB_REPOSITORY" --json workflowName --jq .workflowName)"
+          [[ "$workflow" == Repository ]] || { echo "::error::run $RUN is not a Repository run"; exit 1; }
+          gh run download "$RUN" --repo "$GITHUB_REPOSITORY" --name repo --dir site
+      # publish-repo.sh checked the metadata, and apt and dnf check the packages against it. What
+      # else goes on the site comes from this checkout, so nothing on it is CI's alone.
+      - name: Keep only what was checked
+        run: |
+          expected='^(releases\.txt|deb/dists/stable/Release|deb/dists/stable/main/binary-(amd64|arm64)/Packages(\.gz)?'
+          expected+='|rpm/repodata/(repomd\.xml|[0-9a-f]{64}-(primary|filelists|other)\.xml\.gz)'
+          expected+='|index\.html|ukemi\.asc|deb/ukemi\.sources|rpm/ukemi\.repo)$'
+          while read -r file; do
+            [[ "$file" =~ $expected ]] || { echo "::error::unexpected file $file"; exit 1; }
+          done < <(cd site && find . \! -type d -printf '%P\n')
+          cp packaging/repo/index.html packaging/repo/ukemi.asc site/
+          cp packaging/repo/ukemi.sources site/deb/
+          cp packaging/repo/ukemi.repo site/rpm/
+      - name: Add the signatures
+        env:
+          IN_RELEASE: ${{ inputs.in_release }}
+          RELEASE_SIGNATURE: ${{ inputs.release_signature }}
+          REPOMD_SIGNATURE: ${{ inputs.repomd_signature }}
+        run: |
+          printf '%s\n' "$IN_RELEASE" > site/deb/dists/stable/InRelease
+          printf '%s\n' "$RELEASE_SIGNATURE" > site/deb/dists/stable/Release.gpg
+          printf '%s\n' "$REPOMD_SIGNATURE" > site/rpm/repodata/repomd.xml.asc
+      # apt and dnf check these anyway; this only stops a deploy they would refuse.
+      - name: Check the signatures
+        run: |
+          gpg --dearmor < packaging/repo/ukemi.asc > "$RUNNER_TEMP/keyring.gpg"
+          check() { gpgv --keyring "$RUNNER_TEMP/keyring.gpg" "$@"; }
+          check site/deb/dists/stable/InRelease
+          # apt reads only InRelease, so it has to sign this Release.
+          gpgv --keyring "$RUNNER_TEMP/keyring.gpg" --output - site/deb/dists/stable/InRelease 2>/dev/null |
+            cmp - site/deb/dists/stable/Release
+          check site/deb/dists/stable/Release.gpg site/deb/dists/stable/Release
+          check site/rpm/repodata/repomd.xml.asc site/rpm/repodata/repomd.xml
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site/
+      - id: deployment
+        uses: actions/deploy-pages@v5

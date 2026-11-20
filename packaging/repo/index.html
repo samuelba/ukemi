@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ukemi packages</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #fafafa;
+        --fg: #1d1d1f;
+        --muted: #5f6368;
+        --code: #ececec;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #16171a;
+          --fg: #e6e6e6;
+          --muted: #9aa0a6;
+          --code: #24262b;
+        }
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font:
+          16px/1.55 system-ui,
+          sans-serif;
+      }
+      main {
+        max-width: 46rem;
+        margin: 0 auto;
+        padding: 2.5rem 1rem 4rem;
+      }
+      h1 {
+        font-size: 1.6rem;
+        margin: 0 0 0.25rem;
+      }
+      h2 {
+        font-size: 1.15rem;
+        margin: 2rem 0 0.5rem;
+      }
+      p {
+        margin: 0.5rem 0;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      pre {
+        background: var(--code);
+        padding: 0.8rem 1rem;
+        border-radius: 6px;
+        overflow-x: auto;
+        font-size: 0.85rem;
+      }
+      a {
+        color: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Ukemi packages</h1>
+      <p class="muted">
+        The apt and dnf repositories of <a href="https://samuelba.dev/ukemi">Ukemi</a>, a Jujutsu
+        (jj) GUI.
+      </p>
+
+      <p>
+        Installing a <code>.deb</code> or <code>.rpm</code> from the
+        <a href="https://github.com/samuelba/ukemi/releases/latest">latest release</a> adds the
+        repository for you, and your package manager keeps Ukemi up to date from then on. To add it
+        without downloading a package first:
+      </p>
+
+      <h2>Debian 12+, Ubuntu 22.04+</h2>
+      <pre>
+sudo install -d -m 0755 /etc/apt/keyrings
+sudo curl -fsSLo /etc/apt/keyrings/ukemi.asc https://samuelba.github.io/ukemi/ukemi.asc
+sudo curl -fsSLo /etc/apt/sources.list.d/ukemi.sources https://samuelba.github.io/ukemi/deb/ukemi.sources
+sudo apt update &amp;&amp; sudo apt install ukemi</pre>
+
+      <h2>Fedora</h2>
+      <pre>
+sudo curl -fsSLo /etc/pki/rpm-gpg/RPM-GPG-KEY-ukemi https://samuelba.github.io/ukemi/ukemi.asc
+sudo curl -fsSLo /etc/yum.repos.d/ukemi.repo https://samuelba.github.io/ukemi/rpm/ukemi.repo
+sudo dnf install ukemi</pre>
+
+      <p class="muted">
+        The metadata is signed with the key in <a href="ukemi.asc">ukemi.asc</a>; the packages are
+        downloaded from the GitHub releases. To stop updates from here, set
+        <code>Enabled: no</code> in <code>/etc/apt/sources.list.d/ukemi.sources</code> or
+        <code>enabled=0</code> in <code>/etc/yum.repos.d/ukemi.repo</code>.
+      </p>
+    </main>
+  </body>
+</html>

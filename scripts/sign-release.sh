@@ -8,8 +8,10 @@
 # writes SHA256SUMS over every file, signs it as SHA256SUMS.minisig (trusted comment
 # "ukemi <version>"), uploads both and publishes the release. Ukemi's updater accepts only releases
 # signed this way. Publishing starts the jobs that update the extension stores and the website.
+# Then scripts/publish-repo.sh signs the apt and dnf repositories CI builds for the release.
 #
-# Needs gh (logged in), git, sha256sum and minisign or rsign (rsign2). The key is read from
+# Needs gh (logged in), git, sha256sum and minisign or rsign (rsign2), and for the repositories
+# gpg with the repository key (see publish-repo.sh). The key is read from
 # $UKEMI_SIGNING_KEY, or else ~/.minisign/ukemi.key. rsign asks for the key's password; set
 # UKEMI_SIGNING_PASSWORDLESS=1 for a key without one.
 set -eu
@@ -75,3 +77,7 @@ fi
 gh release upload "$tag" "$work/SHA256SUMS" "$work/SHA256SUMS.minisig" --clobber --repo "$repo"
 gh release edit "$tag" --draft=false --latest --repo "$repo"
 printf 'Published %s.\n' "$tag"
+
+# Publishing started the Repository workflow; sign what it builds and deploy it.
+"$root/scripts/publish-repo.sh" "$tag" ||
+    die "the release is published, but the apt and dnf repositories are not; retry with: scripts/publish-repo.sh $tag"
