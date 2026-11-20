@@ -12,9 +12,10 @@
 # scripts/publish-repo.sh then checks the metadata and signs it on the maintainer's machine, and
 # the Repository deploy workflow puts it on GitHub Pages.
 #
-# Only releases whose SHA256SUMS are signed by the release key and whose packages add the
-# repository go in, the newest $KEEP (default 3) of them. Needs gh, sha256sum, minisign or rsign,
-# apt-ftparchive (apt-utils), createrepo_c, dpkg-deb and rpm.
+# Only releases whose SHA256SUMS are signed by the release key, whose packages add the repository
+# and whose rpm packages are signed by the repository key go in, the newest $KEEP (default 3) of
+# them. Needs gh, sha256sum, minisign or rsign, apt-ftparchive (apt-utils), createrepo_c, dpkg-deb
+# and rpm.
 set -euo pipefail
 
 repo="samuelba/ukemi"
@@ -29,7 +30,7 @@ die() {
 }
 
 [[ -f "$key" ]] || die "no repository key at packaging/repo/ukemi.asc"
-for tool in gh sha256sum apt-ftparchive createrepo_c dpkg-deb rpm; do
+for tool in gh sha256sum apt-ftparchive createrepo_c dpkg-deb rpm rpmkeys; do
     command -v "$tool" >/dev/null || die "needs $tool"
 done
 
@@ -41,7 +42,19 @@ rm -rf -- "$out"
 mkdir -p "$out/deb" "$out/rpm"
 work="$(mktemp -d)"
 trap 'rm -rf -- "$work"' EXIT
-mkdir -p "$work/deb/pool" "$work/rpm/pool"
+mkdir -p "$work/deb/pool" "$work/rpm/pool" "$work/rpmdb"
+# Holds only the repository key, so a signature by any other key does not check out.
+rpmkeys --dbpath "$work/rpmdb" --import "$key"
+
+# Whether every rpm in a directory carries the repository key's signature. --checksig passes an
+# unsigned package on its digests alone, so look for the signature itself.
+rpms_signed() {
+    local rpm checked
+    for rpm in "$1"/*.rpm; do
+        checked="$(rpmkeys --dbpath "$work/rpmdb" --checksig --verbose "$rpm" || true)"
+        grep -qiE 'signature.*: OK$' <<<"$checked" || return 1
+    done
+}
 
 echo "== packages"
 releases=()
@@ -65,6 +78,11 @@ while read -r tag <&3; do
     # newest first, so no older release adds it either: stop before downloading their packages.
     if ! "$root/scripts/check-linux-packages.sh" "$dir" >/dev/null 2>&1; then
         echo "$tag: its packages do not add the repository; it and older releases are left out"
+        break
+    fi
+    # dnf checks each package's signature (gpgcheck=1); scripts/sign-rpms.sh signs them.
+    if ! rpms_signed "$dir"; then
+        echo "$tag: its rpm packages are not signed; it and older releases are left out"
         break
     fi
     mkdir -p "$work/deb/pool/$tag" "$work/rpm/pool/$tag"
