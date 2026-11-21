@@ -90,20 +90,20 @@ body.vscode-high-contrast .split {
 }
 
 .split .status-added {
-  color: var(--vscode-gitDecoration-addedResourceForeground);
+  color: var(--ukemi-added);
 }
 
 .split .status-modified {
-  color: var(--vscode-gitDecoration-modifiedResourceForeground);
+  color: var(--ukemi-modified);
 }
 
 .split .status-removed {
-  color: var(--vscode-gitDecoration-deletedResourceForeground);
+  color: var(--ukemi-deleted);
 }
 
 .split .status-renamed,
 .split .status-copied {
-  color: var(--vscode-gitDecoration-renamedResourceForeground);
+  color: var(--ukemi-renamed);
 }
 
 .whole-note {
