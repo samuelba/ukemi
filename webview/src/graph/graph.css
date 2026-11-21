@@ -531,11 +531,11 @@
 }
 
 .line-added {
-  color: var(--vscode-gitDecoration-addedResourceForeground);
+  color: var(--ukemi-added);
 }
 
 .line-removed {
-  color: var(--vscode-gitDecoration-deletedResourceForeground);
+  color: var(--ukemi-deleted);
 }
 
 .time {
@@ -910,25 +910,25 @@ div.files {
 }
 
 .status-added .file-status {
-  color: var(--vscode-gitDecoration-addedResourceForeground);
+  color: var(--ukemi-added);
 }
 
 .status-modified .file-status {
-  color: var(--vscode-gitDecoration-modifiedResourceForeground);
+  color: var(--ukemi-modified);
 }
 
 .status-removed .file-status {
-  color: var(--vscode-gitDecoration-deletedResourceForeground);
+  color: var(--ukemi-deleted);
 }
 
 .status-renamed .file-status,
 .status-copied .file-status {
-  color: var(--vscode-gitDecoration-renamedResourceForeground);
+  color: var(--ukemi-renamed);
 }
 
 .file.conflicted .file-status,
 .file.conflicted .file-name {
-  color: var(--vscode-gitDecoration-conflictingResourceForeground);
+  color: var(--ukemi-conflicting);
 }
 
 .file.status-removed .file-name {

@@ -32,6 +32,18 @@
   --ukemi-ink-button-hover: color-mix(in srgb, var(--vscode-foreground) 82%, transparent);
   --ukemi-quiet-button-border: var(--vscode-widget-border, var(--ukemi-edge));
   --ukemi-quiet-button-hover: var(--vscode-toolbar-hoverBackground, var(--ukemi-hover));
+  /* The Git extension registers these colors; a webview restored before it loads never receives them. */
+  --ukemi-added: var(--vscode-gitDecoration-addedResourceForeground, var(--vscode-charts-green));
+  --ukemi-modified: var(
+    --vscode-gitDecoration-modifiedResourceForeground,
+    var(--vscode-charts-yellow)
+  );
+  --ukemi-deleted: var(--vscode-gitDecoration-deletedResourceForeground, var(--vscode-charts-red));
+  --ukemi-renamed: var(--vscode-gitDecoration-renamedResourceForeground, var(--vscode-charts-blue));
+  --ukemi-conflicting: var(
+    --vscode-gitDecoration-conflictingResourceForeground,
+    var(--vscode-charts-purple)
+  );
 }
 
 body.vscode-dark,
