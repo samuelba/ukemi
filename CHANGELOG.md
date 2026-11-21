@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.19.1](https://github.com/samuelba/ukemi/compare/v0.19.0...v0.19.1) (2026-11-21)
+
+
+### Bug Fixes
+
+* **desktop:** keep chrome-sandbox in the x64 deb, rpm and tar.gz (@samuelba) ([96d1bab](https://github.com/samuelba/ukemi/commit/96d1bab3a83a4a6dccdd44e73e169a90ae6af02d))
+* **desktop:** sign the rpm packages (@samuelba) ([c52e962](https://github.com/samuelba/ukemi/commit/c52e962b5e8a5c3d7c6df9a9593d8bd4c8d3ee5e))
+
 ## [0.19.0](https://github.com/samuelba/ukemi/compare/v0.18.0...v0.19.0) (2026-11-20)
 
 
