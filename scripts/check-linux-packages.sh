@@ -6,6 +6,9 @@
 #     keeps a user's `Enabled: no` or `enabled=0`
 #   - both are mode 0644: apt reads the key as the unprivileged _apt user
 #   - the rpm provides only ukemi, so no library bundled with Electron stands in for a system one
+#   - both hold chrome-sandbox, which the post-install script makes setuid where the kernel
+#     lets no unprivileged program create a user namespace. electron-builder's snap target
+#     deletes it from the app folder all Linux targets share.
 #
 # Needs dpkg-deb and rpm.
 set -euo pipefail
@@ -29,6 +32,8 @@ for deb in "${debs[@]}"; do
         mode="$(dpkg-deb --fsys-tarfile "$deb" | tar -tvf - ".$path" | cut -c1-10)"
         [[ "$mode" == -rw-r--r-- ]] || die "$deb: $path has mode $mode, not -rw-r--r--"
     done
+    contents="$(dpkg-deb --fsys-tarfile "$deb" | tar -tf -)"
+    grep -qxF ./opt/Ukemi/chrome-sandbox <<<"$contents" || die "$deb has no /opt/Ukemi/chrome-sandbox"
     echo "$deb: ok"
 done
 
@@ -39,6 +44,7 @@ for rpm in "${rpms[@]}"; do
         [[ "$line" == "-rw-r--r-- cn $path" ]] ||
             die "$rpm: $path is \"$line\", not a 0644 %config(noreplace) file"
     done
+    grep -qE ' /opt/Ukemi/chrome-sandbox$' <<<"$files" || die "$rpm has no /opt/Ukemi/chrome-sandbox"
     unexpected="$(rpm -qp --provides "$rpm" | sed 's/ = .*//' | grep -vxE 'ukemi|ukemi\([a-z0-9_-]+\)' || true)"
     [[ -z "$unexpected" ]] || die "$rpm provides more than ukemi: $unexpected"
     echo "$rpm: ok"

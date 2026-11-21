@@ -10,8 +10,9 @@
 # signed this way. Publishing starts the jobs that update the extension stores and the website.
 # Then scripts/publish-repo.sh signs the apt and dnf repositories CI builds for the release.
 #
-# Needs gh (logged in), git, sha256sum and minisign or rsign (rsign2), and for the repositories
-# gpg with the repository key (see publish-repo.sh). The key is read from
+# Needs gh (logged in), git, sha256sum and minisign or rsign (rsign2), and for the rpm packages
+# and the repositories rpmsign (rpm-sign) and gpg with the repository key (see sign-rpms.sh and
+# publish-repo.sh). The key is read from
 # $UKEMI_SIGNING_KEY, or else ~/.minisign/ukemi.key. rsign asks for the key's password; set
 # UKEMI_SIGNING_PASSWORDLESS=1 for a key without one.
 set -eu
@@ -59,6 +60,9 @@ set -- "$work"/*.exe
 git -C "$root" show "$tag:scripts/install.sh" | cmp -s - "$work/install.sh" ||
     die "the release's install.sh is not the one in $tag"
 
+# Signing changes the rpm files, so it comes before the checksums, and they are uploaded again.
+"$root/scripts/sign-rpms.sh" "$work" || die "the rpm packages are not signed"
+
 (cd "$work" && sha256sum -- * >SHA256SUMS)
 cat "$work/SHA256SUMS"
 printf 'Sign and publish %s with these files? [y/N] ' "$tag"
@@ -74,7 +78,7 @@ else
     rsign verify -p "$public_key" -x "$work/SHA256SUMS.minisig" "$work/SHA256SUMS"
 fi
 
-gh release upload "$tag" "$work/SHA256SUMS" "$work/SHA256SUMS.minisig" --clobber --repo "$repo"
+gh release upload "$tag" "$work"/*.rpm "$work/SHA256SUMS" "$work/SHA256SUMS.minisig" --clobber --repo "$repo"
 gh release edit "$tag" --draft=false --latest --repo "$repo"
 printf 'Published %s.\n' "$tag"
 
