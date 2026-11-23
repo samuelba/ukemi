@@ -5,10 +5,8 @@
 
 ### Bug Fixes
 
-* **webview:** fall back to chart colors for file status colors ([696db71](https://github.com/samuelba/ukemi/commit/696db712928e6d69ba5fd49ee4865d4ced20468e))
-* **webview:** fall back to chart colors for file status colors ([3b7e4b3](https://github.com/samuelba/ukemi/commit/3b7e4b3af5b507c0142f8fcd015e0d2a1ff94fa3))
-* **webview:** keep a change's expansion after editing another change ([5d571b0](https://github.com/samuelba/ukemi/commit/5d571b0fba46312e928e3c0e3d3446540ac1d26c))
-* **webview:** keep a change's expansion after editing another change ([bb910b9](https://github.com/samuelba/ukemi/commit/bb910b91ef250cb0adcb1e25fb5ae2c93f83204b))
+* **webview:** fall back to chart colors for file status colors (@samuelba) ([3b7e4b3](https://github.com/samuelba/ukemi/commit/3b7e4b3af5b507c0142f8fcd015e0d2a1ff94fa3))
+* **webview:** keep a change's expansion after editing another change (@samuelba) ([bb910b9](https://github.com/samuelba/ukemi/commit/bb910b91ef250cb0adcb1e25fb5ae2c93f83204b))
 
 ## [0.19.1](https://github.com/samuelba/ukemi/compare/v0.19.0...v0.19.1) (2026-11-21)
 
