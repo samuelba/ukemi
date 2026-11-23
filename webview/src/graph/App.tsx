@@ -26,6 +26,7 @@ import { insertGaps } from './dropCommit'
 import { DescribeDialog, type SuggestionReply } from './DescribeDialog'
 import { DropPreviewBar } from './DropPreviewBar'
 import { EmptyState } from './EmptyState'
+import { isExpanded as isCommitExpanded, toggleExpansion, type Expansion } from './expansion'
 import { fileKey, keepKeys, type FileLoad } from './fileLoads'
 import { FileIconFonts, FileIconThemeContext } from './FileIcon'
 import { previewMovedFile } from './FileList'
@@ -67,8 +68,10 @@ export function App() {
   // The desktop app has no host theme and provides its own bundled one around the graph.
   const bundledIcons = useContext(FileIconThemeContext)
   const [files, setFiles] = useState<ReadonlyMap<string, FileLoad>>(new Map())
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
-  const [isWorkingCopyCollapsed, setIsWorkingCopyCollapsed] = useState(false)
+  const [expansion, setExpansion] = useState<Expansion>({
+    expanded: new Set(),
+    isWorkingCopyCollapsed: false,
+  })
   const requested = useRef(new Set<string>())
   const [selection, setSelection] = useState<Selection | null>(null)
   const announced = useRef<string | null>(null)
@@ -206,9 +209,8 @@ export function App() {
   const gaps = useMemo(() => insertGaps(graph?.commits ?? []), [graph])
 
   const isExpanded = useCallback(
-    (commit: CommitView) =>
-      commit.isWorkingCopy ? !isWorkingCopyCollapsed : expanded.has(commit.changeId),
-    [expanded, isWorkingCopyCollapsed],
+    (commit: CommitView) => isCommitExpanded(expansion, commit),
+    [expansion],
   )
 
   const showLineStats = state?.settings.showLineStats ?? false
@@ -235,12 +237,12 @@ export function App() {
   useEffect(() => {
     for (const commit of graph?.commits ?? []) {
       const key = fileKey(repoId, commit.commitId)
-      if (!commit.isWorkingCopy && expanded.has(commit.changeId) && !requested.current.has(key)) {
+      if (!commit.isWorkingCopy && isExpanded(commit) && !requested.current.has(key)) {
         requested.current.add(key)
         postMessage({ type: 'loadFiles', commitId: commit.commitId })
       }
     }
-  }, [graph, expanded, repoId, showLineStats])
+  }, [graph, isExpanded, repoId, showLineStats])
 
   const retryFiles = useCallback(
     (commit: CommitView) => {
@@ -257,17 +259,7 @@ export function App() {
   )
 
   const toggle = useCallback((commit: CommitView) => {
-    if (commit.isWorkingCopy) {
-      setIsWorkingCopyCollapsed((prev) => !prev)
-      return
-    }
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (!next.delete(commit.changeId)) {
-        next.add(commit.changeId)
-      }
-      return next
-    })
+    setExpansion((prev) => toggleExpansion(prev, commit))
   }, [])
 
   const startDescribe = useCallback((commit: CommitView) => {
