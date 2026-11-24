@@ -4,8 +4,16 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { GRAPH_FILTERS } from '../../shared/model'
 import { confirmedRevset, graphRevset, requestCleanupRevset } from '../../src/jj/revsets'
-import type { JjRepo } from '../../src/jj/repo'
-import { initRepo, jj, makeRepo, makeTempDir, writeFile, type Fixture } from '../helpers/jjFixture'
+import { JjRepo } from '../../src/jj/repo'
+import {
+  initRepo,
+  jj,
+  makeRepo,
+  makeRunner,
+  makeTempDir,
+  writeFile,
+  type Fixture,
+} from '../helpers/jjFixture'
 
 let fixture: Fixture
 let root: string
@@ -542,6 +550,97 @@ describe('mutations', () => {
     expect(pushed?.remoteBookmarks).toEqual([{ name: 'main', remote: 'origin', tracked: true }])
     expect(await repo.trunkBookmark()).toBe('main')
     expect(await repo.remotes()).toEqual([{ name: 'origin', url: remote }])
+  })
+
+  describe('during a slow fetch', () => {
+    let fetching: Promise<unknown>
+
+    beforeEach(async () => {
+      const remote = join(fixture.dir, 'remote.git')
+      execFileSync('git', ['init', '--bare', '-q', remote])
+      jj(root, 'git', 'remote', 'add', 'origin', remote)
+      writeFile(root, 'a.txt', 'a\n')
+      jj(root, 'describe', '-m', 'shared')
+      await repo.setBookmark('main', (await current()).commitId)
+      await repo.push('main')
+      execFileSync('git', ['config', 'remote.origin.uploadpack', 'sleep 2; git-upload-pack'], {
+        cwd: root,
+      })
+      fetching = repo.fetch()
+    })
+
+    test('a snapshot does not wait for the fetch', async () => {
+      let fetched = false
+      void fetching.then(() => (fetched = true))
+      writeFile(root, 'b.txt', 'b\n')
+
+      await repo.snapshot()
+
+      expect(fetched).toBe(false)
+      expect(repo.hasPendingMutations).toBe(true)
+      const files = await repo.files('@')
+      expect(files.map((file) => file.path)).toEqual(['b.txt'])
+      await fetching
+      expect(repo.hasPendingMutations).toBe(false)
+    })
+
+    test('the fetch succeeds when other commands move the working copy meanwhile', async () => {
+      writeFile(root, 'b.txt', 'b\n')
+      await repo.snapshot()
+      await repo.describe((await current()).commitId, 'during the fetch')
+      writeFile(root, 'c.txt', 'c\n')
+      await repo.snapshot()
+
+      await expect(fetching).resolves.toBeDefined()
+      const [workingCopy] = await repo.log('@')
+      expect(workingCopy?.description).toBe('during the fetch\n')
+      expect(workingCopy?.isDivergent).toBe(false)
+    })
+
+    test('a push waiting for the fetch sends the edits made while it waited', async () => {
+      jj(root, 'describe', '-m', 'pushed')
+      jj(root, 'bookmark', 'set', 'main', '-r', '@')
+      const pushing = repo.push('main')
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      writeFile(root, 'a.txt', 'edited while waiting\n')
+
+      await pushing
+
+      const remote = join(fixture.dir, 'remote.git')
+      const shown = execFileSync('git', ['--git-dir', remote, 'show', 'main:a.txt'], {
+        encoding: 'utf8',
+      })
+      expect(shown).toBe('edited while waiting\n')
+    })
+  })
+
+  test('a fetch the user asked for reports its warnings', async () => {
+    const remote = join(fixture.dir, 'remote.git')
+    execFileSync('git', ['init', '--bare', '-q', remote])
+    jj(root, 'git', 'remote', 'add', 'origin', remote)
+    const runner = makeRunner()
+    const warnings: string[] = []
+    runner.onWarning((warning) => warnings.push(warning.text))
+
+    await new JjRepo(root, runner).fetch({ branches: ['missing'] })
+
+    expect(warnings).not.toEqual([])
+  })
+
+  test('push sends edits that were not snapshotted yet', async () => {
+    const remote = join(fixture.dir, 'remote.git')
+    execFileSync('git', ['init', '--bare', '-q', remote])
+    jj(root, 'git', 'remote', 'add', 'origin', remote)
+    jj(root, 'describe', '-m', 'shared')
+    jj(root, 'bookmark', 'create', 'main', '-r', '@')
+    writeFile(root, 'a.txt', 'unsnapshotted\n')
+
+    await repo.push('main')
+
+    const shown = execFileSync('git', ['--git-dir', remote, 'show', 'main:a.txt'], {
+      encoding: 'utf8',
+    })
+    expect(shown).toBe('unsnapshotted\n')
   })
 
   test('newChange on trunk() parents the working copy on the trunk commit', async () => {
