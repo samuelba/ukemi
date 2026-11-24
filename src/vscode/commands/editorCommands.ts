@@ -1,6 +1,6 @@
 import { isAbsolute, join, relative, sep } from 'node:path'
 import * as vscode from 'vscode'
-import { fileTarget } from '../../app/commands/fileCommands'
+import { discardFiles, fileTarget } from '../../app/commands/fileCommands'
 import type { CommandEnv, Handler } from '../../app/commands/context'
 import { parseContext } from '../../app/commands/context'
 import type { RepoModel } from '../../repo/repoModel'
@@ -105,7 +105,7 @@ function editorTarget(
   return { model, path: relative(model.root, fileUri.fsPath).split(sep).join('/') }
 }
 
-function workingCopyContext(model: RepoModel, path: string) {
+function workingCopyContext(model: RepoModel, path?: string) {
   const commit = model.graph?.commits.find((c) => c.isWorkingCopy)
   return commit ? { repoId: model.root, commitId: commit.commitId, path } : null
 }
@@ -120,6 +120,22 @@ function scmContext(env: CommandEnv, arg: unknown) {
   return model && ctx.path ? workingCopyContext(model, ctx.path) : null
 }
 
+// The selected paths by repository root.
+function scmSelection(args: readonly unknown[]): Map<string, string[]> {
+  const selection = new Map<string, string[]>()
+  for (const arg of args) {
+    const { root, path } = (arg ?? {}) as { root?: unknown; path?: unknown }
+    if (typeof root !== 'string' || typeof path !== 'string') {
+      continue
+    }
+    const paths = selection.get(root) ?? []
+    if (!paths.includes(path)) {
+      selection.set(root, [...paths, path])
+    }
+  }
+  return selection
+}
+
 export function editorFileCommands(env: CommandEnv): Record<string, Handler> {
   return {
     'ukemi.file.addToChat': (...args: unknown[]) => addToChat(env, ...args),
@@ -129,10 +145,14 @@ export function editorFileCommands(env: CommandEnv): Record<string, Handler> {
         await vscode.commands.executeCommand('ukemi.file.openDiff', ctx)
       }
     },
-    'ukemi.scm.discard': async (arg?: unknown) => {
-      const ctx = scmContext(env, arg)
-      if (ctx) {
-        await vscode.commands.executeCommand('ukemi.file.discard', ctx)
+    // VS Code passes every selected file.
+    'ukemi.scm.discard': async (...args: unknown[]) => {
+      for (const [root, paths] of scmSelection(args)) {
+        const model = env.registry.modelFor(root)
+        const ctx = model ? workingCopyContext(model) : null
+        if (ctx) {
+          await discardFiles(env, ctx, paths)
+        }
       }
     },
     'ukemi.openFileDiff': async (uri?: unknown) => {
