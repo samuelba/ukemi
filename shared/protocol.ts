@@ -156,7 +156,9 @@ export interface SuggesterView {
 }
 
 export type HostMessage =
-  | { type: 'state'; state: ViewState }
+  // graphUnchanged: the graph is left out because the webview has it already. Its state.graph
+  // is null then, and the webview keeps the graph it shows.
+  | { type: 'state'; state: ViewState; graphUnchanged?: true }
   | { type: 'reveal'; commitId: string }
   | { type: 'files'; repoId: string; commitId: string; files: ChangedFile[] }
   | { type: 'filesFailed'; repoId: string; commitId: string; error: string }

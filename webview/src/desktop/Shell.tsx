@@ -12,6 +12,7 @@ import type { HostMessage, ViewSettings, ViewState } from '../../../shared/proto
 import { App } from '../graph/App'
 import { FileIconFonts, FileIconThemeContext } from '../graph/FileIcon'
 import { useHostListener } from '../shared/hooks'
+import { receivedState } from '../shared/receivedState'
 import { DetailPane } from './DetailPane'
 import { Dialogs } from './Dialogs'
 import { useBundledFileIcons } from './fileIcons'
@@ -82,7 +83,7 @@ export function Shell() {
   useHostListener<DesktopHostMessage | HostMessage>((message) => {
     switch (message.type) {
       case 'state':
-        setViewState(message.state)
+        setViewState((shown) => receivedState(shown, message))
         setNow(Date.now())
         return
       case 'desktop.panels':

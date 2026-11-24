@@ -56,6 +56,7 @@ import { PanelTabs } from './panelTabs'
 import { createSessionWindow } from './sessionWindow'
 import { SettingsPresenter } from './settingsPresenter'
 import { foldersAfterClosing, windowShowing, type WindowContents } from './startup'
+import { StateMessages } from './stateMessages'
 import { Terminals } from './terminals'
 import { zoomPercent } from './zoom'
 import { desktopWorkbench } from './workbench'
@@ -112,6 +113,7 @@ export class DesktopSession implements Disposable {
   // Native dialogs need a mapped parent. On Wayland, a dialog on a hidden window kills the app.
   private readonly shown: Promise<void>
   private stateTimer: ReturnType<typeof setTimeout> | null = null
+  private readonly stateMessages = new StateMessages()
 
   constructor(
     private readonly context: DesktopContext,
@@ -735,6 +737,7 @@ export class DesktopSession implements Disposable {
 
   private sendInitial(): void {
     this.detail.forgetPosted()
+    this.stateMessages.forget()
     const offers = (command: string) => this.offers(command)
     this.post({ type: 'fileIcons', theme: null })
     this.post({ type: 'desktop.window', title: this.title(), platform: process.platform })
@@ -773,7 +776,7 @@ export class DesktopSession implements Disposable {
       autoFetch: this.autoFetch,
     })
     const repos = arrangeTabs(state.repos, this.context.repoTabs.read())
-    this.post({ type: 'state', state: { ...state, repos } })
+    this.post(this.stateMessages.next({ ...state, repos }))
     const panels = sidePanels(this.registry.activeModel, this.folderList)
     this.post({
       type: 'desktop.panels',
