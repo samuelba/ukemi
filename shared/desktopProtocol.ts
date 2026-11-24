@@ -224,7 +224,8 @@ export type DesktopHostMessage =
   | { type: 'desktop.uiUpdate'; id: number; items: UiPickItem[] }
   | { type: 'desktop.uiInvalid'; id: number; problem: string }
   | { type: 'desktop.uiClose'; id: number }
-  | { type: 'desktop.panels'; panels: SidePanels }
+  // Only the panels that changed since the last message.
+  | { type: 'desktop.panels'; panels: Partial<SidePanels> }
   // Starts editing the name of a repository tab in place.
   | { type: 'desktop.startRename'; repoId: string }
   | { type: 'desktop.detail'; detail: ChangeDetail | null }

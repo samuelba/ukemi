@@ -87,7 +87,7 @@ export function Shell() {
         setNow(Date.now())
         return
       case 'desktop.panels':
-        setPanels(message.panels)
+        setPanels((shown) => ({ ...shown, ...message.panels }))
         return
       case 'desktop.detail':
         setPane((current) => withDetail(current, message.detail))
