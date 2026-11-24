@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.20.0](https://github.com/samuelba/ukemi/compare/v0.19.2...v0.20.0) (2026-11-24)
+
+
+### Features
+
+* **forge:** detect forges behind SSH aliases, SSH over 443 and *.ghe.com ([c0a04c5](https://github.com/samuelba/ukemi/commit/c0a04c561b45d8b09ec552656ff95286087948d3))
+
+
+### Bug Fixes
+
+* **describe:** never send files that may hold secrets to the suggester ([eaf5081](https://github.com/samuelba/ukemi/commit/eaf508154552699375390706b2b72dfe884a229d))
+* **gitlab:** keep a session another window refreshed ([dedafc0](https://github.com/samuelba/ukemi/commit/dedafc055ed4144e077390cfbc6bddc318808590))
+* **jj:** run fetch and push outside the mutation queue ([8ad9555](https://github.com/samuelba/ukemi/commit/8ad955564ea42b6015a85f58b7743357875b4cbd))
+* **vscode:** discard every file selected in Source Control ([98a2098](https://github.com/samuelba/ukemi/commit/98a20983be7ee7cf09e7b738ce530856b7ab0a75))
+* **webview:** ignore keys while an input method composes ([4e2877c](https://github.com/samuelba/ukemi/commit/4e2877cb940940eb6d0fe58aef99cd0fb3d68429))
+
+
+### Performance Improvements
+
+* **desktop:** leave out a graph the window already shows ([8eb7fb7](https://github.com/samuelba/ukemi/commit/8eb7fb788edd61dc507d70e7c249fddf739fd7da))
+* **desktop:** send only the side panels that changed ([2cd2ac6](https://github.com/samuelba/ukemi/commit/2cd2ac675c7762b5d5cf7192a582677cd7f108ac))
+* **desktop:** send only the side panels that changed ([90a0054](https://github.com/samuelba/ukemi/commit/90a0054e9ac4fe9eb8a9bc2e06dc0476e7f83f18))
+* **vscode:** leave out a graph the webview already shows ([48c280b](https://github.com/samuelba/ukemi/commit/48c280baee02bc886b5ea4a0c6dab26ef279ab03))
+
 ## [0.19.2](https://github.com/samuelba/ukemi/compare/v0.19.1...v0.19.2) (2026-11-23)
 
 
