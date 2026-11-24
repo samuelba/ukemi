@@ -31,6 +31,7 @@ vi.mock('../../src/forge/ghApi', async (importOriginal) => ({
   ghGitCredential: async (_host: string, field: 'username' | 'password') => state.ghGit[field],
 }))
 
+import { SshHosts } from '../../src/forge/sshHosts'
 import { ForgeService } from '../../src/app/forgeService'
 import { readSettings } from '../../src/app/settings'
 
@@ -42,7 +43,7 @@ const editorSession = async (host: string) =>
     ? { username: state.session.account.label, token: state.session.accessToken }
     : null
 
-function service(overrides: Record<string, unknown> = {}) {
+function service(overrides: Record<string, unknown> = {}, sshHosts?: SshHosts) {
   const secrets = new Map<string, string>()
   const store = {
     get: async (key: string) => secrets.get(key),
@@ -85,7 +86,7 @@ function service(overrides: Record<string, unknown> = {}) {
     },
     untrustedMessage: 'untrusted',
   }
-  const forge = new ForgeService(registry as never, host as never, logger, accounts)
+  const forge = new ForgeService(registry as never, host as never, logger, accounts, sshHosts)
   return { forge, secrets }
 }
 
@@ -455,5 +456,43 @@ describe('trunk CI', () => {
     expect(state.messages).toEqual([])
     forge.dispose()
     vi.unstubAllGlobals()
+  })
+})
+
+describe('forge target over an SSH alias', () => {
+  const remotes = [{ name: 'origin', url: 'git@github-work:o/r.git' }]
+  const model = { remotes, repo: { remotes: async () => remotes } } as never
+
+  function fakeSsh() {
+    const asked: string[] = []
+    const hosts = new SshHosts(async (args) => {
+      asked.push(args[args.length - 1] ?? '')
+      return { code: 0, stdout: 'hostname github.com\n' }
+    })
+    return { hosts, asked }
+  }
+
+  test('finds the forge behind the alias', async () => {
+    const { hosts } = fakeSsh()
+    const { forge } = service({}, hosts)
+
+    expect(await forge.target(model)).toMatchObject({
+      kind: 'github',
+      host: 'github.com',
+      projectPath: 'o/r',
+    })
+    expect(await forge.unknownHosts(model)).toEqual([])
+    forge.dispose()
+  })
+
+  test('does not run ssh in an untrusted window', async () => {
+    state.trusted = false
+    const { hosts, asked } = fakeSsh()
+    const { forge } = service({}, hosts)
+
+    expect(await forge.target(model)).toBeNull()
+    expect(await forge.unknownHosts(model)).toEqual(['github-work'])
+    expect(asked).toEqual([])
+    forge.dispose()
   })
 })

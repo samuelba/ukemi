@@ -1,12 +1,10 @@
 import { cliFetch, isSafeEndpoint, runCli, type CliRun } from './cli'
-import { isSafeHttpsHost } from './hostName'
+import { githubApiHost, isSafeHttpsHost } from './hostName'
 import type { HttpFetch } from './types'
 
 export type GhRun = CliRun
 
 export const runGh: GhRun = (args, stdin) => runCli('gh', args, stdin)
-
-const GITHUB_API_HOST = 'api.github.com'
 
 // Maps an API URL that GithubClient builds to the endpoint that `gh api --hostname <host>` expects.
 export function ghEndpoint(host: string, url: string): string {
@@ -14,8 +12,8 @@ export function ghEndpoint(host: string, url: string): string {
     throw new Error('Invalid GitHub host')
   }
   const parsed = new URL(url)
-  const isDotCom = host.toLowerCase() === 'github.com'
-  const expectedHost = isDotCom ? GITHUB_API_HOST : host.toLowerCase()
+  const apiHost = githubApiHost(host)
+  const expectedHost = apiHost ?? host.toLowerCase()
   if (
     parsed.protocol !== 'https:' ||
     parsed.hostname.toLowerCase() !== expectedHost ||
@@ -25,9 +23,8 @@ export function ghEndpoint(host: string, url: string): string {
   ) {
     throw new Error('Refusing GitHub URL')
   }
-  // github.com serves the API from its own host; Enterprise serves it under /api.
-  const restPrefix = isDotCom ? '' : '/api/v3'
-  const graphqlPath = isDotCom ? '/graphql' : '/api/graphql'
+  const restPrefix = apiHost ? '' : '/api/v3'
+  const graphqlPath = apiHost ? '/graphql' : '/api/graphql'
   let endpoint: string
   if (parsed.pathname === graphqlPath) {
     endpoint = '/graphql'

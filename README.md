@@ -227,6 +227,8 @@ A repository can have its own value for the graph settings (`showGitTags`, `show
 
 Ukemi uses the same credentials for the forge API (pull and merge requests, CI status) and for `git` over HTTPS when jj fetches or pushes. No CLI is required.
 
+Ukemi finds the forge from the repository's remotes. It knows github.com, GitHub Enterprise Cloud (`*.ghe.com`), gitlab.com and `gitlab.*` hosts, and SSH over port 443 (`ssh.github.com`, `altssh.gitlab.com`). For an SSH remote whose host is an alias in `~/.ssh/config`, such as `git@github-work:me/repo.git`, it asks `ssh -G` for the real host name, in trusted windows only.
+
 ### GitHub
 
 Ukemi picks the first of these that is available for the host:

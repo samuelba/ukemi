@@ -15,3 +15,13 @@ export function isAllowedForgeUrl(url: string, host: string): boolean {
     return false
   }
 }
+
+// The host that serves the API of github.com and of GitHub Enterprise Cloud (*.ghe.com), or null
+// for an Enterprise Server, which serves it under /api on its own host.
+export function githubApiHost(host: string): string | null {
+  const normalized = host.toLowerCase()
+  if (normalized === 'github.com') {
+    return 'api.github.com'
+  }
+  return normalized.endsWith('.ghe.com') ? `api.${normalized}` : null
+}

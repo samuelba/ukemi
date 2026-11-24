@@ -8,6 +8,7 @@ import type {
   RequestBadge,
   RequestState,
 } from '../../shared/protocol'
+import { githubApiHost } from './hostName'
 import {
   clampRequestLimit,
   DEFAULT_REQUEST_LIMIT,
@@ -305,13 +306,13 @@ export class GithubClient implements ForgeClient {
   }
 
   private get apiBase(): string {
-    return this.host === 'github.com' ? 'https://api.github.com' : `https://${this.host}/api/v3`
+    const apiHost = githubApiHost(this.host)
+    return apiHost ? `https://${apiHost}` : `https://${this.host}/api/v3`
   }
 
   private get graphqlUrl(): string {
-    return this.host === 'github.com'
-      ? 'https://api.github.com/graphql'
-      : `https://${this.host}/api/graphql`
+    const apiHost = githubApiHost(this.host)
+    return apiHost ? `https://${apiHost}/graphql` : `https://${this.host}/api/graphql`
   }
 
   private call(url: string, init: RequestInit = {}): Promise<unknown> {
