@@ -104,6 +104,9 @@ export function DescribeDialog({
 
   // Escape cancels from anywhere in the dialog, Ctrl+Enter saves from the message.
   const onDialogKeyDown = (event: KeyboardEvent) => {
+    if (event.nativeEvent.isComposing) {
+      return
+    }
     if (event.key === 'Escape') {
       event.preventDefault()
       onCancel()
@@ -113,7 +116,11 @@ export function DescribeDialog({
   }
 
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+    if (
+      event.key === 'Enter' &&
+      (event.ctrlKey || event.metaKey) &&
+      !event.nativeEvent.isComposing
+    ) {
       event.preventDefault()
       onSave(message, canStartNew && event.shiftKey)
     }

@@ -56,7 +56,7 @@ The describe dialog shows a button for each tool below that is installed and ena
 | VS Code language models                                                      | none           | VS Code only. Install GitHub Copilot Chat or another extension that provides language models. VS Code asks once whether Ukemi may use them. |
 
 - **Detection.** Ukemi looks for the command on `PATH` and shows its button when `<command> --version` succeeds. The desktop app reads `PATH` from your login shell when you start it from the launcher. A tool that you install later appears within a minute.
-- **What is sent.** The change's diff (lock files and generated files are left out, the rest is cut at `ukemi.describeSuggest.maxDiffBytes`), its file summary, its current description, the descriptions of its last 10 ancestors so the suggestion follows the repository's style, and your `ukemi.describeSuggest.instructions`. The tool may send them to its provider.
+- **What is sent.** The change's diff (files that may hold secrets, such as `.env*`, private keys and `.npmrc`, and lock files and generated files are left out, the rest is cut at `ukemi.describeSuggest.maxDiffBytes`), its file summary, its current description, the descriptions of its last 10 ancestors so the suggestion follows the repository's style, and your `ukemi.describeSuggest.instructions`. The tool may send them to its provider.
 - **What the tool can do.** Ukemi runs it once, in an empty temporary folder, with its own tools turned off (Claude Code), in ask mode (Cursor) or without tool permissions (Copilot). It cannot read or change your repository. **Stop** or closing the dialog ends it.
 - **Choose tools and models.** `ukemi.describeSuggest.tools` sets which buttons appear and in which order; an empty list hides them. `ukemi.describeSuggest.models` picks a model per tool, for example `{ "claude": "haiku" }` for faster answers.
 
@@ -226,6 +226,8 @@ A repository can have its own value for the graph settings (`showGitTags`, `show
 ## Sign in
 
 Ukemi uses the same credentials for the forge API (pull and merge requests, CI status) and for `git` over HTTPS when jj fetches or pushes. No CLI is required.
+
+Ukemi finds the forge from the repository's remotes. It knows github.com, GitHub Enterprise Cloud (`*.ghe.com`), gitlab.com and `gitlab.*` hosts, and SSH over port 443 (`ssh.github.com`, `altssh.gitlab.com`). For an SSH remote whose host is an alias in `~/.ssh/config`, such as `git@github-work:me/repo.git`, it asks `ssh -G` for the real host name, in trusted windows only.
 
 ### GitHub
 

@@ -1,11 +1,16 @@
 import { describe, expect, test } from 'vitest'
-import { detectForge, forgeKindForHost, unknownHosts } from '../../src/forge/detect'
+import {
+  detectForge,
+  forgeKindForHost,
+  sshAliasCandidates,
+  unknownHosts,
+} from '../../src/forge/detect'
 import { GithubClient, githubCheckState, githubCi, githubState } from '../../src/forge/github'
 import { GitlabClient, gitlabCi, gitlabPipelineCi, gitlabState } from '../../src/forge/gitlab'
 import { isAllowedForgeUrl } from '../../src/forge/hostName'
 import { clampRequestLimit } from '../../src/forge/requestLimit'
 import { forgeRefreshInterval } from '../../src/forge/refreshInterval'
-import { parseRemoteUrl } from '../../src/forge/remoteUrl'
+import { isSshRemoteUrl, parseRemoteUrl } from '../../src/forge/remoteUrl'
 import { ForgeError, type HttpFetch } from '../../src/forge/types'
 
 describe('parseRemoteUrl', () => {
@@ -14,11 +19,22 @@ describe('parseRemoteUrl', () => {
     ['git@github.com:owner/repo.git', 'github.com', 'owner/repo'],
     ['ssh://git@git.anybotics.com:2222/group/sub/repo.git', 'git.anybotics.com', 'group/sub/repo'],
     ['https://user@gitlab.com/group/repo/', 'gitlab.com', 'group/repo'],
+    ['ssh://git@ssh.github.com:443/owner/repo.git', 'github.com', 'owner/repo'],
+    ['ssh://git@altssh.gitlab.com:443/group/repo.git', 'gitlab.com', 'group/repo'],
   ])('parses %s', (url, host, projectPath) => {
     expect(parseRemoteUrl(url)).toEqual({ host, projectPath })
   })
 
+  test('reads ssh URLs as SSH remotes', () => {
+    expect(isSshRemoteUrl('git@github.com:o/r.git')).toBe(true)
+    expect(isSshRemoteUrl('ssh://git@host/o/r.git')).toBe(true)
+    expect(isSshRemoteUrl('git+ssh://git@host/o/r.git')).toBe(true)
+    expect(isSshRemoteUrl('https://host/o/r.git')).toBe(false)
+    expect(isSshRemoteUrl('C:\\repos/remote.git')).toBe(false)
+  })
+
   test('rejects local paths and single-segment paths', () => {
+    expect(parseRemoteUrl('C:\\repos/remote.git')).toBeNull()
     expect(parseRemoteUrl('/tmp/remote.git')).toBeNull()
     expect(parseRemoteUrl('file:///tmp/remote.git')).toBeNull()
     expect(parseRemoteUrl('https://example.com/repo.git')).toBeNull()
@@ -33,6 +49,43 @@ describe('forge detection', () => {
     expect(forgeKindForHost('gitlab.example.org', lists)).toBe('gitlab')
     expect(forgeKindForHost('git.anybotics.com', lists)).toBe('gitlab')
     expect(forgeKindForHost('bitbucket.org', lists)).toBeNull()
+  })
+
+  test('detects GitHub Enterprise Cloud hosts', () => {
+    expect(forgeKindForHost('octocorp.ghe.com', lists)).toBe('github')
+    expect(forgeKindForHost('ghe.com.example.org', lists)).toBeNull()
+  })
+
+  test('follows SSH host aliases', () => {
+    const remotes = [{ name: 'origin', url: 'git@github-work:team/repo.git' }]
+    const aliases = new Map([['github-work', 'github.com']])
+
+    expect(detectForge(remotes, lists, aliases)).toEqual({
+      kind: 'github',
+      host: 'github.com',
+      projectPath: 'team/repo',
+      remote: 'origin',
+    })
+    expect(unknownHosts(remotes, lists, aliases)).toEqual([])
+  })
+
+  test('applies SSH aliases to SSH remotes only', () => {
+    const remotes = [{ name: 'origin', url: 'https://github-work/team/repo.git' }]
+    const aliases = new Map([['github-work', 'github.com']])
+
+    expect(detectForge(remotes, lists, aliases)).toBeNull()
+  })
+
+  test('lists the SSH hosts that may be aliases', () => {
+    const remotes = [
+      { name: 'origin', url: 'git@github-work:team/repo.git' },
+      { name: 'fork', url: 'ssh://git@gitlab-alias:2222/me/repo.git' },
+      { name: 'web', url: 'https://code.example.org/team/repo.git' },
+      { name: 'known', url: 'git@github.com:team/repo.git' },
+      { name: 'again', url: 'git@github-work:me/repo.git' },
+    ]
+
+    expect(sshAliasCandidates(remotes, lists)).toEqual(['github-work', 'gitlab-alias'])
   })
 
   test('prefers the origin remote', () => {
@@ -261,6 +314,32 @@ describe('GithubClient', () => {
 
     expect(calls).toEqual(['POST https://ghe.corp/api/v3/repos/o/r/pulls'])
     expect(created.state).toBe('draft')
+  })
+
+  test('uses the API host of GitHub Enterprise Cloud', async () => {
+    const calls: string[] = []
+    const client = new GithubClient(
+      'octocorp.ghe.com',
+      'o/r',
+      't',
+      fakeFetch(
+        {
+          '/pulls': {
+            number: 5,
+            title: 't',
+            html_url: 'u',
+            draft: false,
+            head: { ref: 'h' },
+            base: { ref: 'b' },
+          },
+        },
+        calls,
+      ),
+    )
+
+    await client.createRequest({ head: 'h', base: 'b', title: 't', body: '', isDraft: false })
+
+    expect(calls).toEqual(['POST https://api.octocorp.ghe.com/repos/o/r/pulls'])
   })
 
   test('sends the chosen base branch', async () => {

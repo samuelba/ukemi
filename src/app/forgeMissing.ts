@@ -1,11 +1,10 @@
-import { unknownHosts } from '../forge/detect'
 import { isSafeHttpsHost } from '../forge/hostName'
 import type { RepoModel } from '../repo/repoModel'
 import type { CommandEnv } from './commands/context'
-import { readHostLists, type Settings } from './settings'
+import type { Settings } from './settings'
 
 const UNKNOWN_HOST_DETAIL =
-  'Ukemi reads the remotes from jj. It recognises github.com, gitlab.com, gitlab.* hosts and the hosts that gh or glab are signed in to. For a self-hosted server, tell Ukemi its type. Ukemi stores it in ukemi.gitlab.hosts or ukemi.github.hosts.'
+  'Ukemi reads the remotes from jj. It recognises github.com, *.ghe.com, gitlab.com, gitlab.* hosts, SSH host aliases and the hosts that gh or glab are signed in to. For a self-hosted server, tell Ukemi its type. Ukemi stores it in ukemi.gitlab.hosts or ukemi.github.hosts.'
 
 const NO_REMOTE_DETAIL = 'Add one with: jj git remote add origin <url>'
 
@@ -16,7 +15,7 @@ const SETTINGS_CHOICE = 'Open Settings'
 type HostKind = 'gitlab' | 'github'
 
 export async function showForgeMissing(model: RepoModel, env: CommandEnv): Promise<void> {
-  const hosts = unknownHosts(await model.repo.remotes(), readHostLists(env.settings))
+  const hosts = await env.forge.unknownHosts(model)
   const host = hosts[0]
   if (!host) {
     await env.ui.ask('warning', 'Ukemi: this repository has no GitHub or GitLab remote.', {

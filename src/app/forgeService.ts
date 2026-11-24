@@ -1,6 +1,15 @@
+import type { Remote } from '../../shared/model'
 import type { CommitCi, ForgeState, RequestBadge } from '../../shared/protocol'
 import type { CredentialRequest } from '../askpass/prompt'
-import { detectForge, forgeKindForHost, type ForgeTarget } from '../forge/detect'
+import {
+  detectForge,
+  forgeKindForHost,
+  sshAliasCandidates,
+  unknownHosts,
+  type ForgeTarget,
+  type HostLists,
+  type SshAliases,
+} from '../forge/detect'
 import { cliAvailable, type CliBinary } from '../forge/cli'
 import { ghGitCredential, ghFetch } from '../forge/ghApi'
 import { ghKnowsHost } from '../forge/ghConfig'
@@ -13,6 +22,7 @@ import {
 import { glabFetch } from '../forge/glabApi'
 import { glabKnowsHost } from '../forge/glabConfig'
 import { GitlabClient, type GitlabTokenKind } from '../forge/gitlab'
+import { SshHosts } from '../forge/sshHosts'
 import {
   FORGE_REFRESH_IDLE_MS,
   forgeRefreshInterval,
@@ -127,6 +137,7 @@ export class ForgeService implements Disposable {
     private readonly host: ForgeHostPorts,
     private readonly logger: Logger,
     private readonly accounts: ForgeAccounts,
+    private readonly sshHosts = new SshHosts(),
   ) {
     this.github = new GithubCredentials(
       host.secrets,
@@ -179,7 +190,25 @@ export class ForgeService implements Disposable {
 
   async target(model: RepoModel): Promise<ForgeTarget | null> {
     const remotes = model.remotes ?? (await model.repo.remotes())
-    return detectForge(remotes, readHostLists(this.host.settings))
+    const lists = readHostLists(this.host.settings)
+    return detectForge(remotes, lists, await this.sshAliases(remotes, lists))
+  }
+
+  // The servers of the remotes that no forge is known for.
+  async unknownHosts(model: RepoModel): Promise<string[]> {
+    const remotes = await model.repo.remotes()
+    const lists = readHostLists(this.host.settings)
+    return unknownHosts(remotes, lists, await this.sshAliases(remotes, lists))
+  }
+
+  // `ssh -G` applies the user's SSH config, whose Match exec rules can run commands for the host
+  // a remote names, so it runs in trusted windows only.
+  private async sshAliases(remotes: readonly Remote[], lists: HostLists): Promise<SshAliases> {
+    const candidates = sshAliasCandidates(remotes, lists)
+    if (candidates.length === 0 || !this.host.window.isTrusted) {
+      return new Map()
+    }
+    return this.sshHosts.resolve(candidates)
   }
 
   private isTrusted(announce: boolean): boolean {

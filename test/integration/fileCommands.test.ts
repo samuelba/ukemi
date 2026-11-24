@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import type { CommandEnv } from '../../src/app/commands/context'
 import { fileCommands } from '../../src/app/commands/fileCommands'
+import { editorFileCommands } from '../../src/vscode/commands/editorCommands'
 import { Operations } from '../../src/app/operations'
 import { RepoModel } from '../../src/repo/repoModel'
 import { NULL_LOGGER } from '../../src/util/logger'
@@ -142,5 +143,34 @@ describe('untrack', () => {
 
     expect(existsSync(join(root, '.gitignore'))).toBe(false)
     expect(tracked()).toBe('keep.txt\nsecret.env\n')
+  })
+})
+
+describe('discard from the Source Control view', () => {
+  test('discards every selected file after one question', async () => {
+    writeFile(root, 'a.txt', 'a\n')
+    writeFile(root, 'b.txt', 'b\n')
+    writeFile(root, 'c.txt', 'c\n')
+    await model.refresh()
+    const asked: string[] = []
+    const env = {
+      registry: { modelFor: () => model, activeModel: model },
+      operations: new Operations(NULL_LOGGER),
+      logger: NULL_LOGGER,
+      ui: {
+        ask: async (_level: string, text: string, _options: unknown, action: string) => {
+          asked.push(text)
+          return action
+        },
+      },
+    } as unknown as CommandEnv
+    const clicked = { root, path: 'a.txt' }
+
+    await editorFileCommands(env)['ukemi.scm.discard']?.(clicked, clicked, { root, path: 'b.txt' })
+
+    expect(asked).toEqual([expect.stringMatching(/^Discard changes to 2 files in /)])
+    expect(existsSync(join(root, 'a.txt'))).toBe(false)
+    expect(existsSync(join(root, 'b.txt'))).toBe(false)
+    expect(existsSync(join(root, 'c.txt'))).toBe(true)
   })
 })

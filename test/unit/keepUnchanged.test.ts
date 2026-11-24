@@ -50,6 +50,14 @@ describe('withUnchangedObjects', () => {
     expect(after.graph?.workingCopyFiles).toBe(before.graph?.workingCopyFiles)
   })
 
+  test('keeps the graph object it already has without comparing the commits', () => {
+    const before = state('/repo', 'one')
+
+    const after = withUnchangedObjects(before, { ...before, busy: 'Fetch' })
+
+    expect(after.graph).toBe(before.graph)
+  })
+
   test('takes every commit of another repository', () => {
     const before = state('/repo', 'one')
     const after = withUnchangedObjects(before, state('/other', 'one'))

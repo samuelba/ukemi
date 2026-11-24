@@ -746,6 +746,20 @@ test('shows Help > About with the version, jj and the license', async () => {
   }
 })
 
+test('lists the side panels again after the window reloads', async () => {
+  const { app, page } = await launch(fixtureRepo())
+  try {
+    const bookmark = page.locator('.side-row', { hasText: 'docs-setup' })
+    await expect(bookmark).toBeVisible()
+
+    await page.reload()
+
+    await expect(bookmark).toBeVisible()
+  } finally {
+    await app.close()
+  }
+})
+
 test('shows the hover buttons of the extension on bookmark rows, and runs them', async () => {
   const titles = new Map(
     (

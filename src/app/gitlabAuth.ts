@@ -18,6 +18,9 @@ import type { Settings } from './settings'
 import type { Ui } from './ui'
 
 const SIGN_IN_TIMEOUT_MS = 180_000
+const REJECTED_REFRESH_RECHECK_MS = 2_000
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
 const sessionSchema = z.object({
   accessToken: z.string().min(1),
@@ -186,12 +189,50 @@ export class GitlabAuth implements Disposable {
       await this.store(host, next)
       return next.accessToken
     } catch (error: unknown) {
-      this.logger.warn(`GitLab token refresh failed: ${errorMessage(error)}`)
       if (error instanceof GitlabOAuthError && error.isRejected) {
-        await this.secrets.delete(oauthKey(host))
+        this.logger.warn(`GitLab rejected the token refresh for ${host}: ${error.message}`)
+        return this.afterRejectedRefresh(host, session)
       }
+      this.logger.warn(`GitLab token refresh failed: ${errorMessage(error)}`)
       return null
     }
+  }
+
+  // GitLab rejects a refresh token another window has already used. That window stores the new
+  // session, possibly only after this rejection arrives, so the session is deleted only if it
+  // still holds the rejected token after a wait.
+  private async afterRejectedRefresh(
+    host: string,
+    rejected: GitlabOAuthSession,
+  ): Promise<string | null> {
+    const stored = await this.storedElsewhere(host, rejected)
+    if (stored !== 'unchanged') {
+      return stored
+    }
+    await sleep(REJECTED_REFRESH_RECHECK_MS)
+    const later = await this.storedElsewhere(host, rejected)
+    if (later !== 'unchanged') {
+      return later
+    }
+    this.logger.warn(`GitLab signed out of ${host}`)
+    await this.secrets.delete(oauthKey(host))
+    return null
+  }
+
+  // The access token another window stored, null when it signed out, or 'unchanged'.
+  private async storedElsewhere(
+    host: string,
+    rejected: GitlabOAuthSession,
+  ): Promise<string | null | 'unchanged'> {
+    const current = await this.read(host)
+    if (!current) {
+      return null
+    }
+    if (current.refreshToken === rejected.refreshToken) {
+      return 'unchanged'
+    }
+    this.logger.info(`GitLab: using the session another window refreshed for ${host}`)
+    return current.accessToken
   }
 
   private read(host: string): Promise<GitlabOAuthSession | null> {

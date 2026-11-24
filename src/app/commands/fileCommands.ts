@@ -34,13 +34,12 @@ export async function fileTarget(env: CommandEnv, arg: unknown): Promise<FileTar
     return null
   }
   const files = await changedFiles(target)
-  const file = files.find((f) => f.path === ctx.path) ?? {
-    path: ctx.path,
-    sourcePath: ctx.path,
-    status: 'modified' as const,
-    isConflicted: false,
-  }
+  const file = files.find((f) => f.path === ctx.path) ?? unlistedFile(ctx.path)
   return { ...target, file }
+}
+
+function unlistedFile(path: string): ChangedFile {
+  return { path, sourcePath: path, status: 'modified', isConflicted: false }
 }
 
 function withFile(env: CommandEnv, fn: (target: FileTarget) => Promise<unknown>): Handler {
@@ -57,13 +56,39 @@ function filePaths(file: ChangedFile): string[] {
   return file.sourcePath === file.path ? [file.path] : [file.sourcePath, file.path]
 }
 
-async function discard(env: CommandEnv, { model, commit, file }: FileTarget): Promise<void> {
-  if (commit.isImmutable) {
+function discard(env: CommandEnv, target: FileTarget): Promise<void> {
+  return discardChanged(env, target, [target.file])
+}
+
+// Discards the files of the change `arg` names, after one question.
+export async function discardFiles(
+  env: CommandEnv,
+  arg: unknown,
+  paths: readonly string[],
+): Promise<void> {
+  const target = contextCommit(env, arg)
+  if (!target) {
     return
   }
-  if (await confirm(env.ui, `Discard changes to ${file.path} in ${shortId(commit)}?`, 'Discard')) {
+  const changed = await changedFiles(target)
+  const files = paths.map(
+    (path) => changed.find((file) => file.path === path) ?? unlistedFile(path),
+  )
+  await discardChanged(env, target, files)
+}
+
+async function discardChanged(
+  env: CommandEnv,
+  { model, commit }: Target,
+  files: readonly ChangedFile[],
+): Promise<void> {
+  if (commit.isImmutable || files.length === 0) {
+    return
+  }
+  const what = files.length === 1 ? files[0]?.path : `${files.length} files`
+  if (await confirm(env.ui, `Discard changes to ${what} in ${shortId(commit)}?`, 'Discard')) {
     await env.operations.run('Discard', model, () =>
-      model.repo.restoreFiles(changeRevision(commit), filePaths(file)),
+      model.repo.restoreFiles(changeRevision(commit), files.flatMap(filePaths)),
     )
   }
 }

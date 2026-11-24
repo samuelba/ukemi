@@ -22,6 +22,9 @@ export function keepIfEqual<T>(previous: T | undefined, next: T): T {
 export function withUnchangedObjects(previous: ViewState | null, next: ViewState): ViewState {
   const settings = keepIfEqual(previous?.settings, next.settings)
   const before = previous?.graph
+  if (before === next.graph) {
+    return { ...next, settings }
+  }
   if (!before || !next.graph || before.repoId !== next.graph.repoId) {
     return { ...next, settings }
   }

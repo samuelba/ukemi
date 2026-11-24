@@ -155,7 +155,7 @@ export function Sidebar({ panels }: { panels: SidePanels }) {
               placeholder="Filter bookmarks"
               spellCheck={false}
               onChange={(e) => setFilter(e.target.value)}
-              onKeyDown={(e) => e.key === 'Escape' && setFilter('')}
+              onKeyDown={(e) => e.key === 'Escape' && !e.nativeEvent.isComposing && setFilter('')}
             />
           </div>
         }

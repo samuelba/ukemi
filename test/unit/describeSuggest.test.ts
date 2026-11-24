@@ -63,6 +63,76 @@ describe('limitDiff', () => {
     expect(result).toContain('[Diff omitted for: package-lock.json, logo.png]')
   })
 
+  test.each([
+    '.env',
+    'app/.env.local',
+    '.envrc',
+    'certs/server.pem',
+    'tls/server.key',
+    'keys/client.p12',
+    '.ssh/id_rsa',
+    'id_ed25519.pub',
+    '.npmrc',
+    '.pypirc',
+    '.netrc',
+    '.git-credentials',
+    'android/release.keystore',
+    'signing.jks',
+  ])('withholds the secret file %s whatever the budget', (path) => {
+    const result = limitDiff(patch('src/a.ts', '+a') + patch(path, '+SECRET=1'), 10_000)
+
+    expect(result).toContain('+a')
+    expect(result).not.toContain('SECRET')
+    expect(result).toContain(`[Diff withheld, may hold secrets: ${path}]`)
+  })
+
+  test('keeps files that only look like secret files', () => {
+    const paths = ['src/keyboard.ts', 'docs/environment.md', 'src/env.ts', 'src/apikey.ts']
+    const diff = paths.map((path) => patch(path, `+${path}`)).join('')
+
+    expect(limitDiff(diff, 10_000)).toBe(diff)
+  })
+
+  test('withholds a file renamed away from a secret name', () => {
+    const renamed = 'diff --git a/.env b/settings.txt\nrename from .env\nrename to settings.txt\n'
+    const result = limitDiff(renamed + '@@ -1 +1 @@\n+SECRET=1\n', 10_000)
+
+    expect(result).not.toContain('SECRET')
+    expect(result).toContain('[Diff withheld, may hold secrets: settings.txt]')
+  })
+
+  test.each(['prod.env', 'APP/.ENV', 'keys/ID_RSA', '.aws/credentials', 'infra/prod.tfvars'])(
+    'withholds %s too',
+    (path) => {
+      expect(limitDiff(patch(path, '+SECRET=1'), 10_000)).not.toContain('SECRET')
+    },
+  )
+
+  test('withholds a secret file renamed in a folder whose name has " b/" in it', () => {
+    const renamed = [
+      'diff --git a/a b/.env b/a b/renamed.txt',
+      'rename from a b/.env',
+      'rename to a b/renamed.txt',
+      '--- a/a b/.env',
+      '+++ b/a b/renamed.txt',
+      '@@ -1 +1,2 @@',
+      ' SECRET=1',
+      '+more',
+      '',
+    ].join('\n')
+
+    const result = limitDiff(renamed, 10_000)
+
+    expect(result).not.toContain('SECRET')
+    expect(result).toContain('[Diff withheld, may hold secrets: a b/renamed.txt]')
+  })
+
+  test('names a file by its own path when the folder has " b/" in it', () => {
+    const header = 'diff --git a/a b/c.ts b/a b/c.ts\n--- a/a b/c.ts\n+++ b/a b/c.ts\n'
+
+    expect(splitPatch(`${header}@@ -1 +1 @@\n+x\n`)[0]?.path).toBe('a b/c.ts')
+  })
+
   test('cuts the diff where the budget runs out', () => {
     const big = patch('a.ts', `+${'x'.repeat(500)}`)
     const result = limitDiff(big + patch('b.ts', '+b'), 100)

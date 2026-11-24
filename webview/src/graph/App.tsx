@@ -19,6 +19,7 @@ import type {
 } from '../../../shared/protocol'
 import { title } from '../shared/format'
 import { useHostMessages } from '../shared/hooks'
+import { receivedState } from '../shared/receivedState'
 import { postMessage } from '../shared/hostApi'
 import { canSquashIntoParent } from './canSquashIntoParent'
 import { CommitRow } from './CommitRow'
@@ -90,14 +91,24 @@ export function App() {
   const [isSearching, setIsSearching] = useState(false)
   const [searchText, setSearchText] = useState('')
   const [pending, setPending] = useState<PendingDrop | null>(null)
+  const received = useRef<ViewState | null>(null)
 
   useHostMessages<HostMessage>(
     (message) => {
       switch (message.type) {
-        case 'state':
-          setState((previous) => withUnchangedObjects(previous, message.state))
-          setPending((previous) => previous && nextPending(previous, message.state))
+        case 'state': {
+          const next = receivedState(received.current, message)
+          received.current = next
+          // A graph the host left out is the one shown, so its commits need no comparing.
+          setState((previous) =>
+            withUnchangedObjects(
+              previous,
+              message.graphUnchanged && previous ? { ...next, graph: previous.graph } : next,
+            ),
+          )
+          setPending((previous) => previous && nextPending(previous, next))
           return
+        }
         case 'reveal': {
           const commit = state?.graph?.commits.find((c) => c.commitId === message.commitId)
           setSelection({ commitId: message.commitId, changeId: commit?.changeId ?? '' })

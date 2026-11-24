@@ -112,6 +112,10 @@ const REBASE_MODE_FLAGS: Record<RebaseMode, string> = {
 
 export class JjRepo {
   private readonly mutations = new SerialQueue()
+  // Fetch and push can take minutes, so they queue apart from the mutations. They run with
+  // --ignore-working-copy: a fetch without it fails with "Concurrent checkout" when another
+  // command moves the working copy meanwhile.
+  private readonly network = new SerialQueue()
 
   constructor(
     readonly root: string,
@@ -132,7 +136,7 @@ export class JjRepo {
   }
 
   get hasPendingMutations(): boolean {
-    return this.mutations.size > 0
+    return this.mutations.size > 0 || this.network.size > 0
   }
 
   private read(args: readonly string[]): Promise<RunResult> {
@@ -719,27 +723,39 @@ export class JjRepo {
       branches.length > 0
         ? ['git', 'fetch', ...branches.flatMap((name) => ['--branch', exactBookmark(name)])]
         : ['git', 'fetch', '--all-remotes']
-    return this.mutate(args, {
-      timeoutMs: NETWORK_TIMEOUT_MS,
-      env,
-      background: options.interactive === false,
+    const background = options.interactive === false
+    return this.network.run(() => this.runNetworkNow(args, { env, background }))
+  }
+
+  // The snapshot runs once the push's turn comes, so edits made while it waited are pushed too.
+  push(bookmarks?: string | readonly string[]) {
+    const names = typeof bookmarks === 'string' ? [bookmarks] : (bookmarks ?? [])
+    return this.network.run(async () => {
+      await this.snapshot()
+      const targets = names.length > 0 ? names : await this.localBookmarkNames()
+      return this.runNetworkNow(pushArgs(targets))
     })
   }
 
-  push(bookmarks?: string | readonly string[]) {
-    const names = typeof bookmarks === 'string' ? [bookmarks] : (bookmarks ?? [])
-    if (names.length > 0) {
-      return this.mutate(pushArgs(names), { timeoutMs: NETWORK_TIMEOUT_MS })
+  private async localBookmarkNames(): Promise<string[]> {
+    return (await this.bookmarkList())
+      .filter((row) => row.remote === null && row.present)
+      .map((row) => row.name)
+  }
+
+  // Passes the flag itself: the runner's ignoreWorkingCopy option also hides warnings.
+  private runNetworkNow(
+    args: readonly string[],
+    options: Pick<RunOptions, 'env' | 'background'> = {},
+  ) {
+    if (this.operationId !== null) {
+      throw new Error('jj commands cannot run at an old operation')
     }
-    return this.mutations.run(async () => {
-      const local = (await this.bookmarkList())
-        .filter((row) => row.remote === null && row.present)
-        .map((row) => row.name)
-      return this.runner.run({
-        cwd: this.root,
-        args: pushArgs(local),
-        timeoutMs: NETWORK_TIMEOUT_MS,
-      })
+    return this.runner.run({
+      cwd: this.root,
+      args: ['--ignore-working-copy', ...args],
+      timeoutMs: NETWORK_TIMEOUT_MS,
+      ...options,
     })
   }
 

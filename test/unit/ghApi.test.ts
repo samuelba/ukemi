@@ -50,6 +50,14 @@ describe('ghEndpoint', () => {
     )
   })
 
+  test('maps GitHub Enterprise Cloud urls', () => {
+    expect(ghEndpoint('octocorp.ghe.com', 'https://api.octocorp.ghe.com/graphql')).toBe('/graphql')
+    expect(ghEndpoint('octocorp.ghe.com', 'https://api.octocorp.ghe.com/repos/o/r')).toBe(
+      '/repos/o/r',
+    )
+    expect(() => ghEndpoint('octocorp.ghe.com', 'https://octocorp.ghe.com/api/v3/user')).toThrow()
+  })
+
   test('maps enterprise urls', () => {
     expect(ghEndpoint('ghe.example.com', 'https://ghe.example.com/api/graphql')).toBe('/graphql')
     expect(ghEndpoint('ghe.example.com', 'https://GHE.example.com/api/v3/repos/o/r/pulls/1')).toBe(

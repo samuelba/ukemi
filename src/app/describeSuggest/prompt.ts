@@ -11,10 +11,26 @@ export interface DescribeContext {
 const NOISE_PATH =
   /(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|Cargo\.lock|poetry\.lock|uv\.lock|Gemfile\.lock|composer\.lock|go\.sum|flake\.lock)$|\.min\.(js|css)$|\.map$|(^|\/)(dist|out|build|vendor|node_modules)\//
 
+// Files that often hold credentials. Their content is never sent, whatever the budget.
+const SECRET_PATH = new RegExp(
+  [
+    String.raw`(^|/)(\.env([._-].*|rc)?|[^/]*\.env)$`,
+    String.raw`(^|/)id_(rsa|dsa|ecdsa|ed25519)[^/]*$`,
+    String.raw`\.(pem|key|p8|p12|pfx|ppk|keystore|jks|kdbx|tfvars|tfstate)$`,
+    String.raw`(^|/)(\.npmrc|\.pypirc|\.netrc|\.git-credentials|\.pgpass|\.htpasswd|\.dockercfg|kubeconfig)$`,
+    String.raw`(^|/)(\.aws/credentials|\.docker/config\.json)$`,
+  ].join('|'),
+  'i',
+)
+
 const FILE_HEADER = /^diff --git a\/(.*?) b\/(.*)$/
+
+// jj does not quote paths, so these lines name a file unambiguously where the header may not.
+const PATH_LINE = /^(rename from |copy from |--- a\/|rename to |copy to |\+\+\+ b\/)(.+)$/gm
 
 interface FilePatch {
   path: string
+  sourcePath: string
   text: string
 }
 
@@ -22,21 +38,53 @@ export function splitPatch(diff: string): FilePatch[] {
   const files: FilePatch[] = []
   for (const part of diff.split(/^(?=diff --git )/m)) {
     const header = FILE_HEADER.exec(part.split('\n', 1)[0] ?? '')
-    if (header) {
-      files.push({ path: header[2] ?? '', text: part })
+    if (!header) {
+      continue
     }
+    const lines = pathLines(part)
+    const source = lines.find((line) => /^(rename from|copy from|---)/.test(line.kind))
+    const target = lines.find((line) => /^(rename to|copy to|\+\+\+)/.test(line.kind))
+    files.push({
+      path: target?.path ?? header[2] ?? '',
+      sourcePath: source?.path ?? header[1] ?? '',
+      text: part,
+    })
   }
   return files
+}
+
+function pathLines(part: string): { kind: string; path: string }[] {
+  return [...part.matchAll(PATH_LINE)].map((match) => ({
+    kind: match[1] ?? '',
+    path: match[2] ?? '',
+  }))
+}
+
+// Every name the patch could be about: each way to split its header, and its path lines. A file
+// is withheld when any of them looks like a secret file.
+function candidatePaths(file: FilePatch): string[] {
+  const header = (file.text.split('\n', 1)[0] ?? '').slice('diff --git a/'.length)
+  const splits = [...header.matchAll(/ b\//g)].flatMap((match) => [
+    header.slice(0, match.index),
+    header.slice(match.index + ' b/'.length),
+  ])
+  return [file.path, file.sourcePath, ...splits, ...pathLines(file.text).map((line) => line.path)]
+}
+
+function isSecret(file: FilePatch): boolean {
+  return candidatePaths(file).some((path) => SECRET_PATH.test(path))
 }
 
 function isNoise(file: FilePatch): boolean {
   return NOISE_PATH.test(file.path) || /^Binary files .* differ$/m.test(file.text)
 }
 
-// Keeps the patch under `maxBytes`. Noisy files go first, then files are cut where the budget
-// runs out, with a note so the model knows it sees only part of the change.
+// Keeps the patch under `maxBytes`. Secret and noisy files go first, then files are cut where
+// the budget runs out, with notes so the model knows it sees only part of the change.
 export function limitDiff(diff: string, maxBytes: number): string {
-  const files = splitPatch(diff)
+  const all = splitPatch(diff)
+  const withheld = all.filter(isSecret).map((file) => file.path)
+  const files = all.filter((file) => !isSecret(file))
   const omitted = files.filter(isNoise).map((file) => file.path)
   let budget = maxBytes
   const kept: string[] = []
@@ -52,8 +100,11 @@ export function limitDiff(diff: string, maxBytes: number): string {
       omitted.push(file.path)
     }
   }
-  const note = omitted.length > 0 ? `\n[Diff omitted for: ${omitted.join(', ')}]\n` : ''
-  return kept.join('') + note
+  const notes = [
+    withheld.length > 0 ? `[Diff withheld, may hold secrets: ${withheld.join(', ')}]` : '',
+    omitted.length > 0 ? `[Diff omitted for: ${omitted.join(', ')}]` : '',
+  ].filter(Boolean)
+  return kept.join('') + notes.map((note) => `\n${note}\n`).join('')
 }
 
 function truncateBytes(text: string, maxBytes: number): string {

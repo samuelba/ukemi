@@ -52,10 +52,12 @@ import {
 import { aboutText } from './about'
 import { DetailPresenter } from './detailPresenter'
 import { droppedPaths, foldersToOpen } from './openPaths'
+import { PanelMessages } from './panelMessages'
 import { PanelTabs } from './panelTabs'
 import { createSessionWindow } from './sessionWindow'
 import { SettingsPresenter } from './settingsPresenter'
 import { foldersAfterClosing, windowShowing, type WindowContents } from './startup'
+import { StateMessages } from '../app/stateMessages'
 import { Terminals } from './terminals'
 import { zoomPercent } from './zoom'
 import { desktopWorkbench } from './workbench'
@@ -112,6 +114,8 @@ export class DesktopSession implements Disposable {
   // Native dialogs need a mapped parent. On Wayland, a dialog on a hidden window kills the app.
   private readonly shown: Promise<void>
   private stateTimer: ReturnType<typeof setTimeout> | null = null
+  private readonly stateMessages = new StateMessages()
+  private readonly panelMessages = new PanelMessages()
 
   constructor(
     private readonly context: DesktopContext,
@@ -735,6 +739,8 @@ export class DesktopSession implements Disposable {
 
   private sendInitial(): void {
     this.detail.forgetPosted()
+    this.stateMessages.forget()
+    this.panelMessages.forget()
     const offers = (command: string) => this.offers(command)
     this.post({ type: 'fileIcons', theme: null })
     this.post({ type: 'desktop.window', title: this.title(), platform: process.platform })
@@ -773,19 +779,19 @@ export class DesktopSession implements Disposable {
       autoFetch: this.autoFetch,
     })
     const repos = arrangeTabs(state.repos, this.context.repoTabs.read())
-    this.post({ type: 'state', state: { ...state, repos } })
+    this.post(this.stateMessages.next({ ...state, repos }))
     const panels = sidePanels(this.registry.activeModel, this.folderList)
-    this.post({
-      type: 'desktop.panels',
-      panels: {
-        bookmarks: panels.bookmarks.map((group) => ({
-          ...group,
-          rows: group.rows.map((row) => this.withActions(row)),
-        })),
-        workspaces: panels.workspaces.map((row) => this.withActions(row)),
-        operations: panels.operations.map((row) => this.withActions(row)),
-      },
+    const changed = this.panelMessages.next({
+      bookmarks: panels.bookmarks.map((group) => ({
+        ...group,
+        rows: group.rows.map((row) => this.withActions(row)),
+      })),
+      workspaces: panels.workspaces.map((row) => this.withActions(row)),
+      operations: panels.operations.map((row) => this.withActions(row)),
     })
+    if (changed) {
+      this.post({ type: 'desktop.panels', panels: changed })
+    }
     void this.detail.refresh()
   }
 
