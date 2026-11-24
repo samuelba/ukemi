@@ -222,6 +222,9 @@ function InputPrompt({
     input.current?.select()
   }, [])
   const onKey = (event: KeyboardEvent) => {
+    if (event.nativeEvent.isComposing) {
+      return
+    }
     if (event.key === 'Enter') {
       answer(id, { kind: 'text', value })
     } else if (event.key === 'Escape') {
@@ -344,6 +347,9 @@ function PickPrompt({
   }
 
   const onKey = (event: KeyboardEvent) => {
+    if (event.nativeEvent.isComposing) {
+      return
+    }
     switch (event.key) {
       case 'ArrowDown':
         event.preventDefault()

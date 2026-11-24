@@ -87,6 +87,9 @@ export function Palette({
   }
 
   const onKey = (event: KeyboardEvent) => {
+    if (event.nativeEvent.isComposing) {
+      return
+    }
     if (event.key === 'ArrowDown') {
       event.preventDefault()
       setActive((i) => Math.min(i + 1, visible.length - 1))

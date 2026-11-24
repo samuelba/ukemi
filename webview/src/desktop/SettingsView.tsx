@@ -68,7 +68,7 @@ function TextControl({ field, type }: { field: SettingField; type: TextFieldType
           type={type === 'number' ? 'number' : 'text'}
           min={field.minimum}
           max={field.maximum}
-          onKeyDown={(e) => e.key === 'Enter' && commit()}
+          onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && commit()}
         />
       )}
       {problem && <p className="setting-problem">{problem}</p>}
