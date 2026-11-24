@@ -4,6 +4,7 @@ import type { HostMessage, ViewState, WebviewMessage } from '../../shared/protoc
 import type { GraphSurface } from '../app/commands/context'
 import type { Operations } from '../app/operations'
 import type { RepoRegistry } from '../app/registry'
+import { StateMessages } from '../app/stateMessages'
 import { buildViewState } from '../app/viewState'
 import { errorMessage, type Logger } from '../util/logger'
 import { readConfig } from './config'
@@ -31,6 +32,7 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable,
   private pendingReveal: string | null = null
   private iconGeneration = 0
   private readonly readyWebviews = new WeakSet<vscode.Webview>()
+  private readonly stateMessages = new WeakMap<vscode.Webview, StateMessages>()
   private readonly disposables: vscode.Disposable[] = []
 
   constructor(
@@ -130,6 +132,7 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable,
     webview.onDidReceiveMessage(async (message: WebviewMessage) => {
       if (message.type === 'ready') {
         this.readyWebviews.add(webview)
+        this.stateMessages.get(webview)?.forget()
         this.postState()
         this.postFileIcons()
         this.flushReveal()
@@ -141,6 +144,7 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable,
         this.logger.error(`webview message ${message.type} failed: ${errorMessage(error)}`)
       }
     })
+    this.stateMessages.set(webview, new StateMessages())
     this.webviews.add(webview)
   }
 
@@ -204,7 +208,11 @@ export class GraphView implements vscode.WebviewViewProvider, vscode.Disposable,
 
   postState(): void {
     const state = this.state()
-    this.post({ type: 'state', state })
+    for (const webview of this.webviews) {
+      const sent = this.readyWebviews.has(webview) ? this.stateMessages.get(webview) : undefined
+      const message = sent?.next(state) ?? { type: 'state', state }
+      void webview.postMessage(message)
+    }
     this.updateBadge(state)
   }
 

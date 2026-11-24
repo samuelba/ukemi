@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { GraphState, ViewState } from '../../shared/protocol'
-import { StateMessages } from '../../src/desktop/stateMessages'
+import { StateMessages } from '../../src/app/stateMessages'
 import { receivedState } from '../../webview/src/shared/receivedState'
 
 function state(graph: GraphState | null, busy: string | null = null): ViewState {
